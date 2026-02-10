@@ -13,7 +13,7 @@ An interactive weather assistant built with the GitHub Copilot SDK, demonstratin
 
 Before you begin, make sure you have:
 
-- **Node.js** 18+ installed
+- **Node.js** 24+ installed
 - **GitHub Copilot CLI** installed and authenticated ([Installation guide](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli))
 
 Verify the CLI is working:
