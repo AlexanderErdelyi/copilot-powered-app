@@ -1,5 +1,17 @@
-node_modules/
-dist/
+# .NET specific
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
 *.log
+.vs/
+.vscode/
+
+# Common
 .DS_Store
 .env
+
