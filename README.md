@@ -13,7 +13,7 @@ An interactive weather assistant built with the GitHub Copilot SDK for .NET, dem
 
 Before you begin, make sure you have:
 
-- **.NET** 8.0+ installed
+- **.NET SDK** 8.0 or later installed
 - **GitHub Copilot CLI** installed and authenticated ([Installation guide](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli))
 
 Verify the CLI is working:
