@@ -18,8 +18,24 @@ builder.Services.AddDbContext<ReceiptHealthContext>(options =>
 
 // Register application services
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
-builder.Services.AddScoped<ITextExtractionService, TextExtractionService>();
-builder.Services.AddScoped<IReceiptParserService, ReceiptParserService>();
+
+// Configure AI-powered services (GitHub Copilot SDK integration)
+// Set "ReceiptHealth:UseAI" to true in appsettings.json to enable AI-powered OCR and parsing
+var useAI = builder.Configuration.GetValue<bool>("ReceiptHealth:UseAI", true); // Default to AI-powered
+
+if (useAI)
+{
+    builder.Services.AddScoped<ITextExtractionService, AICopilotTextExtractionService>();
+    builder.Services.AddScoped<IReceiptParserService, AICopilotReceiptParserService>();
+    Console.WriteLine("✨ AI-powered text extraction and receipt parsing enabled (GitHub Copilot SDK)");
+}
+else
+{
+    builder.Services.AddScoped<ITextExtractionService, TextExtractionService>();
+    builder.Services.AddScoped<IReceiptParserService, ReceiptParserService>();
+    Console.WriteLine("📝 Using basic text extraction and receipt parsing");
+}
+
 builder.Services.AddScoped<ICategoryService, RuleBasedCategoryService>();
 builder.Services.AddScoped<IHealthScoreService, HealthScoreService>();
 builder.Services.AddScoped<IReceiptProcessingService, ReceiptProcessingService>();
