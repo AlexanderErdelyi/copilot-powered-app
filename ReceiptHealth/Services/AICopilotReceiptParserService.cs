@@ -12,12 +12,10 @@ namespace ReceiptHealth.Services;
 public class AICopilotReceiptParserService : IReceiptParserService
 {
     private readonly ILogger<AICopilotReceiptParserService> _logger;
-    private readonly CopilotClient _copilotClient;
 
     public AICopilotReceiptParserService(ILogger<AICopilotReceiptParserService> logger)
     {
         _logger = logger;
-        _copilotClient = new CopilotClient();
     }
 
     public async Task<(Receipt receipt, List<LineItem> lineItems)> ParseReceiptAsync(string text)
@@ -26,8 +24,11 @@ public class AICopilotReceiptParserService : IReceiptParserService
 
         try
         {
+            // Create a new CopilotClient for this operation
+            using var copilotClient = new CopilotClient();
+            
             // Create a session with GPT-4
-            await using var session = await _copilotClient.CreateSessionAsync(new SessionConfig
+            await using var session = await copilotClient.CreateSessionAsync(new SessionConfig
             {
                 Model = "gpt-4.1",
                 Streaming = false
@@ -47,6 +48,7 @@ Please extract the following information and return it as a JSON object:
     ""subtotal"": 0.00,
     ""tax"": 0.00,
     ""total"": 0.00,
+    ""currency"": ""EUR"",
     ""lineItems"": [
         {{
             ""description"": ""item name"",
@@ -56,18 +58,29 @@ Please extract the following information and return it as a JSON object:
     ]
 }}
 
-Rules:
-1. Extract ALL line items from the receipt
-2. Use today's date ({DateTime.Today:yyyy-MM-dd}) if the date is not clearly specified
-3. Set subtotal, tax, and total to 0 if not found
-4. Clean up item descriptions (remove extra spaces, formatting)
-5. Ensure all prices are in decimal format (e.g., 4.99, not $4.99)
-6. Return ONLY the JSON object, no other text or explanation";
+CRITICAL RULES:
+1. Extract EVERY SINGLE line item from the receipt - count carefully
+2. Vendor is the store name (e.g., 'Lidl', 'REWE', 'Aldi')
+3. Parse dates in any format (DD.MM.YYYY or MM/DD/YYYY or YYYY-MM-DD)
+4. Detect currency from the receipt (EUR, €, USD, $, GBP, £, etc.)
+5. Handle European number formats (e.g., '9,88' = 9.88, '1.234,56' = 1234.56)
+6. Parse quantities like '0,79 x 2' as price=0.79, quantity=2
+7. For line items with multipliers (x 2, x 3), extract the unit price and quantity separately
+8. Clean descriptions but keep them recognizable (e.g., 'Kefir 1,5%', 'Pepsi Zero Zucker')
+9. Look for totals with keywords: 'zu zahlen', 'total', 'sum', 'summe', 'gesamt'
+10. If subtotal or tax not found, calculate: subtotal = total - tax
+11. Include tax information (MwST, VAT, sales tax)
+12. Return ONLY the JSON object, no markdown formatting
+
+Date today: {DateTime.Today:yyyy-MM-dd}";
 
             // Send the prompt and wait for response
             var response = await session.SendAndWaitAsync(new MessageOptions { Prompt = prompt });
             
             var jsonResponse = response?.Data?.Content ?? string.Empty;
+            
+            _logger.LogInformation("📝 AI Response (first 500 chars): {Response}", 
+                jsonResponse.Length > 500 ? jsonResponse.Substring(0, 500) + "..." : jsonResponse);
             
             // Clean up the response (remove markdown code blocks if present)
             jsonResponse = jsonResponse.Trim();
@@ -84,6 +97,9 @@ Rules:
                 jsonResponse = jsonResponse.Substring(0, jsonResponse.Length - 3);
             }
             jsonResponse = jsonResponse.Trim();
+            
+            _logger.LogInformation("🔍 Cleaned JSON for parsing (first 300 chars): {Json}", 
+                jsonResponse.Length > 300 ? jsonResponse.Substring(0, 300) + "..." : jsonResponse);
 
             // Parse the JSON response
             var parsedData = JsonSerializer.Deserialize<ReceiptParseResult>(jsonResponse, new JsonSerializerOptions
@@ -104,6 +120,7 @@ Rules:
                 Subtotal = parsedData.Subtotal,
                 Tax = parsedData.Tax,
                 Total = parsedData.Total,
+                Currency = parsedData.Currency ?? "USD",
                 RawText = text,
                 ProcessedAt = DateTime.UtcNow
             };
@@ -178,6 +195,7 @@ Rules:
         public decimal Subtotal { get; set; }
         public decimal Tax { get; set; }
         public decimal Total { get; set; }
+        public string? Currency { get; set; }
         public List<LineItemParseResult>? LineItems { get; set; }
     }
 

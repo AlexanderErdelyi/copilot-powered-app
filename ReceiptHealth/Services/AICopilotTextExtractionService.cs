@@ -10,12 +10,10 @@ namespace ReceiptHealth.Services;
 public class AICopilotTextExtractionService : ITextExtractionService
 {
     private readonly ILogger<AICopilotTextExtractionService> _logger;
-    private readonly CopilotClient _copilotClient;
 
     public AICopilotTextExtractionService(ILogger<AICopilotTextExtractionService> logger)
     {
         _logger = logger;
-        _copilotClient = new CopilotClient();
     }
 
     public async Task<string> ExtractTextAsync(string filePath, string contentType)
@@ -49,66 +47,54 @@ public class AICopilotTextExtractionService : ITextExtractionService
     {
         try
         {
-            // Read the image file and encode as base64
-            var imageBytes = await File.ReadAllBytesAsync(filePath);
-            var base64Image = Convert.ToBase64String(imageBytes);
+            _logger.LogInformation("🖼️ Attempting OCR with file reference: {FilePath}", filePath);
             
-            // Determine the image MIME type based on extension
-            var extension = Path.GetExtension(filePath).ToLowerInvariant();
-            var mimeType = extension switch
+            // Create a new CopilotClient for this operation
+            using var copilotClient = new CopilotClient();
+            
+            // Create a session
+            await using var session = await copilotClient.CreateSessionAsync(new SessionConfig
             {
-                ".jpg" or ".jpeg" => "image/jpeg",
-                ".png" => "image/png",
-                _ => "image/jpeg" // Default
-            };
-
-            // Create a data URL for the image
-            var imageDataUrl = $"data:{mimeType};base64,{base64Image}";
-
-            // Create a session with GPT-4o (vision-enabled model)
-            await using var session = await _copilotClient.CreateSessionAsync(new SessionConfig
-            {
-                Model = "gpt-4o", // Vision-enabled model
+                Model = "gpt-4.1",
                 Streaming = false
             });
 
-            // Create a prompt for receipt OCR
-            var prompt = @"You are an OCR system specialized in extracting text from receipt images.
+            // Try sending just the file path - maybe the SDK can access local files
+            var prompt = $@"Extract all text from this receipt image file: {filePath}
 
-Please analyze this receipt image and extract ALL visible text exactly as it appears.
-Maintain the original layout and structure as much as possible.
+Please extract every line item, price, date, store name, and total.
+Return the extracted text in a structured format.";
 
-Include:
-- Store/vendor name
-- Date
-- All line items with prices
-- Subtotal, tax, and total amounts
-- Any other visible text
-
-Return ONLY the extracted text, without any additional commentary or explanation.";
-
-            // Send the image with the prompt
-            // Note: The Copilot SDK handles multimodal content internally
             var response = await session.SendAndWaitAsync(new MessageOptions 
             { 
-                Prompt = $"{prompt}\n\nImage: {imageDataUrl}"
+                Prompt = prompt
             });
 
             var extractedText = response?.Data?.Content ?? string.Empty;
             
-            if (string.IsNullOrWhiteSpace(extractedText))
+            // Check if SDK actually processed the image or just returned text saying it can't
+            if (string.IsNullOrWhiteSpace(extractedText) || 
+                extractedText.Contains("cannot") || 
+                extractedText.Contains("I don't have") ||
+                extractedText.Contains("I apologize"))
             {
-                _logger.LogWarning("AI returned empty text from image");
-                throw new InvalidOperationException("Failed to extract text from image");
+                _logger.LogWarning("⚠️ GitHub Copilot SDK does not support vision/OCR");
+                
+                // Fall back to suggesting text file upload
+                throw new NotSupportedException(
+                    "Image OCR is not supported by the GitHub Copilot SDK.\n\n" +
+                    $"Please manually convert your receipt to text format and upload a .txt file.\n\n" +
+                    $"Or use the text file at: {Path.Combine(Path.GetDirectoryName(filePath) ?? ".", "lidl-receipt-sample.txt")}"
+                );
             }
 
-            _logger.LogInformation("Successfully extracted {Length} characters from image", extractedText.Length);
+            _logger.LogInformation("✅ Successfully extracted {Length} characters", extractedText.Length);
             return extractedText;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during AI-powered image OCR");
-            throw new InvalidOperationException($"Failed to extract text from image: {ex.Message}", ex);
+            _logger.LogError(ex, "❌ Error during image processing");
+            throw new InvalidOperationException($"Image OCR not supported. Please upload a text file instead. Error: {ex.Message}", ex);
         }
     }
 

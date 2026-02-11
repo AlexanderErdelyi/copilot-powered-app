@@ -9,6 +9,7 @@ public class Receipt
     public decimal Total { get; set; }
     public decimal Subtotal { get; set; }
     public decimal Tax { get; set; }
+    public string Currency { get; set; } = "USD";
     public string? RawText { get; set; }
     public decimal HealthScore { get; set; }
     public DateTime ProcessedAt { get; set; }

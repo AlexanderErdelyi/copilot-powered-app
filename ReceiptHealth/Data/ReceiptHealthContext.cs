@@ -41,6 +41,7 @@ public class ReceiptHealthContext : DbContext
             entity.Property(e => e.Subtotal).HasColumnType("decimal(18,2)");
             entity.Property(e => e.Tax).HasColumnType("decimal(18,2)");
             entity.Property(e => e.HealthScore).HasColumnType("decimal(5,2)");
+            entity.Property(e => e.Currency).HasMaxLength(10).HasDefaultValue("USD");
         });
 
         // LineItem configuration

@@ -192,6 +192,82 @@
         .loading.active {
             display: block;
         }
+
+        .processing-status {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .processing-status.active {
+            display: block;
+        }
+
+        .status-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #667eea;
+        }
+
+        .status-item.processing {
+            border-left-color: #f59e0b;
+        }
+
+        .status-item.completed {
+            border-left-color: #10b981;
+        }
+
+        .status-item.error {
+            border-left-color: #ef4444;
+        }
+
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .status-header h4 {
+            margin: 0;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .status-details {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 13px;
+            color: #666;
+            display: none;
+        }
+
+        .status-details.expanded {
+            display: block;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .status-badge.processing {
+            background: #f59e0b;
+        }
+
+        .status-badge.completed {
+            background: #10b981;
+        }
+
+        .status-badge.error {
+            background: #ef4444;
+        }
     </style>
 </head>
 <body>
@@ -214,6 +290,10 @@
             </div>
             <div class="loading" id="loadingIndicator">
                 ⏳ Processing uploads...
+            </div>
+            <div class="processing-status" id="processingStatus">
+                <h3 style="margin-bottom: 10px;">Upload Status</h3>
+                <div id="statusList"></div>
             </div>
         </div>
 
@@ -284,6 +364,10 @@
             if (files.length === 0) return;
 
             loadingIndicator.classList.add('active');
+            const processingStatusDiv = document.getElementById('processingStatus');
+            const statusList = document.getElementById('statusList');
+            processingStatusDiv.classList.add('active');
+
             const formData = new FormData();
 
             for (let i = 0; i < files.length; i++) {
@@ -299,17 +383,191 @@
                 const result = await response.json();
                 console.log('Upload result:', result);
 
-                // Refresh dashboard after upload
-                setTimeout(() => {
-                    loadDashboardData();
-                    loadingIndicator.classList.remove('active');
-                    fileInput.value = '';
-                }, 2000);
+                loadingIndicator.classList.remove('active');
+
+                // Create status items for each upload
+                result.uploads.forEach(upload => {
+                    const statusItem = createStatusItem(upload);
+                    statusList.prepend(statusItem);
+
+                    if (upload.status === 'processing') {
+                        // Save to localStorage for persistence across page navigation
+                        saveActiveUpload(upload.id, upload.fileName);
+                        // Start polling for status
+                        pollStatus(upload.id, statusItem);
+                    }
+                });
+
+                fileInput.value = '';
             } catch (error) {
                 console.error('Upload error:', error);
                 alert('Error uploading files: ' + error.message);
                 loadingIndicator.classList.remove('active');
             }
+        }
+
+        function saveActiveUpload(documentId, fileName) {
+            const activeUploads = JSON.parse(localStorage.getItem('activeUploads') || '{}');
+            activeUploads[documentId] = { fileName, startedAt: new Date().toISOString() };
+            localStorage.setItem('activeUploads', JSON.stringify(activeUploads));
+        }
+
+        function removeActiveUpload(documentId) {
+            const activeUploads = JSON.parse(localStorage.getItem('activeUploads') || '{}');
+            delete activeUploads[documentId];
+            localStorage.setItem('activeUploads', JSON.stringify(activeUploads));
+        }
+
+        async function restoreActiveUploads() {
+            const activeUploads = JSON.parse(localStorage.getItem('activeUploads') || '{}');
+            const processingStatusDiv = document.getElementById('processingStatus');
+            const statusList = document.getElementById('statusList');
+            
+            for (const [documentId, uploadInfo] of Object.entries(activeUploads)) {
+                try {
+                    // Check if this upload is still active on the server
+                    const response = await fetch(`/api/upload/status/${documentId}`);
+                    if (!response.ok) {
+                        // Upload not found, remove from localStorage
+                        removeActiveUpload(documentId);
+                        continue;
+                    }
+                    
+                    const statusData = await response.json();
+                    
+                    // If completed or error, remove from active tracking
+                    if (statusData.status.toLowerCase() === 'completed' || statusData.status.toLowerCase() === 'error') {
+                        removeActiveUpload(documentId);
+                        continue;
+                    }
+                    
+                    // Still processing - restore the status item
+                    processingStatusDiv.classList.add('active');
+                    const statusItem = createStatusItem({
+                        id: parseInt(documentId),
+                        fileName: uploadInfo.fileName,
+                        status: statusData.status.toLowerCase(),
+                        message: statusData.message
+                    });
+                    statusList.prepend(statusItem);
+                    
+                    // Resume polling
+                    pollStatus(parseInt(documentId), statusItem);
+                    
+                    console.log(`Restored active upload: ${documentId} (${uploadInfo.fileName})`);
+                } catch (error) {
+                    console.error(`Error restoring upload ${documentId}:`, error);
+                    removeActiveUpload(documentId);
+                }
+            }
+        }
+
+        function createStatusItem(upload) {
+            const statusClass = upload.status || 'processing';
+            const item = document.createElement('div');
+            item.className = `status-item ${statusClass}`;
+            item.id = `status-${upload.id}`;
+            
+            item.innerHTML = `
+                <div class="status-header" onclick="toggleStatusDetails(${upload.id})">
+                    <h4>📄 ${upload.fileName || 'Upload'}</h4>
+                    <span class="status-badge ${statusClass}">${statusClass.toUpperCase()}</span>
+                </div>
+                <div class="status-details expanded" id="details-${upload.id}">
+                    <p><strong>Status:</strong> ${upload.message || upload.error || 'Processing...'}</p>
+                    <div id="progress-${upload.id}" style="margin-top: 10px;"></div>
+                    <p style="font-size: 11px; color: #999; margin-top: 5px;">Document ID: ${upload.id}</p>
+                </div>
+            `;
+            
+            return item;
+        }
+
+        function toggleStatusDetails(documentId) {
+            const details = document.getElementById(`details-${documentId}`);
+            details.classList.toggle('expanded');
+        }
+
+        async function pollStatus(documentId, statusItem) {
+            const maxPolls = 120; // Poll for max 120 seconds (2 minutes)
+            let pollCount = 0;
+
+            const pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/upload/status/${documentId}`);
+                    if (!response.ok) {
+                        clearInterval(pollInterval);
+                        return;
+                    }
+                    
+                    const statusData = await response.json();
+
+                    // Update status item
+                    const statusBadge = statusItem.querySelector('.status-badge');
+                    const statusDetails = document.getElementById(`details-${documentId}`);
+                    const progressDiv = document.getElementById(`progress-${documentId}`);
+                    
+                    const statusClassMap = {
+                        'processing': 'processing',
+                        'completed': 'completed',
+                        'error': 'error'
+                    };
+                    const statusClass = statusClassMap[statusData.status.toLowerCase()] || 'processing';
+
+                    statusItem.className = `status-item ${statusClass}`;
+                    statusBadge.className = `status-badge ${statusClass}`;
+                    statusBadge.textContent = statusData.status.toUpperCase();
+                    
+                    if (statusDetails) {
+                        let detailsHTML = `<p><strong>Status:</strong> ${statusData.message}</p>`;
+                        
+                        // Build progress details
+                        let progressHTML = '<div style="margin: 10px 0; padding: 10px; background: #f9fafb; border-radius: 6px; font-size: 13px;">';
+                        
+                        if (statusData.ocrText) {
+                            progressHTML += `<div style="margin-bottom: 5px;">✅ <strong>OCR:</strong> ${statusData.ocrText}</div>`;
+                        }
+                        
+                        if (statusData.itemCount) {
+                            progressHTML += `<div style="margin-bottom: 5px;">✅ <strong>Items Found:</strong> ${statusData.itemCount}</div>`;
+                        }
+                        
+                        if (statusData.totalItems && statusData.categorizedCount !== undefined) {
+                            const percent = Math.round((statusData.categorizedCount / statusData.totalItems) * 100);
+                            progressHTML += `<div style="margin-bottom: 5px;">`;
+                            progressHTML += `🏷️ <strong>Categorization:</strong> ${statusData.categorizedCount}/${statusData.totalItems} items (${percent}%)`;
+                            progressHTML += `<div style="margin-top: 5px; background: #e5e7eb; border-radius: 4px; height: 8px; overflow: hidden;">`;
+                            progressHTML += `<div style="background: #667eea; height: 100%; width: ${percent}%; transition: width 0.3s;"></div>`;
+                            progressHTML += `</div></div>`;
+                        }
+                        
+                        progressHTML += '</div>';
+                        
+                        if (statusData.receiptId) {
+                            detailsHTML += `<p style="color: #10b981; margin-top: 10px; font-weight: 600;">✓ Receipt ID: ${statusData.receiptId}</p>`;
+                        }
+                        detailsHTML += `<p style="font-size: 11px; color: #999; margin-top: 10px;">Last updated: ${new Date(statusData.updatedAt).toLocaleTimeString()}</p>`;
+                        
+                        statusDetails.innerHTML = detailsHTML + progressHTML;
+                    }
+
+                    if (statusData.status.toLowerCase() === 'completed' || statusData.status.toLowerCase() === 'error') {
+                        clearInterval(pollInterval);
+                        // Remove from active uploads
+                        removeActiveUpload(documentId);
+                        // Refresh dashboard after completion
+                        loadDashboardData();
+                    }
+
+                    pollCount++;
+                    if (pollCount >= maxPolls) {
+                        clearInterval(pollInterval);
+                    }
+                } catch (error) {
+                    console.error('Error polling status:', error);
+                    clearInterval(pollInterval);
+                }
+            }, 2000); // Poll every 2 seconds
         }
 
         // Dashboard data
@@ -444,6 +702,9 @@
 
         // Load data on page load
         loadDashboardData();
+        
+        // Restore any active uploads from before page navigation
+        restoreActiveUploads();
     </script>
 </body>
 </html>
