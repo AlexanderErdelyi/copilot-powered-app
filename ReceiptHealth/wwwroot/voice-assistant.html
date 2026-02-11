@@ -290,6 +290,12 @@
                     <input type="checkbox" id="continuousListening">
                     <label for="continuousListening">Continuous listening</label>
                 </div>
+                <div class="setting-item">
+                    <label for="voiceSelect">🎵 Voice:</label>
+                    <select id="voiceSelect" style="padding: 5px; border-radius: 4px; border: 1px solid #ddd; margin-left: 10px;">
+                        <option value="">Loading voices...</option>
+                    </select>
+                </div>
             </div>
 
             <div class="controls">
@@ -354,6 +360,8 @@
         let recognition = null;
         let isListening = false;
         let currentShoppingListId = null;
+        let availableVoices = [];
+        let selectedVoice = null;
 
         // Elements
         const micBtn = document.getElementById('micBtn');
@@ -366,6 +374,84 @@
         const clearBtn = document.getElementById('clearBtn');
         const textInput = document.getElementById('textInput');
         const sendBtn = document.getElementById('sendBtn');
+        const voiceSelect = document.getElementById('voiceSelect');
+
+        // Load available voices
+        function loadVoices() {
+            availableVoices = SpeechSynthesis.getVoices();
+            
+            if (availableVoices.length === 0) {
+                // Voices not loaded yet, try again
+                setTimeout(loadVoices, 100);
+                return;
+            }
+
+            console.log('🎵 Available voices:', availableVoices.length);
+            
+            // Populate voice selector
+            voiceSelect.innerHTML = '';
+            availableVoices.forEach((voice, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                voiceSelect.appendChild(option);
+            });
+
+            // Select the best natural-sounding voice automatically
+            selectBestVoice();
+        }
+
+        // Select the most natural-sounding voice
+        function selectBestVoice() {
+            // Preferred voices in order (natural-sounding, neural voices)
+            const preferredVoicePatterns = [
+                /google.*us.*english.*female/i,
+                /google.*uk.*english.*female/i,
+                /microsoft.*zira/i,
+                /microsoft.*aria/i,
+                /microsoft.*jenny/i,
+                /samantha/i,
+                /karen/i,
+                /female/i,
+                /en-us/i,
+                /en-gb/i
+            ];
+
+            for (const pattern of preferredVoicePatterns) {
+                const voice = availableVoices.find(v => pattern.test(v.name) || pattern.test(v.lang));
+                if (voice) {
+                    const index = availableVoices.indexOf(voice);
+                    selectedVoice = voice;
+                    voiceSelect.value = index;
+                    console.log('🎤 Selected natural voice:', voice.name);
+                    
+                    // Save preference
+                    localStorage.setItem('preferredVoiceIndex', index);
+                    return;
+                }
+            }
+
+            // Fallback: use first available voice
+            if (availableVoices.length > 0) {
+                selectedVoice = availableVoices[0];
+                voiceSelect.value = 0;
+            }
+        }
+
+        // Voice selection change
+        voiceSelect.addEventListener('change', () => {
+            const index = parseInt(voiceSelect.value);
+            selectedVoice = availableVoices[index];
+            localStorage.setItem('preferredVoiceIndex', index);
+            console.log('🎵 Voice changed to:', selectedVoice.name);
+        });
+
+        // Load voices on page load
+        if (SpeechSynthesis) {
+            loadVoices();
+            // Some browsers need this event
+            SpeechSynthesis.onvoiceschanged = loadVoices;
+        }
 
         // Initialize recognition
         if (SpeechRecognition) {
@@ -456,16 +542,57 @@
             addMessage(text, 'user');
 
             try {
-                // Check for shopping list commands
-                if (text.toLowerCase().includes('create') && text.toLowerCase().includes('shopping list')) {
-                    await handleCreateShoppingList(text);
-                } else if (text.toLowerCase().includes('add') && (text.toLowerCase().includes('to list') || text.toLowerCase().includes('to my list') || text.toLowerCase().includes('shopping list'))) {
-                    await handleAddItem(text);
-                } else if (text.toLowerCase().includes('generate') && text.toLowerCase().includes('shopping list')) {
-                    await handleGenerateShoppingList();
+                console.log('🎤 Sending voice command to AI backend:', text);
+                
+                // Prepare conversation history
+                const history = Array.from(chatContainer.querySelectorAll('.message')).map(msg => ({
+                    role: msg.classList.contains('user-message') ? 'user' : 'assistant',
+                    content: msg.textContent
+                }));
+
+                // Send to backend AI for processing
+                const response = await fetch('/api/voice/process-command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        transcript: text,
+                        sessionId: sessionStorage.getItem('voiceSessionId'),
+                        conversationHistory: history.slice(-10) // Last 10 messages
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Backend error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log('🤖 AI Response:', result);
+
+                // Store session ID for context continuity
+                if (result.sessionId) {
+                    sessionStorage.setItem('voiceSessionId', result.sessionId);
+                }
+
+                // Handle the response
+                if (result.success) {
+                    // Update current shopping list if created/selected
+                    if (result.data?.listId) {
+                        currentShoppingListId = result.data.listId;
+                        console.log('📋 Active shopping list:', currentShoppingListId);
+                    }
+
+                    // Handle special actions
+                    if (result.data?.action) {
+                        handleVoiceAction(result.data);
+                    }
+
+                    // Display the AI's response
+                    addMessage(result.response, 'assistant');
+                    speak(result.response);
                 } else {
-                    // General query - use insights API
-                    await handleGeneralQuery(text);
+                    // Error occurred
+                    addMessage(result.response || 'Sorry, I encountered an error processing your request.', 'assistant');
+                    speak(result.response || 'Sorry, I encountered an error.');
                 }
             } catch (error) {
                 console.error('❌ Error processing command:', error);
@@ -477,6 +604,108 @@
             updateStatus('Ready to listen', 'idle');
         }
 
+        // Handle special voice actions
+        function handleVoiceAction(data) {
+            console.log('🎬 Handling action:', data.action, data);
+
+            switch (data.action) {
+                case 'navigate':
+                    // Navigate to the specified page
+                    console.log('🧭 Navigating to:', data.url);
+                    setTimeout(() => {
+                        window.location.href = data.url;
+                    }, 1500); // Give time for voice response
+                    break;
+
+                case 'upload_file':
+                    // Trigger file upload
+                    console.log('📁 Opening file picker...');
+                    setTimeout(() => {
+                        // Create temporary file input
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = 'image/*,.pdf,.txt';
+                        fileInput.onchange = async (e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                                await uploadReceiptFile(file);
+                            }
+                        };
+                        fileInput.click();
+                    }, 1000);
+                    break;
+
+                case 'take_photo':
+                    // Trigger camera
+                    console.log('📸 Opening camera...');
+                    setTimeout(() => {
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = 'image/*';
+                        fileInput.capture = 'environment'; // Use rear camera
+                        fileInput.onchange = async (e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                                await uploadReceiptFile(file);
+                            }
+                        };
+                        fileInput.click();
+                    }, 1000);
+                    break;
+
+                case 'open_receipt':
+                    // Navigate to specific receipt
+                    console.log('🧾 Opening receipt:', data.receiptId);
+                    setTimeout(() => {
+                        window.location.href = data.url || `/receipts.html?id=${data.receiptId}`;
+                    }, 1500);
+                    break;
+
+                default:
+                    console.log('⚠️ Unknown action:', data.action);
+            }
+        }
+
+        // Upload receipt file
+        async function uploadReceiptFile(file) {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                addMessage('Uploading and processing your receipt...', 'assistant');
+                speak('Processing your receipt, give me a sec...');
+
+                const response = await fetch('/api/receipts/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    const successMsg = `Got it! Receipt from ${result.vendor || 'store'} uploaded. Total was $${result.total?.toFixed(2) || '0.00'}.`;
+                    addMessage(successMsg, 'assistant');
+                    speak(successMsg);
+                    
+                    // Optionally navigate to receipts page
+                    setTimeout(() => {
+                        if (confirm('Receipt uploaded! View it now?')) {
+                            window.location.href = '/receipts.html';
+                        }
+                    }, 2000);
+                } else {
+                    throw new Error('Upload failed');
+                }
+            } catch (error) {
+                console.error('❌ Upload error:', error);
+                const errorMsg = 'Oops, trouble uploading that. Try again?';
+                addMessage(errorMsg, 'assistant');
+                speak(errorMsg);
+            }
+        }
+
+        // Legacy command handlers - now handled by AI backend
+        // These are kept for reference but are no longer called
+        /*
         // Handle creating a shopping list
         async function handleCreateShoppingList(text) {
             // Extract list name from command
@@ -592,6 +821,7 @@
                 throw new Error('Failed to process query');
             }
         }
+        */
 
         // Add message to chat
         function addMessage(text, type) {
@@ -602,7 +832,7 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        // Text-to-speech
+        // Text-to-speech with natural voice
         function speak(text) {
             if (!autoSpeak.checked || !SpeechSynthesis) {
                 return;
@@ -615,9 +845,26 @@
             stopSpeakBtn.disabled = false;
 
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.rate = 1.0;
-            utterance.pitch = 1.0;
-            utterance.volume = 1.0;
+            
+            // Use selected voice for natural sound
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            }
+            
+            // Natural speech parameters
+            utterance.rate = 0.95;     // Slightly slower = more natural and clear
+            utterance.pitch = 1.05;    // Slightly higher = friendlier tone
+            utterance.volume = 1.0;    // Full volume
+
+            // Add natural pauses by processing text
+            // Replace commas and periods with longer pauses
+            let processedText = text
+                .replace(/,/g, ',  ')      // Pause after commas
+                .replace(/\./g, '.  ')     // Pause after periods
+                .replace(/!/g, '!  ')      // Pause after exclamations
+                .replace(/\?/g, '?  ');    // Pause after questions
+
+            utterance.text = processedText;
 
             utterance.onend = () => {
                 updateStatus('Ready to listen', 'idle');
@@ -630,6 +877,7 @@
                 stopSpeakBtn.disabled = true;
             };
 
+            console.log('🔊 Speaking with voice:', selectedVoice ? selectedVoice.name : 'default');
             SpeechSynthesis.speak(utterance);
         }
 

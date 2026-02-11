@@ -55,6 +55,7 @@ builder.Services.AddScoped<IShoppingListService, ShoppingListService>();
 builder.Services.AddScoped<IGamificationService, GamificationService>();
 builder.Services.AddScoped<IInsightsService, InsightsService>();
 builder.Services.AddScoped<INutritionService, NutritionService>();
+builder.Services.AddScoped<VoiceAssistantService>();
 
 var app = builder.Build();
 
@@ -666,6 +667,27 @@ app.MapGet("/api/insights/budget-prediction", async (IInsightsService insightsSe
     return Results.Ok(prediction);
 });
 
+// === Voice Assistant Endpoints ===
+
+// Process voice command with AI
+app.MapPost("/api/voice/process-command", async (HttpRequest request, VoiceAssistantService voiceAssistant) =>
+{
+    var body = await request.ReadFromJsonAsync<VoiceCommandRequest>();
+    if (body == null || string.IsNullOrEmpty(body.Transcript))
+    {
+        return Results.BadRequest(new { error = "Transcript is required" });
+    }
+    
+    Console.WriteLine($"🎤 Voice command received: {body.Transcript}");
+    
+    var response = await voiceAssistant.ProcessVoiceCommandAsync(
+        body.Transcript, 
+        body.SessionId, 
+        body.ConversationHistory);
+    
+    return Results.Ok(response);
+});
+
 // === Nutrition Endpoints ===
 
 // Get daily nutrition summary
@@ -809,4 +831,5 @@ public record AddShoppingListItemRequest(string ItemName, int Quantity = 1);
 public record UpdateItemStatusRequest(bool IsPurchased);
 public record CreateChallengeRequest(string Name, string Description, string Type, decimal TargetValue, int DurationDays);
 public record NaturalLanguageQueryRequest(string Query);
+public record VoiceCommandRequest(string Transcript, string? SessionId = null, List<ReceiptHealth.Services.ConversationMessage>? ConversationHistory = null);
 
