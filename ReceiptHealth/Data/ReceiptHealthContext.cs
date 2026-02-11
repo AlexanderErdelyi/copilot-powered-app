@@ -20,6 +20,10 @@ public class ReceiptHealthContext : DbContext
     public DbSet<Achievement> Achievements { get; set; }
     public DbSet<Challenge> Challenges { get; set; }
     public DbSet<NutritionInfo> NutritionInfos { get; set; }
+    public DbSet<MealPlan> MealPlans { get; set; }
+    public DbSet<MealPlanDay> MealPlanDays { get; set; }
+    public DbSet<Recipe> Recipes { get; set; }
+    public DbSet<RecipeIngredient> RecipeIngredients { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -142,6 +146,45 @@ public class ReceiptHealthContext : DbContext
             entity.Property(e => e.Fiber).HasColumnType("decimal(10,2)");
             entity.Property(e => e.Sugar).HasColumnType("decimal(10,2)");
             entity.Property(e => e.Sodium).HasColumnType("decimal(10,2)");
+        });
+
+        // MealPlan configuration
+        modelBuilder.Entity<MealPlan>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+        });
+
+        // MealPlanDay configuration
+        modelBuilder.Entity<MealPlanDay>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.MealPlan)
+                  .WithMany(mp => mp.Days)
+                  .HasForeignKey(e => e.MealPlanId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Recipe)
+                  .WithMany(r => r.MealPlanDays)
+                  .HasForeignKey(e => e.RecipeId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Recipe configuration
+        modelBuilder.Entity<Recipe>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+        });
+
+        // RecipeIngredient configuration
+        modelBuilder.Entity<RecipeIngredient>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Recipe)
+                  .WithMany(r => r.Ingredients)
+                  .HasForeignKey(e => e.RecipeId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.IngredientName).IsRequired().HasMaxLength(200);
         });
     }
 }
