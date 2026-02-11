@@ -472,7 +472,7 @@
             </div>
             <div class="btn-group" id="challengeActions" style="display: none;">
                 <button class="btn" onclick="acceptSelectedChallenge()">Accept Selected Challenge</button>
-                <button class="btn-secondary btn" onclick="hideChallengOptions()">Cancel</button>
+                <button class="btn-secondary btn" onclick="hideChallengeOptions()">Cancel</button>
             </div>
         </div>
 
@@ -738,7 +738,7 @@
                 if (response.ok) {
                     alert('✅ Challenge accepted! Good luck!');
                     await loadChallenges();
-                    hideChallengOptions();
+                    hideChallengeOptions();
                 } else {
                     alert('Failed to create challenge');
                 }
@@ -747,7 +747,7 @@
             }
         }
 
-        function hideChallengOptions() {
+        function hideChallengeOptions() {
             document.getElementById('challengeOptions').style.display = 'none';
             document.getElementById('challengeActions').style.display = 'none';
             selectedChallengeIndex = -1;
