@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ReceiptHealth.Data;
 using ReceiptHealth.Services;
+using ReceiptHealth.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -486,26 +487,7 @@ app.MapGet("/api/recommendations/category", async (IRecommendationService recomm
 app.MapGet("/api/shopping-lists", async (IShoppingListService shoppingListService) =>
 {
     var lists = await shoppingListService.GetAllShoppingListsAsync();
-    // Project to anonymous objects to avoid circular reference
-    return Results.Ok(lists.Select(list => new
-    {
-        list.Id,
-        list.Name,
-        list.CreatedAt,
-        list.LastModifiedAt,
-        list.IsActive,
-        Items = list.Items.Select(item => new
-        {
-            item.Id,
-            item.ItemName,
-            item.Quantity,
-            item.IsPurchased,
-            item.AddedAt,
-            item.LastKnownPrice,
-            item.LastKnownVendor,
-            item.Category
-        }).ToList()
-    }).ToList());
+    return Results.Ok(lists.Select(MapShoppingListToDto).ToList());
 });
 
 // Get a specific shopping list
@@ -514,26 +496,7 @@ app.MapGet("/api/shopping-lists/{id}", async (int id, IShoppingListService shopp
     try
     {
         var list = await shoppingListService.GetShoppingListAsync(id);
-        // Project to anonymous object to avoid circular reference
-        return Results.Ok(new
-        {
-            list.Id,
-            list.Name,
-            list.CreatedAt,
-            list.LastModifiedAt,
-            list.IsActive,
-            Items = list.Items.Select(item => new
-            {
-                item.Id,
-                item.ItemName,
-                item.Quantity,
-                item.IsPurchased,
-                item.AddedAt,
-                item.LastKnownPrice,
-                item.LastKnownVendor,
-                item.Category
-            }).ToList()
-        });
+        return Results.Ok(MapShoppingListToDto(list));
     }
     catch (InvalidOperationException ex)
     {
@@ -551,52 +514,14 @@ app.MapPost("/api/shopping-lists", async (HttpRequest request, IShoppingListServ
     }
     
     var list = await shoppingListService.CreateShoppingListAsync(body.Name);
-    // Project to anonymous object to avoid circular reference
-    return Results.Created($"/api/shopping-lists/{list.Id}", new
-    {
-        list.Id,
-        list.Name,
-        list.CreatedAt,
-        list.LastModifiedAt,
-        list.IsActive,
-        Items = list.Items.Select(item => new
-        {
-            item.Id,
-            item.ItemName,
-            item.Quantity,
-            item.IsPurchased,
-            item.AddedAt,
-            item.LastKnownPrice,
-            item.LastKnownVendor,
-            item.Category
-        }).ToList()
-    });
+    return Results.Created($"/api/shopping-lists/{list.Id}", MapShoppingListToDto(list));
 });
 
 // Generate shopping list from healthy items
 app.MapPost("/api/shopping-lists/generate", async (int daysBack, IShoppingListService shoppingListService) =>
 {
     var list = await shoppingListService.GenerateFromHealthyItemsAsync(daysBack);
-    // Project to anonymous object to avoid circular reference
-    return Results.Created($"/api/shopping-lists/{list.Id}", new
-    {
-        list.Id,
-        list.Name,
-        list.CreatedAt,
-        list.LastModifiedAt,
-        list.IsActive,
-        Items = list.Items.Select(item => new
-        {
-            item.Id,
-            item.ItemName,
-            item.Quantity,
-            item.IsPurchased,
-            item.AddedAt,
-            item.LastKnownPrice,
-            item.LastKnownVendor,
-            item.Category
-        }).ToList()
-    });
+    return Results.Created($"/api/shopping-lists/{list.Id}", MapShoppingListToDto(list));
 });
 
 // Add item to shopping list
@@ -842,6 +767,30 @@ Console.WriteLine(string.Empty);
 app.Logger.LogInformation("ReceiptHealth API is running on http://localhost:5002");
 
 app.Run();
+
+// Helper method to project ShoppingList to DTO to avoid circular references
+static object MapShoppingListToDto(ShoppingList list)
+{
+    return new
+    {
+        list.Id,
+        list.Name,
+        list.CreatedAt,
+        list.LastModifiedAt,
+        list.IsActive,
+        Items = list.Items.Select(item => new
+        {
+            item.Id,
+            item.ItemName,
+            item.Quantity,
+            item.IsPurchased,
+            item.AddedAt,
+            item.LastKnownPrice,
+            item.LastKnownVendor,
+            item.Category
+        }).ToList()
+    };
+}
 
 // Record types must be defined after top-level statements
 public record ProcessingStatusDetails(
