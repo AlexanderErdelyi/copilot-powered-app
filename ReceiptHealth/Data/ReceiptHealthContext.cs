@@ -19,6 +19,7 @@ public class ReceiptHealthContext : DbContext
     public DbSet<ShoppingListItem> ShoppingListItems { get; set; }
     public DbSet<Achievement> Achievements { get; set; }
     public DbSet<Challenge> Challenges { get; set; }
+    public DbSet<FeatureUsage> FeatureUsages { get; set; }
     public DbSet<NutritionInfo> NutritionInfos { get; set; }
     public DbSet<MealPlan> MealPlans { get; set; }
     public DbSet<MealPlanDay> MealPlanDays { get; set; }
@@ -130,6 +131,14 @@ public class ReceiptHealthContext : DbContext
             entity.Property(e => e.CurrentValue).HasColumnType("decimal(18,2)");
             entity.HasIndex(e => e.IsCompleted);
             entity.HasIndex(e => e.EndDate);
+        });
+
+        // FeatureUsage configuration
+        modelBuilder.Entity<FeatureUsage>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.FeatureName);
+            entity.HasIndex(e => e.UsedAt);
         });
 
         // NutritionInfo configuration
