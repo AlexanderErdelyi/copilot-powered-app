@@ -1,0 +1,24 @@
+WHOLESOME MARKET
+123 Health Street, Seattle WA
+Phone: (555) 123-4567
+
+Date: 2024-02-11
+
+Fresh Organic Salad Mix      $6.99
+Organic Bananas (2 lbs)       $3.50
+Greek Yogurt Plain            $5.99
+Mixed Vegetables Frozen       $4.49
+Potato Chips Family Size      $4.99
+Coca Cola 2L                  $2.99
+Sparkling Water 12pk          $5.99
+Brown Rice 2lb                $3.99
+Whole Wheat Bread             $4.49
+Chocolate Chip Cookies        $3.99
+
+Subtotal:                    $47.41
+Tax (10.1%):                  $4.79
+Total:                       $52.20
+
+Thank you for shopping with us!
+Payment Method: Credit Card
+Card: ****1234
