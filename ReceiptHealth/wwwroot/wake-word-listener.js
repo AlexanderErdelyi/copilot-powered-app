@@ -77,12 +77,61 @@
             return;
         }
 
-        // Select a natural-sounding English voice
+        // Select the most natural-sounding English voice with priority order:
+        // 1. Premium/Enhanced voices (Google US English, Microsoft Natural)
+        // 2. Google voices (generally high quality)
+        // 3. Natural/Neural voices
+        // 4. Any English voice
+        // 5. Fallback to first available
+        
+        // Priority list for best natural voices
+        const premiumVoices = [
+            'Google US English',
+            'Google UK English Female',
+            'Microsoft Zira - English (United States)',
+            'Microsoft Mark - English (United States)',
+            'Samantha',  // macOS/iOS premium voice
+            'Alex',      // macOS/iOS premium voice
+            'Moira',     // macOS/iOS UK voice
+        ];
+        
+        // Try premium voices first
+        for (const premiumName of premiumVoices) {
+            const voice = availableVoices.find(v => 
+                v.lang.startsWith('en') && v.name.includes(premiumName)
+            );
+            if (voice) {
+                selectedVoice = voice;
+                console.log('🎵 Selected premium voice:', selectedVoice.name);
+                return;
+            }
+        }
+        
+        // Try Enhanced/Natural/Neural voices
         selectedVoice = availableVoices.find(v => 
             v.lang.startsWith('en') && 
-            (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Microsoft'))
-        ) || availableVoices.find(v => v.lang.startsWith('en')) || availableVoices[0];
-
+            (v.name.toLowerCase().includes('enhanced') || 
+             v.name.toLowerCase().includes('natural') || 
+             v.name.toLowerCase().includes('neural'))
+        );
+        
+        if (selectedVoice) {
+            console.log('🎵 Selected natural voice:', selectedVoice.name);
+            return;
+        }
+        
+        // Try Google voices (generally high quality)
+        selectedVoice = availableVoices.find(v => 
+            v.lang.startsWith('en') && v.name.includes('Google')
+        );
+        
+        if (selectedVoice) {
+            console.log('🎵 Selected Google voice:', selectedVoice.name);
+            return;
+        }
+        
+        // Fallback to any English voice or first available
+        selectedVoice = availableVoices.find(v => v.lang.startsWith('en')) || availableVoices[0];
         console.log('🎵 Selected voice:', selectedVoice?.name);
     }
 
@@ -397,7 +446,34 @@
     }
 
     /**
-     * Speak text using speech synthesis
+     * Process text for more natural speech delivery
+     */
+    function processTextForSpeech(text) {
+        // Add natural pauses after punctuation for breathing and clarity
+        let processed = text
+            .replace(/\. /g, '.  ')      // Longer pause after sentences
+            .replace(/, /g, ',  ')       // Pause after commas
+            .replace(/! /g, '!  ')       // Pause after exclamations
+            .replace(/\? /g, '?  ')      // Pause after questions
+            .replace(/: /g, ':  ')       // Pause after colons
+            .replace(/; /g, ';  ');      // Pause after semicolons
+        
+        // Handle numbers more naturally
+        processed = processed
+            .replace(/\b(\d+)%/g, '$1 percent')
+            .replace(/\$(\d+)/g, '$1 dollars');
+        
+        // Handle common abbreviations
+        processed = processed
+            .replace(/\bAI\b/g, 'A I')
+            .replace(/\bAPI\b/g, 'A P I')
+            .replace(/\bURL\b/g, 'U R L');
+        
+        return processed;
+    }
+
+    /**
+     * Speak text using natural speech synthesis
      */
     function speak(text, isFullResponse) {
         if (!SpeechSynthesis) {
@@ -407,16 +483,34 @@
         // Stop any ongoing speech
         SpeechSynthesis.cancel();
 
-        const utterance = new SpeechSynthesisUtterance(text);
+        // Process text for more natural delivery
+        const processedText = processTextForSpeech(text);
+
+        const utterance = new SpeechSynthesisUtterance(processedText);
         
         if (selectedVoice) {
             utterance.voice = selectedVoice;
         }
         
-        // Shorter responses get normal rate, longer ones get slightly faster
-        utterance.rate = isFullResponse && text.length > 100 ? 1.1 : 1.0;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
+        // Natural speech parameters (more human-like)
+        // Rate: Slightly slower for clarity and natural feel
+        utterance.rate = 0.92;
+        
+        // Pitch: Slightly higher for friendlier, more engaging tone
+        // Research shows slightly higher pitch is perceived as more pleasant
+        utterance.pitch = 1.08;
+        
+        // Volume: Slightly lower can sound less robotic
+        utterance.volume = 0.95;
+
+        // Add event handlers for better UX
+        utterance.onend = () => {
+            console.log('✅ Finished speaking');
+        };
+
+        utterance.onerror = (event) => {
+            console.error('❌ Speech synthesis error:', event);
+        };
 
         SpeechSynthesis.speak(utterance);
     }

@@ -406,36 +406,70 @@
 
         // Select the most natural-sounding voice
         function selectBestVoice() {
-            // Preferred voices in order (natural-sounding, neural voices)
-            const preferredVoicePatterns = [
-                /google.*us.*english.*female/i,
-                /google.*uk.*english.*female/i,
-                /microsoft.*zira/i,
-                /microsoft.*aria/i,
-                /microsoft.*jenny/i,
-                /samantha/i,
-                /karen/i,
-                /female/i,
-                /en-us/i,
-                /en-gb/i
+            // Priority list for best natural voices (same as wake-word-listener)
+            const premiumVoices = [
+                'Google US English',
+                'Google UK English Female',
+                'Microsoft Zira - English (United States)',
+                'Microsoft Mark - English (United States)',
+                'Samantha',  // macOS/iOS premium voice
+                'Alex',      // macOS/iOS premium voice
+                'Moira',     // macOS/iOS UK voice
             ];
-
-            for (const pattern of preferredVoicePatterns) {
-                const voice = availableVoices.find(v => pattern.test(v.name) || pattern.test(v.lang));
+            
+            // Try premium voices first
+            for (const premiumName of premiumVoices) {
+                const voice = availableVoices.find(v => 
+                    v.lang.startsWith('en') && v.name.includes(premiumName)
+                );
                 if (voice) {
                     const index = availableVoices.indexOf(voice);
                     selectedVoice = voice;
                     voiceSelect.value = index;
-                    console.log('🎤 Selected natural voice:', voice.name);
-                    
-                    // Save preference
+                    console.log('🎤 Selected premium voice:', voice.name);
                     localStorage.setItem('preferredVoiceIndex', index);
                     return;
                 }
             }
+            
+            // Try Enhanced/Natural/Neural voices
+            const voice = availableVoices.find(v => 
+                v.lang.startsWith('en') && 
+                (v.name.toLowerCase().includes('enhanced') || 
+                 v.name.toLowerCase().includes('natural') || 
+                 v.name.toLowerCase().includes('neural'))
+            );
+            
+            if (voice) {
+                const index = availableVoices.indexOf(voice);
+                selectedVoice = voice;
+                voiceSelect.value = index;
+                console.log('🎤 Selected natural voice:', voice.name);
+                localStorage.setItem('preferredVoiceIndex', index);
+                return;
+            }
+            
+            // Try Google voices (generally high quality)
+            const googleVoice = availableVoices.find(v => 
+                v.lang.startsWith('en') && v.name.includes('Google')
+            );
+            
+            if (googleVoice) {
+                const index = availableVoices.indexOf(googleVoice);
+                selectedVoice = googleVoice;
+                voiceSelect.value = index;
+                console.log('🎤 Selected Google voice:', googleVoice.name);
+                localStorage.setItem('preferredVoiceIndex', index);
+                return;
+            }
 
-            // Fallback: use first available voice
-            if (availableVoices.length > 0) {
+            // Fallback: use first English voice or first available
+            const englishVoice = availableVoices.find(v => v.lang.startsWith('en'));
+            if (englishVoice) {
+                const index = availableVoices.indexOf(englishVoice);
+                selectedVoice = englishVoice;
+                voiceSelect.value = index;
+            } else if (availableVoices.length > 0) {
                 selectedVoice = availableVoices[0];
                 voiceSelect.value = 0;
             }
@@ -835,6 +869,31 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
+        // Process text for more natural speech delivery
+        function processTextForSpeech(text) {
+            // Add natural pauses after punctuation for breathing and clarity
+            let processed = text
+                .replace(/\. /g, '.  ')      // Longer pause after sentences
+                .replace(/, /g, ',  ')       // Pause after commas
+                .replace(/! /g, '!  ')       // Pause after exclamations
+                .replace(/\? /g, '?  ')      // Pause after questions
+                .replace(/: /g, ':  ')       // Pause after colons
+                .replace(/; /g, ';  ');      // Pause after semicolons
+            
+            // Handle numbers more naturally
+            processed = processed
+                .replace(/\b(\d+)%/g, '$1 percent')
+                .replace(/\$(\d+)/g, '$1 dollars');
+            
+            // Handle common abbreviations
+            processed = processed
+                .replace(/\bAI\b/g, 'A I')
+                .replace(/\bAPI\b/g, 'A P I')
+                .replace(/\bURL\b/g, 'U R L');
+            
+            return processed;
+        }
+
         // Text-to-speech with natural voice
         function speak(text) {
             if (!autoSpeak.checked || !SpeechSynthesis) {
@@ -847,27 +906,20 @@
             updateStatus('Speaking...', 'speaking');
             stopSpeakBtn.disabled = false;
 
-            const utterance = new SpeechSynthesisUtterance(text);
+            // Process text for more natural delivery
+            const processedText = processTextForSpeech(text);
+
+            const utterance = new SpeechSynthesisUtterance(processedText);
             
             // Use selected voice for natural sound
             if (selectedVoice) {
                 utterance.voice = selectedVoice;
             }
             
-            // Natural speech parameters
-            utterance.rate = 0.95;     // Slightly slower = more natural and clear
-            utterance.pitch = 1.05;    // Slightly higher = friendlier tone
-            utterance.volume = 1.0;    // Full volume
-
-            // Add natural pauses by processing text
-            // Replace commas and periods with longer pauses
-            let processedText = text
-                .replace(/,/g, ',  ')      // Pause after commas
-                .replace(/\./g, '.  ')     // Pause after periods
-                .replace(/!/g, '!  ')      // Pause after exclamations
-                .replace(/\?/g, '?  ');    // Pause after questions
-
-            utterance.text = processedText;
+            // Natural speech parameters (tuned for human-like quality)
+            utterance.rate = 0.92;     // Slightly slower = more natural and clear
+            utterance.pitch = 1.08;    // Slightly higher = friendlier, more engaging tone
+            utterance.volume = 0.95;   // Slightly lower = less robotic
 
             utterance.onend = () => {
                 updateStatus('Ready to listen', 'idle');
