@@ -367,7 +367,17 @@
             const container = document.getElementById('recommendationsContainer');
             try {
                 const response = await fetch('/api/recommendations/category');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const data = await response.json();
+
+                if (!data || !data.recommendations) {
+                    container.innerHTML = '<div class="empty-state">⏳ Start uploading receipts to get personalized recommendations!</div>';
+                    return;
+                }
 
                 if (data.recommendations.length === 0) {
                     container.innerHTML = '<div class="empty-state">🎉 You\'re doing great! No recommendations at this time.</div>';
@@ -380,7 +390,8 @@
                     </div>
                 `).join('');
             } catch (error) {
-                container.innerHTML = `<div class="alert error">Failed to load recommendations: ${error.message}</div>`;
+                console.error('Error loading recommendations:', error);
+                container.innerHTML = `<div class="alert error">⚠️ Unable to load recommendations. Please ensure the server is running. (${error.message})</div>`;
             }
         }
     </script>

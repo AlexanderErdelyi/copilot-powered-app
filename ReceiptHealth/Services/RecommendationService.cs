@@ -1,3 +1,5 @@
+using GitHub.Copilot.SDK;
+using Microsoft.Extensions.AI;
 using Microsoft.EntityFrameworkCore;
 using ReceiptHealth.Data;
 using ReceiptHealth.Models;
@@ -14,10 +16,12 @@ public class RecommendationService : IRecommendationService
 {
     private readonly ReceiptHealthContext _context;
     private readonly Dictionary<string, List<string>> _healthyAlternatives;
+    private readonly CopilotClient _copilotClient;
 
     public RecommendationService(ReceiptHealthContext context)
     {
         _context = context;
+        _copilotClient = new CopilotClient();
         
         // Predefined healthy alternatives for common junk items
         _healthyAlternatives = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
@@ -75,21 +79,41 @@ public class RecommendationService : IRecommendationService
         // Analyze recent spending patterns
         var recentReceipts = await _context.Receipts
             .Include(r => r.CategorySummary)
+            .Include(r => r.LineItems)
             .Where(r => r.Date >= DateTime.Now.AddDays(-30))
+            .OrderByDescending(r => r.Date)
             .ToListAsync();
 
         if (!recentReceipts.Any())
         {
+            recommendations.Add("📊 Start tracking your receipts to receive personalized healthy eating recommendations!");
             return recommendations;
         }
 
         var totalJunk = recentReceipts.Sum(r => r.CategorySummary?.JunkTotal ?? 0);
         var totalHealthy = recentReceipts.Sum(r => r.CategorySummary?.HealthyTotal ?? 0);
+        var totalOther = recentReceipts.Sum(r => r.CategorySummary?.OtherTotal ?? 0);
         var totalSpend = recentReceipts.Sum(r => r.Total);
 
         var junkPercentage = totalSpend > 0 ? (totalJunk / totalSpend) * 100 : 0;
         var healthyPercentage = totalSpend > 0 ? (totalHealthy / totalSpend) * 100 : 0;
 
+        // Try AI-powered recommendations first
+        try
+        {
+            var aiRecommendations = await GenerateAIRecommendationsAsync(recentReceipts, totalSpend, junkPercentage, healthyPercentage);
+            if (aiRecommendations.Any())
+            {
+                recommendations.AddRange(aiRecommendations);
+                return recommendations;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ AI recommendations failed, using rule-based: {ex.Message}");
+        }
+
+        // Fallback to rule-based recommendations
         if (junkPercentage > 30)
         {
             recommendations.Add($"⚠️ You're spending {junkPercentage:F1}% on junk food. Try to reduce it to under 20% for better health.");
@@ -101,9 +125,13 @@ public class RecommendationService : IRecommendationService
         }
 
         var avgHealthScore = recentReceipts.Average(r => r.HealthScore);
-        if (avgHealthScore < 40)
+        if (avgHealthScore < 50)
         {
             recommendations.Add($"📉 Your average health score is {avgHealthScore:F1}. Focus on buying more fruits, vegetables, and whole grains.");
+        }
+        else if (avgHealthScore >= 70)
+        {
+            recommendations.Add($"🎉 Excellent! Your average health score is {avgHealthScore:F1}. Keep up the great work!");
         }
 
         // Find most purchased junk items
@@ -123,6 +151,79 @@ public class RecommendationService : IRecommendationService
             {
                 var alt = alternatives.First();
                 recommendations.Add($"💡 You bought {item.Item} {item.Count} times. Consider switching to {alt.HealthyAlternative} instead.");
+            }
+        }
+
+        if (recommendations.Count == 0)
+        {
+            recommendations.Add("✅ You're maintaining a balanced diet! Keep tracking your receipts to stay on track.");
+        }
+
+        return recommendations;
+    }
+
+    private async Task<List<string>> GenerateAIRecommendationsAsync(List<Receipt> receipts, decimal totalSpend, decimal junkPercentage, decimal healthyPercentage)
+    {
+        var recommendations = new List<string>();
+
+        // Build context from receipts
+        var topJunkItems = receipts
+            .SelectMany(r => r.LineItems)
+            .Where(li => li.Category == "Junk")
+            .GroupBy(li => li.Description)
+            .OrderByDescending(g => g.Sum(li => li.Price))
+            .Take(5)
+            .Select(g => $"{g.Key} (${g.Sum(li => li.Price):F2})")
+            .ToList();
+
+        var topHealthyItems = receipts
+            .SelectMany(r => r.LineItems)
+            .Where(li => li.Category == "Healthy")
+            .GroupBy(li => li.Description)
+            .OrderByDescending(g => g.Sum(li => li.Price))
+            .Take(5)
+            .Select(g => $"{g.Key} (${g.Sum(li => li.Price):F2})")
+            .ToList();
+
+        var avgHealthScore = receipts.Average(r => r.HealthScore);
+
+        var prompt = $@"You are a nutrition and healthy shopping advisor. Analyze the user's shopping patterns and provide 3-5 personalized recommendations to improve their diet.
+
+Shopping Summary (Last 30 Days):
+- Total Spent: ${totalSpend:F2}
+- Junk Food: {junkPercentage:F1}%
+- Healthy Food: {healthyPercentage:F1}%
+- Average Health Score: {avgHealthScore:F1}/100
+
+Top Junk Items: {(topJunkItems.Any() ? string.Join(", ", topJunkItems) : "None")}
+Top Healthy Items: {(topHealthyItems.Any() ? string.Join(", ", topHealthyItems) : "None")}
+
+Please provide 3-5 specific, actionable recommendations. Each recommendation should:
+- Start with an emoji
+- Be concise (1-2 sentences)
+- Focus on specific items they're buying
+- Suggest concrete alternatives or actions
+
+Format: Return ONLY a numbered list, one recommendation per line.";
+
+        var session = await _copilotClient.CreateSessionAsync();
+        var response = await session.SendAndWaitAsync(new MessageOptions { Prompt = prompt });
+
+        if (response?.Data?.Content != null)
+        {
+            var lines = response.Data.Content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                // Remove numbering (1. 2. etc.) if present
+                if (trimmed.Length > 2 && char.IsDigit(trimmed[0]) && trimmed[1] == '.')
+                {
+                    trimmed = trimmed.Substring(2).Trim();
+                }
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                {
+                    recommendations.Add(trimmed);
+                }
             }
         }
 

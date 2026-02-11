@@ -99,10 +99,17 @@
 
         .btn-danger {
             background: #dc3545;
+            padding: 8px 15px;
+            font-size: 0.9em;
         }
 
         .btn-danger:hover {
             background: #c82333;
+        }
+
+        .btn-small {
+            padding: 8px 15px;
+            font-size: 0.85em;
         }
 
         .list-container {
@@ -364,9 +371,14 @@
     <!-- View List Modal -->
     <div id="viewListModal" class="modal">
         <div class="modal-content" style="max-width: 700px;">
-            <h3 id="listTitle"></h3>
-            <button class="btn btn-success" onclick="showAddItemModal()">➕ Add Item</button>
-            <button class="btn btn-secondary" onclick="hideViewListModal()">Close</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 id="listTitle" style="margin: 0;"></h3>
+                <button class="btn btn-danger btn-small" onclick="deleteList()">🗑️ Delete List</button>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <button class="btn btn-success" onclick="showAddItemModal()">➕ Add Item</button>
+                <button class="btn btn-secondary" onclick="hideViewListModal()">Close</button>
+            </div>
             <ul id="itemsList" class="item-list"></ul>
         </div>
     </div>
@@ -382,10 +394,15 @@
             const container = document.getElementById('listsContainer');
             try {
                 const response = await fetch('/api/shopping-lists');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const lists = await response.json();
 
-                if (lists.length === 0) {
-                    container.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: #999; padding: 40px;">No shopping lists yet. Create one to get started!</p>';
+                if (!lists || lists.length === 0) {
+                    container.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: #999; padding: 40px;">🛒 No shopping lists yet. Create one to get started!</p>';
                     return;
                 }
 
@@ -393,8 +410,8 @@
                     <div class="list-card" onclick="viewList(${list.id})">
                         <h3>${list.name}</h3>
                         <div class="list-meta">
-                            ${list.items.length} items
-                            • ${list.items.filter(i => i.isPurchased).length} purchased
+                            ${list.items?.length || 0} items
+                            • ${list.items?.filter(i => i.isPurchased).length || 0} purchased
                         </div>
                         <div class="list-meta" style="margin-top: 5px;">
                             Created: ${new Date(list.createdAt).toLocaleDateString()}
@@ -402,7 +419,8 @@
                     </div>
                 `).join('');
             } catch (error) {
-                container.innerHTML = `<p style="color: red;">Failed to load lists: ${error.message}</p>`;
+                console.error('Error loading shopping lists:', error);
+                container.innerHTML = `<p style="grid-column: 1 / -1; color: red; text-align: center; padding: 20px;">⚠️ Unable to load shopping lists. Please ensure the server is running.<br><small>${error.message}</small></p>`;
             }
         }
 
@@ -534,17 +552,24 @@
             }
 
             try {
+                console.log('🥗 Generating healthy list...');
                 const response = await fetch('/api/shopping-lists/generate?daysBack=30', {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
                 });
 
                 if (response.ok) {
-                    loadLists();
-                    alert('✅ Healthy shopping list generated!');
+                    console.log('✅ Healthy list generated');
+                    await loadLists();
+                    const result = await response.json();
+                    alert(`✅ Healthy shopping list "${result.name}" generated with ${result.items?.length || 0} items!`);
                 } else {
-                    alert('Failed to generate list');
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    console.error('❌ Failed to generate list:', errorData);
+                    alert(`Failed to generate list: ${errorData.error || response.statusText}`);
                 }
             } catch (error) {
+                console.error('❌ Error generating list:', error);
                 alert(`Error: ${error.message}`);
             }
         }
@@ -559,6 +584,7 @@
             }
 
             try {
+                console.log('Adding item:', { listId: currentListId, itemName, quantity });
                 const response = await fetch(`/api/shopping-lists/${currentListId}/items`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -566,12 +592,16 @@
                 });
 
                 if (response.ok) {
+                    console.log('✅ Item added successfully');
                     hideAddItemModal();
-                    viewList(currentListId);
+                    await viewList(currentListId);
                 } else {
-                    alert('Failed to add item');
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    console.error('❌ Failed to add item:', errorData);
+                    alert(`Failed to add item: ${errorData.error || response.statusText}`);
                 }
             } catch (error) {
+                console.error('❌ Error adding item:', error);
                 alert(`Error: ${error.message}`);
             }
         }
@@ -594,11 +624,42 @@
             }
 
             try {
-                await fetch(`/api/shopping-lists/items/${itemId}`, {
+                const response = await fetch(`/api/shopping-lists/items/${itemId}`, {
                     method: 'DELETE'
                 });
-                viewList(currentListId);
+                if (response.ok) {
+                    await viewList(currentListId);
+                } else {
+                    alert('Failed to remove item');
+                }
             } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function deleteList() {
+            if (!confirm('Delete this entire shopping list? This cannot be undone.')) {
+                return;
+            }
+
+            try {
+                console.log('🗑️ Deleting list:', currentListId);
+                const response = await fetch(`/api/shopping-lists/${currentListId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    console.log('✅ List deleted');
+                    hideViewListModal();
+                    await loadLists();
+                    alert('✅ Shopping list deleted');
+                } else {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    console.error('❌ Failed to delete list:', errorData);
+                    alert(`Failed to delete list: ${errorData.error || response.statusText}`);
+                }
+            } catch (error) {
+                console.error('❌ Error deleting list:', error);
                 alert(`Error: ${error.message}`);
             }
         }

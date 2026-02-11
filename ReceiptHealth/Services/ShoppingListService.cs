@@ -12,6 +12,7 @@ public interface IShoppingListService
     Task<ShoppingListItem> AddItemAsync(int listId, string itemName, int quantity = 1);
     Task<bool> MarkItemPurchasedAsync(int itemId, bool isPurchased);
     Task<bool> RemoveItemAsync(int itemId);
+    Task<bool> DeleteShoppingListAsync(int listId);
     Task<ShoppingList> GenerateFromHealthyItemsAsync(int daysBack = 30);
     Task<List<PriceAlert>> GetPriceAlertsAsync(int listId);
 }
@@ -61,9 +62,12 @@ public class ShoppingListService : IShoppingListService
 
     public async Task<ShoppingListItem> AddItemAsync(int listId, string itemName, int quantity = 1)
     {
+        Console.WriteLine($"📝 Adding item '{itemName}' (qty: {quantity}) to list {listId}");
+        
         var list = await _context.ShoppingLists.FindAsync(listId);
         if (list == null)
         {
+            Console.WriteLine($"❌ Shopping list {listId} not found");
             throw new InvalidOperationException($"Shopping list {listId} not found");
         }
 
@@ -72,10 +76,12 @@ public class ShoppingListService : IShoppingListService
         try
         {
             category = _categoryService.CategorizeItem(itemName);
+            Console.WriteLine($"✅ Categorized '{itemName}' as '{category}'");
         }
-        catch
+        catch (Exception ex)
         {
             // If categorization fails, default to Unknown
+            Console.WriteLine($"⚠️ Categorization failed for '{itemName}': {ex.Message}");
             category = "Unknown";
         }
         
@@ -101,6 +107,8 @@ public class ShoppingListService : IShoppingListService
         _context.ShoppingListItems.Add(item);
         list.LastModifiedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+        
+        Console.WriteLine($"✅ Added item {item.Id}: '{itemName}' to list {listId}");
 
         return item;
     }
@@ -131,24 +139,54 @@ public class ShoppingListService : IShoppingListService
         return true;
     }
 
+    public async Task<bool> DeleteShoppingListAsync(int listId)
+    {
+        var list = await _context.ShoppingLists
+            .Include(sl => sl.Items)
+            .FirstOrDefaultAsync(sl => sl.Id == listId);
+        
+        if (list == null)
+        {
+            return false;
+        }
+
+        // Remove all items first
+        _context.ShoppingListItems.RemoveRange(list.Items);
+        
+        // Remove the list
+        _context.ShoppingLists.Remove(list);
+        await _context.SaveChangesAsync();
+        
+        return true;
+    }
+
     public async Task<ShoppingList> GenerateFromHealthyItemsAsync(int daysBack = 30)
     {
+        Console.WriteLine($"🥗 Generating healthy shopping list from last {daysBack} days...");
         var cutoffDate = DateTime.Now.AddDays(-daysBack);
         
         // Find frequently purchased healthy items
-        var healthyItems = await _context.LineItems
+        // Load into memory first to avoid SQLite decimal Average limitation
+        var healthyLineItems = await _context.LineItems
             .Include(li => li.Receipt)
             .Where(li => li.Category == "Healthy" && li.Receipt.Date >= cutoffDate)
+            .ToListAsync();
+        
+        Console.WriteLine($"📊 Found {healthyLineItems.Count} healthy line items");
+        
+        var healthyItems = healthyLineItems
             .GroupBy(li => li.Description)
             .Select(g => new
             {
                 ItemName = g.Key,
                 Frequency = g.Count(),
-                AvgPrice = g.Average(li => li.Price)
+                AvgPrice = g.Average(li => (double)li.Price) // Convert to double for in-memory average
             })
             .OrderByDescending(x => x.Frequency)
             .Take(20)
-            .ToListAsync();
+            .ToList();
+
+        Console.WriteLine($"✅ Grouped into {healthyItems.Count} unique items");
 
         var list = await CreateShoppingListAsync($"Healthy Items (Generated {DateTime.Now:yyyy-MM-dd})");
 
@@ -157,6 +195,7 @@ public class ShoppingListService : IShoppingListService
             await AddItemAsync(list.Id, item.ItemName, 1);
         }
 
+        Console.WriteLine($"✅ Generated shopping list '{list.Name}' with {healthyItems.Count} items");
         return list;
     }
 

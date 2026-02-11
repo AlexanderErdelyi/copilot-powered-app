@@ -315,12 +315,17 @@
             const container = document.getElementById('achievementsContainer');
             try {
                 const response = await fetch('/api/achievements');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const achievements = await response.json();
 
-                document.getElementById('totalAchievements').textContent = achievements.length;
+                document.getElementById('totalAchievements').textContent = achievements?.length || 0;
 
-                if (achievements.length === 0) {
-                    container.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: #999; padding: 40px;">No achievements yet. Keep shopping healthy to unlock your first badge!</p>';
+                if (!achievements || achievements.length === 0) {
+                    container.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: #999; padding: 40px;">🏆 No achievements yet. Keep shopping healthy to unlock your first badge!</p>';
                     return;
                 }
 
@@ -340,7 +345,8 @@
                     `;
                 }).join('');
             } catch (error) {
-                container.innerHTML = `<p style="color: red;">Failed to load achievements: ${error.message}</p>`;
+                console.error('Error loading achievements:', error);
+                container.innerHTML = `<p style="grid-column: 1 / -1; color: red; text-align: center; padding: 20px;">⚠️ Unable to load achievements. Please ensure the server is running.<br><small>${error.message}</small></p>`;
             }
         }
 

@@ -268,6 +268,34 @@
         .status-badge.error {
             background: #ef4444;
         }
+
+        /* Camera button styling */
+        .camera-btn {
+            background: #667eea;
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+        }
+
+        .camera-btn:hover {
+            background: #764ba2;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .upload-controls {
+            margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
@@ -285,6 +313,11 @@
 
         <div class="upload-section">
             <h2 style="margin-bottom: 20px;">Upload Receipts</h2>
+            <div class="upload-controls">
+                <button class="camera-btn" id="cameraBtn">
+                    📷 Take Photo
+                </button>
+            </div>
             <div class="upload-zone" id="uploadZone">
                 <div class="upload-icon">📄</div>
                 <p>Drag & drop receipts here or click to browse</p>
@@ -321,7 +354,12 @@
 
         <div class="charts-grid">
             <div class="chart-card">
-                <h2>Monthly Spend (2024)</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h2 id="monthlySpendTitle">Monthly Spend (2026)</h2>
+                    <select id="yearSelector" style="padding: 8px 12px; border: 2px solid #667eea; border-radius: 8px; background: white; color: #667eea; font-weight: 600; cursor: pointer; font-size: 14px;">
+                        <option value="2026">2026</option>
+                    </select>
+                </div>
                 <div class="chart-container">
                     <canvas id="monthlySpendChart"></canvas>
                 </div>
@@ -333,9 +371,139 @@
                 </div>
             </div>
         </div>
+
+        <!-- Camera Modal -->
+        <div class="camera-modal" id="cameraModal">
+            <div class="camera-container">
+                <h2 style="margin: 0 0 15px 0; color: #333;">📷 Capture Receipt</h2>
+                <div class="camera-preview">
+                    <video id="cameraVideo" autoplay playsinline></video>
+                    <canvas id="cameraCanvas" style="display: none;"></canvas>
+                </div>
+                <div class="camera-controls">
+                    <button class="capture-btn" id="captureBtn" style="display: none;">📸 Capture Photo</button>
+                    <button class="retake-btn" id="retakeBtn" style="display: none;">🔄 Retake</button>
+                    <button class="upload-photo-btn" id="uploadPhotoBtn" style="display: none;">✅ Upload Photo</button>
+                    <button class="cancel-btn" id="cancelCameraBtn">❌ Cancel</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
+        // Camera functionality
+        let cameraStream = null;
+        let capturedImage = null;
+
+        const cameraBtn = document.getElementById('cameraBtn');
+        const cameraModal = document.getElementById('cameraModal');
+        const cameraVideo = document.getElementById('cameraVideo');
+        const cameraCanvas = document.getElementById('cameraCanvas');
+        const captureBtn = document.getElementById('captureBtn');
+        const retakeBtn = document.getElementById('retakeBtn');
+        const uploadPhotoBtn = document.getElementById('uploadPhotoBtn');
+        const cancelCameraBtn = document.getElementById('cancelCameraBtn');
+
+        cameraBtn.addEventListener('click', async () => {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment', // Use back camera on mobile
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    } 
+                });
+                cameraVideo.srcObject = cameraStream;
+                cameraModal.classList.add('active');
+                cameraVideo.style.display = 'block';
+                cameraCanvas.style.display = 'none';
+                captureBtn.style.display = 'inline-block';
+                retakeBtn.style.display = 'none';
+                uploadPhotoBtn.style.display = 'none';
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                alert('Unable to access camera. Please ensure you have granted camera permissions.');
+            }
+        });
+
+        captureBtn.addEventListener('click', () => {
+            const context = cameraCanvas.getContext('2d');
+            cameraCanvas.width = cameraVideo.videoWidth;
+            cameraCanvas.height = cameraVideo.videoHeight;
+            context.drawImage(cameraVideo, 0, 0);
+            
+            cameraVideo.style.display = 'none';
+            cameraCanvas.style.display = 'block';
+            captureBtn.style.display = 'none';
+            retakeBtn.style.display = 'inline-block';
+            uploadPhotoBtn.style.display = 'inline-block';
+        });
+
+        retakeBtn.addEventListener('click', () => {
+            cameraVideo.style.display = 'block';
+            cameraCanvas.style.display = 'none';
+            captureBtn.style.display = 'inline-block';
+            retakeBtn.style.display = 'none';
+            uploadPhotoBtn.style.display = 'none';
+        });
+
+        uploadPhotoBtn.addEventListener('click', async () => {
+            cameraCanvas.toBlob(async (blob) => {
+                const fileName = `receipt_${Date.now()}.jpg`;
+                const file = new File([blob], fileName, { type: 'image/jpeg' });
+                
+                closeCameraModal();
+                
+                // Upload the captured image
+                const formData = new FormData();
+                formData.append('files', file);
+                
+                loadingIndicator.classList.add('active');
+                const processingStatusDiv = document.getElementById('processingStatus');
+                const statusList = document.getElementById('statusList');
+                processingStatusDiv.classList.add('active');
+                
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    console.log('Upload result:', result);
+                    
+                    loadingIndicator.classList.remove('active');
+                    
+                    result.uploads.forEach(upload => {
+                        const statusItem = createStatusItem(upload);
+                        statusList.prepend(statusItem);
+                        
+                        if (upload.status === 'processing') {
+                            saveActiveUpload(upload.id, upload.fileName);
+                            pollStatus(upload.id, statusItem);
+                        }
+                    });
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    alert('Error uploading photo: ' + error.message);
+                    loadingIndicator.classList.remove('active');
+                }
+            }, 'image/jpeg', 0.9);
+        });
+
+        cancelCameraBtn.addEventListener('click', () => {
+            closeCameraModal();
+        });
+
+        function closeCameraModal() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            cameraModal.classList.remove('active');
+            cameraVideo.srcObject = null;
+        }
+
         // Upload functionality
         const uploadZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('fileInput');
@@ -576,13 +744,43 @@
         // Dashboard data
         let monthlyChart = null;
         let categoryChart = null;
+        let currentYear = new Date().getFullYear();
+
+        async function loadAvailableYears() {
+            try {
+                const response = await fetch('/api/analytics/available-years');
+                const data = await response.json();
+                const yearSelector = document.getElementById('yearSelector');
+                
+                yearSelector.innerHTML = data.years.map(year => 
+                    `<option value="${year}" ${year === currentYear ? 'selected' : ''}>${year}</option>`
+                ).join('');
+                
+                yearSelector.addEventListener('change', (e) => {
+                    currentYear = parseInt(e.target.value);
+                    loadMonthlyData();
+                });
+            } catch (error) {
+                console.error('Error loading available years:', error);
+            }
+        }
+
+        async function loadMonthlyData() {
+            try {
+                const monthlyResponse = await fetch(`/api/analytics/monthly-spend?year=${currentYear}`);
+                const monthlyData = await monthlyResponse.json();
+                document.getElementById('monthlySpendTitle').textContent = `Monthly Spend (${currentYear})`;
+                updateMonthlyChart(monthlyData);
+            } catch (error) {
+                console.error('Error loading monthly data:', error);
+            }
+        }
 
         async function loadDashboardData() {
             try {
-                // Load monthly spend
-                const monthlyResponse = await fetch('/api/analytics/monthly-spend?year=2024');
-                const monthlyData = await monthlyResponse.json();
-                updateMonthlyChart(monthlyData);
+                // Load available years and monthly spend
+                await loadAvailableYears();
+                await loadMonthlyData();
 
                 // Load category breakdown
                 const categoryResponse = await fetch('/api/analytics/category-breakdown');
@@ -652,6 +850,8 @@
                 categoryChart.destroy();
             }
 
+            const total = data.healthyTotal + data.junkTotal + data.otherTotal + data.unknownTotal;
+
             categoryChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
@@ -677,6 +877,16 @@
                     plugins: {
                         legend: {
                             position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    return `${label}: $${value.toFixed(2)} (${percentage}%)`;
+                                }
+                            }
                         }
                     }
                 }

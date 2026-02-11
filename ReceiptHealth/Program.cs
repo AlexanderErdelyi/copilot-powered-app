@@ -376,6 +376,30 @@ app.MapGet("/api/receipts/{id}", async (int id, ReceiptHealthContext context) =>
     });
 });
 
+// Analytics: Get available years
+app.MapGet("/api/analytics/available-years", async (ReceiptHealthContext context) =>
+{
+    var years = await context.Receipts
+        .Select(r => r.Date.Year)
+        .Distinct()
+        .OrderByDescending(y => y)
+        .ToListAsync();
+    
+    var currentYear = DateTime.Now.Year;
+    if (!years.Contains(currentYear) && years.Count > 0)
+    {
+        // Add current year if no receipts yet for easier navigation
+        years.Insert(0, currentYear);
+    }
+    else if (years.Count == 0)
+    {
+        // No receipts at all, just return current year
+        years.Add(currentYear);
+    }
+    
+    return Results.Ok(new { years });
+});
+
 // Analytics: Monthly spend
 app.MapGet("/api/analytics/monthly-spend", async (ReceiptHealthContext context, int? year) =>
 {
@@ -537,6 +561,21 @@ app.MapDelete("/api/shopping-lists/items/{itemId}", async (int itemId, IShopping
 {
     var success = await shoppingListService.RemoveItemAsync(itemId);
     return success ? Results.Ok(new { success = true }) : Results.NotFound();
+});
+
+// Delete shopping list
+app.MapDelete("/api/shopping-lists/{listId}", async (int listId, IShoppingListService shoppingListService) =>
+{
+    try
+    {
+        var success = await shoppingListService.DeleteShoppingListAsync(listId);
+        return success ? Results.Ok(new { success = true }) : Results.NotFound(new { error = "Shopping list not found" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error deleting shopping list {listId}: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
 });
 
 // Get price alerts for shopping list
