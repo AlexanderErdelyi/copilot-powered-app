@@ -301,6 +301,161 @@
         .upload-controls {
             margin-bottom: 15px;
         }
+
+        /* Category drill-down modal */
+        .category-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .category-modal.show {
+            display: flex;
+        }
+
+        .category-modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            animation: slideUp 0.3s ease;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 24px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: #f3f4f6;
+            color: #333;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .items-table th {
+            background: #f9fafb;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .items-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .items-table tr:hover {
+            background: #f9fafb;
+        }
+
+        .category-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .category-badge.healthy {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .category-badge.junk {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .category-badge.other {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .category-badge.unknown {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .category-summary {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .summary-item {
+            text-align: center;
+        }
+
+        .summary-item .label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .summary-item .value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
     </style>
     <!-- Wake Word Listener -->
     <link rel="stylesheet" href="/wake-word-styles.css">
@@ -380,6 +535,43 @@
                 <div class="chart-container">
                     <canvas id="categoryChart"></canvas>
                 </div>
+            </div>
+        </div>
+
+        <!-- Category Drill-Down Modal -->
+        <div class="category-modal" id="categoryModal">
+            <div class="category-modal-content">
+                <div class="modal-header">
+                    <h2 id="modalCategoryTitle">Category Items</h2>
+                    <button class="modal-close" onclick="closeCategoryModal()">&times;</button>
+                </div>
+                <div class="category-summary" id="categorySummary">
+                    <div class="summary-item">
+                        <div class="label">Total Items</div>
+                        <div class="value" id="summaryCount">0</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="label">Total Spend</div>
+                        <div class="value" id="summaryTotal">$0.00</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="label">Average Price</div>
+                        <div class="value" id="summaryAvg">$0.00</div>
+                    </div>
+                </div>
+                <table class="items-table" id="itemsTable">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Vendor</th>
+                            <th>Date</th>
+                            <th>Quantity</th>
+                            <th>Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody">
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -885,6 +1077,10 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true
+                    },
                     plugins: {
                         legend: {
                             position: 'bottom'
@@ -899,10 +1095,80 @@
                                 }
                             }
                         }
+                    },
+                    onClick: (event, activeElements) => {
+                        if (activeElements.length > 0) {
+                            const index = activeElements[0].index;
+                            const category = ['Healthy', 'Junk', 'Other', 'Unknown'][index];
+                            showCategoryDetails(category);
+                        }
                     }
                 }
             });
         }
+
+        async function showCategoryDetails(category) {
+            const modal = document.getElementById('categoryModal');
+            const title = document.getElementById('modalCategoryTitle');
+            
+            // Update modal title with emoji
+            const categoryEmojis = {
+                'Healthy': '🥗',
+                'Junk': '🍟',
+                'Other': '🥛',
+                'Unknown': '❓'
+            };
+            
+            title.textContent = `${categoryEmojis[category]} ${category} Items`;
+            modal.classList.add('show');
+
+            try {
+                const response = await fetch(`/api/analytics/category-items/${category}`);
+                const items = await response.json();
+
+                // Update summary
+                const totalSpend = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                const avgPrice = items.length > 0 ? totalSpend / items.length : 0;
+                
+                document.getElementById('summaryCount').textContent = items.length;
+                document.getElementById('summaryTotal').textContent = `$${totalSpend.toFixed(2)}`;
+                document.getElementById('summaryAvg').textContent = `$${avgPrice.toFixed(2)}`;
+
+                // Update table
+                const tbody = document.getElementById('itemsTableBody');
+                tbody.innerHTML = items.map(item => `
+                    <tr>
+                        <td><strong>${item.description}</strong></td>
+                        <td>${item.vendor || 'Unknown'}</td>
+                        <td>${new Date(item.receiptDate).toLocaleDateString()}</td>
+                        <td>${item.quantity}</td>
+                        <td>$${(item.price * item.quantity).toFixed(2)}</td>
+                    </tr>
+                `).join('');
+
+                if (items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #999;">No items found in this category</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error loading category items:', error);
+                document.getElementById('itemsTableBody').innerHTML = 
+                    '<tr><td colspan="5" style="text-align: center; padding: 40px; color: red;">Failed to load items</td></tr>';
+            }
+        }
+
+        function closeCategoryModal() {
+            const modal = document.getElementById('categoryModal');
+            modal.classList.remove('show');
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('categoryModal');
+            if (e.target === modal) {
+                closeCategoryModal();
+            }
+        });
+
 
         function updateKPIs(data) {
             const total = data.healthyTotal + data.junkTotal + data.otherTotal + data.unknownTotal;

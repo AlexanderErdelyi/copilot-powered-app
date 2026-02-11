@@ -262,6 +262,158 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Celebration effects */
+        .celebration-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            display: none;
+        }
+
+        .celebration-overlay.active {
+            display: block;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #f0f;
+            animation: confetti-fall 3s linear forwards;
+        }
+
+        @keyframes confetti-fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        .achievement-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            z-index: 10000;
+            display: none;
+        }
+
+        .achievement-popup.show {
+            display: block;
+            animation: popup 0.5s ease forwards;
+        }
+
+        @keyframes popup {
+            to {
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        .popup-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: bounce 1s ease infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .popup-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .popup-description {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .next-achievements {
+            margin-top: 20px;
+        }
+
+        .challenge-generator {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .challenge-options {
+            display: grid;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .challenge-option {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .challenge-option:hover {
+            border-color: #667eea;
+            background: #f3f4ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .challenge-option.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .challenge-option h3 {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .challenge-option p {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+
+        .challenge-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
     </style>
     <!-- Wake Word Listener -->
     <link rel="stylesheet" href="/wake-word-styles.css">
@@ -299,6 +451,31 @@
             </div>
         </div>
 
+        <!-- Next Available Achievements -->
+        <div class="card next-achievements">
+            <h2>🎯 Next Available Achievements</h2>
+            <p style="color: #666; margin-bottom: 20px;">These achievements are within your reach! Keep going to unlock them.</p>
+            <div id="nextAchievementsContainer" class="achievements-grid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading next achievements...
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Challenge Generator -->
+        <div class="challenge-generator">
+            <h2>🤖 AI-Generated Challenges</h2>
+            <p style="color: #666; margin-bottom: 15px;">Get personalized challenge suggestions based on your shopping habits!</p>
+            <button class="btn" onclick="generateChallenges()">✨ Generate New Challenges</button>
+            <div id="challengeOptions" class="challenge-options" style="display: none;">
+            </div>
+            <div class="btn-group" id="challengeActions" style="display: none;">
+                <button class="btn" onclick="acceptSelectedChallenge()">Accept Selected Challenge</button>
+                <button class="btn-secondary btn" onclick="hideChallengeOptions()">Cancel</button>
+            </div>
+        </div>
+
         <!-- Achievements -->
         <div class="card">
             <h2>🎖️ Your Achievements</h2>
@@ -323,12 +500,18 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            loadAchievements();
-            loadChallenges();
-        });
+    <!-- Celebration Overlay -->
+    <div class="celebration-overlay" id="celebrationOverlay"></div>
 
+    <!-- Achievement Popup -->
+    <div class="achievement-popup" id="achievementPopup">
+        <div class="popup-icon" id="popupIcon">🏆</div>
+        <div class="popup-title" id="popupTitle">Achievement Unlocked!</div>
+        <div class="popup-description" id="popupDescription">You've earned a new badge!</div>
+        <button class="btn" onclick="closeAchievementPopup()">Awesome!</button>
+    </div>
+
+    <script>
         async function loadAchievements() {
             const container = document.getElementById('achievementsContainer');
             try {
@@ -434,7 +617,17 @@
                 if (response.ok) {
                     await loadAchievements();
                     await loadChallenges();
-                    alert('✅ Achievements updated! Check if you unlocked any new badges.');
+                    await loadNextAchievements();
+                    
+                    // Check if we should show celebration
+                    const celebResponse = await fetch('/api/achievements/celebration');
+                    const celebData = await celebResponse.json();
+                    
+                    if (celebData.celebrate) {
+                        showCelebration();
+                    } else {
+                        alert('✅ Achievements updated! Check if you unlocked any new badges.');
+                    }
                 } else {
                     alert('Failed to check achievements');
                 }
@@ -442,6 +635,162 @@
                 alert(`Error: ${error.message}`);
             }
         }
+
+        async function loadNextAchievements() {
+            const container = document.getElementById('nextAchievementsContainer');
+            try {
+                const response = await fetch('/api/achievements/next');
+                const achievements = await response.json();
+
+                if (!achievements || achievements.length === 0) {
+                    container.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: #999; padding: 40px;">🎉 You\'re doing great! All current achievements unlocked.</p>';
+                    return;
+                }
+
+                container.innerHTML = achievements.map(achievement => `
+                    <div class="achievement-card">
+                        <div class="achievement-icon">${achievement.icon}</div>
+                        <div class="achievement-name">${achievement.name}</div>
+                        <div class="achievement-description">${achievement.description}</div>
+                        <div style="font-size: 0.8em; color: #999; margin-top: 10px;">
+                            🎯 Target: ${achievement.requiredValue}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading next achievements:', error);
+                container.innerHTML = `<p style="grid-column: 1 / -1; color: red; text-align: center;">Failed to load: ${error.message}</p>`;
+            }
+        }
+
+        let selectedChallengeIndex = -1;
+
+        async function generateChallenges() {
+            const container = document.getElementById('challengeOptions');
+            const actions = document.getElementById('challengeActions');
+            
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>Generating personalized challenges...</div>';
+            container.style.display = 'grid';
+            
+            try {
+                const response = await fetch('/api/challenges/generate?count=3');
+                const challenges = await response.json();
+
+                container.innerHTML = challenges.map((challenge, index) => {
+                    const parts = challenge.split('|');
+                    if (parts.length !== 5) return '';
+                    
+                    const [name, description, type, target, duration] = parts;
+                    return `
+                        <div class="challenge-option" onclick="selectChallenge(${index})">
+                            <h3>${name}</h3>
+                            <p>${description}</p>
+                            <div class="challenge-meta">
+                                <span>🎯 Target: ${target}</span>
+                                <span>⏰ Duration: ${duration} days</span>
+                                <span>📊 Type: ${type.replace('_', ' ')}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                actions.style.display = 'flex';
+                window.generatedChallenges = challenges;
+            } catch (error) {
+                container.innerHTML = `<p style="color: red;">Failed to generate challenges: ${error.message}</p>`;
+            }
+        }
+
+        function selectChallenge(index) {
+            document.querySelectorAll('.challenge-option').forEach((el, i) => {
+                if (i === index) {
+                    el.classList.add('selected');
+                } else {
+                    el.classList.remove('selected');
+                }
+            });
+            selectedChallengeIndex = index;
+        }
+
+        async function acceptSelectedChallenge() {
+            if (selectedChallengeIndex === -1) {
+                alert('Please select a challenge first');
+                return;
+            }
+
+            const challenge = window.generatedChallenges[selectedChallengeIndex];
+            const parts = challenge.split('|');
+            const [name, description, type, target, duration] = parts;
+
+            try {
+                const response = await fetch('/api/challenges', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name,
+                        description,
+                        type,
+                        targetValue: parseFloat(target),
+                        durationDays: parseInt(duration)
+                    })
+                });
+
+                if (response.ok) {
+                    alert('✅ Challenge accepted! Good luck!');
+                    await loadChallenges();
+                    hideChallengeOptions();
+                } else {
+                    alert('Failed to create challenge');
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        function hideChallengeOptions() {
+            document.getElementById('challengeOptions').style.display = 'none';
+            document.getElementById('challengeActions').style.display = 'none';
+            selectedChallengeIndex = -1;
+        }
+
+        function showCelebration() {
+            const overlay = document.getElementById('celebrationOverlay');
+            overlay.classList.add('active');
+
+            // Create confetti
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * 100 + '%';
+                    confetti.style.background = ['#ff0', '#f0f', '#0ff', '#f00', '#0f0'][Math.floor(Math.random() * 5)];
+                    confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                    overlay.appendChild(confetti);
+
+                    setTimeout(() => confetti.remove(), 3000);
+                }, i * 30);
+            }
+
+            // Show popup
+            const popup = document.getElementById('achievementPopup');
+            popup.classList.add('show');
+
+            // Hide after 5 seconds
+            setTimeout(() => {
+                overlay.classList.remove('active');
+            }, 3000);
+        }
+
+        function closeAchievementPopup() {
+            document.getElementById('achievementPopup').classList.remove('show');
+        }
+
+        // Load next achievements on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAchievements();
+            loadChallenges();
+            loadNextAchievements();
+        });
     </script>
 </body>
 </html>

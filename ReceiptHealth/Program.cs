@@ -451,6 +451,29 @@ app.MapGet("/api/analytics/category-breakdown", async (ReceiptHealthContext cont
     return Results.Ok(breakdown);
 });
 
+// Analytics: Get line items by category (for drill-down)
+app.MapGet("/api/analytics/category-items/{category}", async (string category, ReceiptHealthContext context) =>
+{
+    var items = await context.LineItems
+        .Include(li => li.Receipt)
+        .Where(li => li.Category.ToLower() == category.ToLower())
+        .OrderByDescending(li => li.Receipt.Date)
+        .Take(100) // Limit to 100 most recent items
+        .Select(li => new
+        {
+            li.Id,
+            li.Description,
+            li.Price,
+            li.Quantity,
+            li.Category,
+            ReceiptDate = li.Receipt.Date,
+            Vendor = li.Receipt.Vendor
+        })
+        .ToListAsync();
+
+    return Results.Ok(items);
+});
+
 // === Price Comparison Endpoints ===
 
 // Compare prices for an item
@@ -889,6 +912,40 @@ app.MapPost("/api/achievements/check", async (IGamificationService gamificationS
     return Results.Ok(new { message = "Achievements and challenges updated" });
 });
 
+// Get next available achievements (not yet unlocked)
+app.MapGet("/api/achievements/next", async (IGamificationService gamificationService) =>
+{
+    var nextAchievements = await gamificationService.GetNextAvailableAchievementsAsync();
+    return Results.Ok(nextAchievements);
+});
+
+// Generate AI-powered challenge suggestions
+app.MapGet("/api/challenges/generate", async (IGamificationService gamificationService, int count = 3) =>
+{
+    var suggestions = await gamificationService.GenerateAIChallengesAsync(count);
+    return Results.Ok(suggestions);
+});
+
+// Track feature usage
+app.MapPost("/api/features/track", async (HttpRequest request, IGamificationService gamificationService) =>
+{
+    var body = await request.ReadFromJsonAsync<TrackFeatureRequest>();
+    if (body == null || string.IsNullOrEmpty(body.FeatureName))
+    {
+        return Results.BadRequest(new { error = "Feature name is required" });
+    }
+    
+    await gamificationService.TrackFeatureUsageAsync(body.FeatureName, body.Details);
+    return Results.Ok(new { message = "Feature usage tracked" });
+});
+
+// Check if there are new achievements for celebration
+app.MapGet("/api/achievements/celebration", async (IGamificationService gamificationService) =>
+{
+    var shouldCelebrate = await gamificationService.ShowCelebrationForNewAchievements();
+    return Results.Ok(new { celebrate = shouldCelebrate });
+});
+
 // === AI Insights Endpoints ===
 
 // Natural language query
@@ -1081,6 +1138,7 @@ public record CreateShoppingListRequest(string Name);
 public record AddShoppingListItemRequest(string ItemName, int Quantity = 1);
 public record UpdateItemStatusRequest(bool IsPurchased);
 public record CreateChallengeRequest(string Name, string Description, string Type, decimal TargetValue, int DurationDays);
+public record TrackFeatureRequest(string FeatureName, string? Details = null);
 public record NaturalLanguageQueryRequest(string Query);
 public record VoiceCommandRequest(string Transcript, string? SessionId = null, List<ReceiptHealth.Services.ConversationMessage>? ConversationHistory = null);
 public record GenerateMealPlanRequest(string DietaryPreference, DateTime? StartDate = null);
