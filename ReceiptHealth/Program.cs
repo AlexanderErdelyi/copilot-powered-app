@@ -774,8 +774,18 @@ app.MapPost("/api/meal-plans/generate", async (HttpRequest request, IMealPlanner
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Error generating meal plan: {ex.Message}\n{ex.StackTrace}");
-        return Results.Problem(ex.Message);
+        Console.WriteLine($"❌ Error generating meal plan: {ex.Message}");
+        Console.WriteLine($"   Stack trace: {ex.StackTrace}");
+        if (ex.InnerException != null)
+        {
+            Console.WriteLine($"   Inner exception: {ex.InnerException.Message}");
+            Console.WriteLine($"   Inner stack trace: {ex.InnerException.StackTrace}");
+        }
+        return Results.Json(new { 
+            error = ex.Message,
+            details = ex.InnerException?.Message,
+            type = ex.GetType().Name
+        }, statusCode: 500);
     }
 });
 
