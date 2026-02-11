@@ -880,16 +880,23 @@
                 .replace(/: /g, ':  ')       // Pause after colons
                 .replace(/; /g, ';  ');      // Pause after semicolons
             
-            // Handle numbers more naturally
-            processed = processed
-                .replace(/\b(\d+)%/g, '$1 percent')
-                .replace(/\$(\d+)/g, '$1 dollars');
+            // Handle currency more naturally (including decimals)
+            processed = processed.replace(/\$(\d+(?:\.\d{2})?)/g, (match, amount) => {
+                const [dollars, cents] = amount.split('.');
+                if (cents) {
+                    return `${dollars} dollars and ${cents} cents`;
+                }
+                return `${dollars} dollars`;
+            });
             
-            // Handle common abbreviations
+            // Handle percentages (including decimals)
+            processed = processed.replace(/\b(\d+(?:\.\d+)?)%/g, '$1 percent');
+            
+            // Handle common abbreviations (case-insensitive)
             processed = processed
-                .replace(/\bAI\b/g, 'A I')
-                .replace(/\bAPI\b/g, 'A P I')
-                .replace(/\bURL\b/g, 'U R L');
+                .replace(/\bAI\b/gi, 'A I')
+                .replace(/\bAPI\b/gi, 'A P I')
+                .replace(/\bURL\b/gi, 'U R L');
             
             return processed;
         }
