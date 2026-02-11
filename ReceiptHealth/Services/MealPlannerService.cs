@@ -130,13 +130,10 @@ public class MealPlannerService : IMealPlannerService
     {
         var prompt = BuildRecipeGenerationPrompt(dietaryPreference, count);
 
-        var session = _copilotClient.CreateSession();
-        var response = await session.Messages.Create([
-            new AssistantMessage("You are a professional chef and nutritionist."),
-            new UserMessage(prompt)
-        ], ["gpt-4o"]);
+        var session = await _copilotClient.CreateSessionAsync();
+        var response = await session.SendAndWaitAsync(new MessageOptions { Prompt = prompt });
 
-        var content = response.GetContent();
+        var content = response?.Data?.Content?.Trim();
         _logger.LogInformation("📝 AI Response: {Content}", content?.Substring(0, Math.Min(200, content?.Length ?? 0)));
 
         // Parse the JSON response
