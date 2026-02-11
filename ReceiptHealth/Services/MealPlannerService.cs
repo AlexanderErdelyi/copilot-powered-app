@@ -125,12 +125,16 @@ public class MealPlannerService : IMealPlannerService
         {
             _logger.LogError(ex, "❌ Error generating meal plan: {Message}", ex.Message);
             
-            // Delete the partially created meal plan
+            // Delete the partially created meal plan if it was saved
             try
             {
-                _context.MealPlans.Remove(mealPlan);
-                await _context.SaveChangesAsync();
-                _logger.LogInformation("🗑️ Cleaned up partial meal plan");
+                var entry = _context.Entry(mealPlan);
+                if (entry.State != Microsoft.EntityFrameworkCore.EntityState.Detached)
+                {
+                    _context.MealPlans.Remove(mealPlan);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("🗑️ Cleaned up partial meal plan");
+                }
             }
             catch (Exception cleanupEx)
             {
@@ -165,7 +169,7 @@ public class MealPlannerService : IMealPlannerService
             
             _logger.LogInformation("📝 AI Response received ({Length} chars): {Preview}...", 
                 content.Length, 
-                content.Substring(0, Math.Min(100, content.Length)));
+                content[..Math.Min(100, content.Length)]);
 
             // Parse the JSON response
             var recipesData = ParseRecipesFromAI(content);

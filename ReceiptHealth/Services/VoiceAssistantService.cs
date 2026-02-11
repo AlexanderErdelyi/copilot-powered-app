@@ -730,8 +730,9 @@ Just be human:
 
             _logger.LogInformation("🍽️ Generating meal plan with preference: {Preference}", dietaryPreference);
 
-            // Generate the meal plan
-            var startDate = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek); // Start of current week
+            // Generate the meal plan - start of current week (Monday)
+            var today = DateTime.Today;
+            var startDate = today.AddDays(-(int)today.DayOfWeek + (today.DayOfWeek == DayOfWeek.Sunday ? -6 : 1));
             var mealPlan = await _mealPlannerService.GenerateWeeklyMealPlanAsync(dietaryPreference ?? "Healthy", startDate);
 
             response.Success = true;
