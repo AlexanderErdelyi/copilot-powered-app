@@ -131,7 +131,10 @@ public class MealPlannerService : IMealPlannerService
         var prompt = BuildRecipeGenerationPrompt(dietaryPreference, count);
 
         var session = await _copilotClient.CreateSessionAsync();
-        var response = await session.SendAndWaitAsync(new MessageOptions { Prompt = prompt });
+        
+        // Increase timeout to 3 minutes for complex recipe generation
+        var timeout = TimeSpan.FromMinutes(3);
+        var response = await session.SendAndWaitAsync(new MessageOptions { Prompt = prompt }, timeout);
 
         var content = response?.Data?.Content?.Trim();
         _logger.LogInformation("📝 AI Response: {Content}", content?.Substring(0, Math.Min(200, content?.Length ?? 0)));
