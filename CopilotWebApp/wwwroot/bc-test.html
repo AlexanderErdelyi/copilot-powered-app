@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Central Integration Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f0f0f0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: #0078d4;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .container {
+            display: flex;
+            flex: 1;
+            gap: 10px;
+            padding: 10px;
+            overflow: hidden;
+        }
+        
+        .iframe-container {
+            flex: 2;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .messages-panel {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .messages-panel h2 {
+            color: #0078d4;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .message-log {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-left: 4px solid #0078d4;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        
+        .message-log.user {
+            border-left-color: #28a745;
+        }
+        
+        .message-log.assistant {
+            border-left-color: #667eea;
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .message-type {
+            font-size: 11px;
+            padding: 2px 8px;
+            background: #0078d4;
+            color: white;
+            border-radius: 3px;
+        }
+        
+        .message-type.user {
+            background: #28a745;
+        }
+        
+        .message-type.assistant {
+            background: #667eea;
+        }
+        
+        .message-content {
+            color: #555;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .message-meta {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #888;
+        }
+        
+        .clear-button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+        
+        .clear-button:hover {
+            background: #c82333;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏢 Business Central - Copilot Chat Integration Test</h1>
+        <p>This page simulates Business Central receiving messages from the embedded chat</p>
+    </div>
+    
+    <div class="container">
+        <div class="iframe-container">
+            <iframe src="/index.html" title="Copilot Chat"></iframe>
+        </div>
+        
+        <div class="messages-panel">
+            <h2>📨 Messages Received from Chat</h2>
+            <button class="clear-button" onclick="clearMessages()">Clear All Messages</button>
+            <div id="messagesList">
+                <div class="empty-state">
+                    No messages received yet.<br>
+                    Send a message in the chat to see it here.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const messagesList = document.getElementById('messagesList');
+        let messageCount = 0;
+
+        // Listen for messages from the iframe
+        window.addEventListener('message', (event) => {
+            // In production, validate event.origin for security
+            // if (event.origin !== 'http://localhost:5001') return;
+            
+            const data = event.data;
+            
+            // Check if it's a message from our chat app
+            if (data.type && data.sessionId) {
+                console.log('📨 Received from Chat:', data);
+                displayMessage(data);
+            }
+        });
+
+        function displayMessage(data) {
+            // Remove empty state
+            if (messageCount === 0) {
+                messagesList.innerHTML = '';
+            }
+            messageCount++;
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message-log ${data.type === 'userMessage' ? 'user' : 'assistant'}`;
+            
+            const typeLabel = data.type === 'userMessage' ? 'USER' : 'ASSISTANT';
+            const emoji = data.type === 'userMessage' ? '👤' : '🤖';
+            
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    <span>${emoji} ${typeLabel}</span>
+                    <span class="message-type ${data.type === 'userMessage' ? 'user' : 'assistant'}">${data.type}</span>
+                </div>
+                <div class="message-content">${escapeHtml(data.content)}</div>
+                ${data.originalMessage ? `<div class="message-meta">📎 In response to: "${escapeHtml(data.originalMessage)}"</div>` : ''}
+                <div class="message-meta">
+                    🕐 ${new Date(data.timestamp).toLocaleTimeString()} | 
+                    🔑 Session: ${data.sessionId.substring(0, 15)}...
+                </div>
+            `;
+            
+            messagesList.insertBefore(messageDiv, messagesList.firstChild);
+        }
+
+        function clearMessages() {
+            messagesList.innerHTML = `
+                <div class="empty-state">
+                    No messages received yet.<br>
+                    Send a message in the chat to see it here.
+                </div>
+            `;
+            messageCount = 0;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        console.log('✅ Business Central integration test page ready');
+        console.log('📡 Listening for messages from embedded chat...');
+    </script>
+</body>
+</html>

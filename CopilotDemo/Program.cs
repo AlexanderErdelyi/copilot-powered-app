@@ -1,4 +1,4 @@
-using GitHub.Copilot.SDK;
+﻿using GitHub.Copilot.SDK;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
 
@@ -14,12 +14,26 @@ var getWeather = AIFunctionFactory.Create(
     "get_weather",
     "Get the current weather for a city");
 
+// Define the app info tool to read and return README documentation
+var getAppInfo = AIFunctionFactory.Create(
+    () =>
+    {
+        var readmePath = Path.Combine(Directory.GetCurrentDirectory(), "README.md");
+        if (File.Exists(readmePath))
+        {
+            return File.ReadAllText(readmePath);
+        }
+        return "README.md not found. Unable to provide application documentation.";
+    },
+    "get_app_info",
+    "Read the application's README.md file to answer questions about the app's features, usage, purpose, license, technical details, and any other documentation");
+
 await using var client = new CopilotClient();
 await using var session = await client.CreateSessionAsync(new SessionConfig
 {
     Model = "gpt-4.1",
     Streaming = true,
-    Tools = [getWeather]
+    Tools = [getWeather, getAppInfo]
 });
 
 // Listen for response chunks
@@ -35,8 +49,11 @@ session.On(ev =>
     }
 });
 
-Console.WriteLine("🌤️  Weather Assistant (type 'exit' to quit)");
-Console.WriteLine("   Try: 'What's the weather in Paris?' or 'Compare weather in NYC and LA'\n");
+Console.WriteLine("🤖 Copilot Agent Demo - Weather & App Info Assistant (type 'exit' to quit)");
+Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+Console.WriteLine("Ask me about:");
+Console.WriteLine("  🌤️  Weather - 'What's the weather in Paris?' or 'Compare NYC and LA'");
+Console.WriteLine("  📱 This App - 'What can you do?' or 'How does this work?'\n");
 
 while (true)
 {
