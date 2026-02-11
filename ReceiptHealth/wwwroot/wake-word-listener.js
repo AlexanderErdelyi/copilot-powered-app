@@ -8,7 +8,7 @@
     'use strict';
 
     // Configuration
-    const WAKE_WORDS = ['hey assistant', 'hey assistance', 'a assistant', 'ok assistant'];
+    const WAKE_WORDS = ['hey assistant', 'a assistant', 'ok assistant'];
     const ACTIVATION_TIMEOUT = 30000; // 30 seconds after activation
     
     // Check for Web Speech API support
@@ -333,7 +333,7 @@
             content: text
         });
 
-        // Keep only last 10 messages
+        // Keep only last 10 messages (5 exchanges)
         if (conversationHistory.length > 10) {
             conversationHistory = conversationHistory.slice(-10);
         }
@@ -391,8 +391,8 @@
      * Format response text (convert URLs to links, etc.)
      */
     function formatResponse(text) {
-        // Convert URLs to clickable links
-        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        // Convert URLs to clickable links (exclude trailing punctuation)
+        const urlRegex = /(https?:\/\/[^\s]+?)(?=[.,;:!?)\]\s]|$)/g;
         return text.replace(urlRegex, '<a href="$1" target="_blank">$1</a>');
     }
 
