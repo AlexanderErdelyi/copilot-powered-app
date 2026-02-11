@@ -116,58 +116,37 @@ Return ONLY the extracted text, without any additional commentary or explanation
     {
         try
         {
-            // For PDFs, we'll use AI to extract and structure the text
-            // Note: This is a simplified approach. For production, you might want to:
-            // 1. Convert PDF pages to images first
-            // 2. Process each page separately
-            // 3. Or use a dedicated PDF library with AI for enhancement
-
-            _logger.LogInformation("Reading PDF file for AI processing");
+            // Note: PDF text extraction with AI vision models is challenging because:
+            // 1. Vision models work best with images, not PDF binary data
+            // 2. Base64-encoded PDFs can be very large (exceeding token limits)
+            // 
+            // Recommended approaches for production:
+            // 1. Use a PDF library (e.g., PdfPig, iTextSharp) to extract text directly
+            // 2. Convert PDF pages to images and process each image with AI vision
+            // 3. Use a dedicated PDF text extraction service
+            //
+            // For now, we'll log a warning and suggest alternatives
             
-            // Read PDF as bytes
-            var pdfBytes = await File.ReadAllBytesAsync(filePath);
-            var base64Pdf = Convert.ToBase64String(pdfBytes);
-
-            // Create a session with GPT-4o
-            await using var session = await _copilotClient.CreateSessionAsync(new SessionConfig
-            {
-                Model = "gpt-4o",
-                Streaming = false
-            });
-
-            var prompt = @"You are a document processing system specialized in extracting structured text from receipt PDFs.
-
-This is a receipt PDF file. Please extract ALL text content from the document.
-
-Include:
-- Store/vendor name
-- Date
-- All line items with quantities and prices
-- Subtotal, tax, and total amounts
-- Any other relevant information
-
-Return ONLY the extracted text in a clean, structured format suitable for parsing. Do NOT include any explanations or commentary.";
-
-            // Send the PDF for processing
-            var response = await session.SendAndWaitAsync(new MessageOptions 
-            { 
-                Prompt = $"{prompt}\n\nPDF (base64): {base64Pdf.Substring(0, Math.Min(1000, base64Pdf.Length))}..."
-            });
-
-            var extractedText = response?.Data?.Content ?? string.Empty;
+            _logger.LogWarning("PDF text extraction with AI vision is not fully implemented");
+            _logger.LogInformation("Attempting to use fallback: suggesting use of dedicated PDF library");
             
-            if (string.IsNullOrWhiteSpace(extractedText))
-            {
-                _logger.LogWarning("AI returned empty text from PDF");
-                throw new InvalidOperationException("Failed to extract text from PDF");
-            }
-
-            _logger.LogInformation("Successfully extracted {Length} characters from PDF", extractedText.Length);
-            return extractedText;
+            // For a production implementation, you would:
+            // 1. Install a PDF library: dotnet add package PdfPig
+            // 2. Extract text using the library:
+            //    using (var document = PdfDocument.Open(filePath))
+            //    {
+            //        var text = string.Join("\n", document.GetPages().Select(p => p.Text));
+            //        return text;
+            //    }
+            
+            throw new NotSupportedException(
+                "PDF text extraction requires a dedicated PDF library. " +
+                "Please install PdfPig or iTextSharp for PDF support, or convert PDF to images first. " +
+                "Alternatively, use text or image files for best results.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during AI-powered PDF extraction");
+            _logger.LogError(ex, "Error during PDF extraction");
             throw new InvalidOperationException($"Failed to extract text from PDF: {ex.Message}", ex);
         }
     }

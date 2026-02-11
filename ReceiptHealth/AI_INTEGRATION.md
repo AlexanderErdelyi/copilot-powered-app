@@ -38,7 +38,7 @@ The application can be configured to use AI-powered or basic services via `appse
 
 ## How It Works
 
-### Image OCR Flow
+### Image OCR Flow (Supported)
 
 1. User uploads an image (JPG/PNG)
 2. Image file is saved to storage
@@ -48,6 +48,40 @@ The application can be configured to use AI-powered or basic services via `appse
 6. Base64 image is sent with OCR prompt
 7. AI extracts and returns text
 8. Text is passed to receipt parser
+
+### PDF Processing (Requires Additional Implementation)
+
+**Current Status**: PDF extraction is not fully implemented in this version.
+
+**Why?** 
+- AI vision models (GPT-4o) work best with images, not raw PDF binary data
+- Base64-encoded PDFs can exceed token limits
+- PDF binary format is not optimized for vision models
+
+**Recommended Solutions**:
+
+1. **Use a PDF Text Extraction Library** (Best for text-based PDFs)
+   ```bash
+   dotnet add package PdfPig
+   ```
+   ```csharp
+   using UglyToad.PdfPig;
+   using (var document = PdfDocument.Open(filePath))
+   {
+       var text = string.Join("\n", document.GetPages().Select(p => p.Text));
+   }
+   ```
+
+2. **Convert PDF to Images** (Best for scanned PDFs)
+   - Use a library like `PdfiumViewer` or `GhostScript.NET`
+   - Convert each PDF page to an image
+   - Process each image with the AI OCR service
+
+3. **Hybrid Approach**
+   - Try PDF text extraction first (fast for text-based PDFs)
+   - Fall back to image conversion + OCR for scanned PDFs
+
+See the "Future Enhancements" section below for implementation details.
 
 ### Receipt Parsing Flow
 
@@ -210,14 +244,66 @@ If processing is slow:
 
 Potential improvements to the AI integration:
 
+### High Priority
+- [ ] **PDF Support Implementation** - Add PdfPig or iTextSharp for PDF text extraction
+- [ ] **PDF-to-Image Conversion** - Convert scanned PDFs to images for AI OCR
+- [ ] **Hybrid PDF Processing** - Try text extraction first, fall back to image OCR
+
+### Performance & Reliability
 - [ ] Caching AI responses to reduce API calls
 - [ ] Batch processing multiple receipts in parallel
-- [ ] Fine-tuning prompts for specific vendors
 - [ ] Adding retry logic for transient API failures
 - [ ] Implementing rate limiting for API calls
+
+### AI Enhancements
+- [ ] Fine-tuning prompts for specific vendors
 - [ ] Adding AI-powered categorization (replace keyword-based)
 - [ ] Multi-language receipt support
 - [ ] Confidence scores for extracted data
+- [ ] Better error handling with graceful degradation
+
+### Example: Adding PDF Support with PdfPig
+
+```bash
+# Install the package
+dotnet add package PdfPig
+```
+
+```csharp
+// In AICopilotTextExtractionService.cs
+using UglyToad.PdfPig;
+
+private async Task<string> ExtractTextFromPdfAsync(string filePath)
+{
+    try
+    {
+        // Try direct text extraction first (fast for text-based PDFs)
+        using (var document = PdfDocument.Open(filePath))
+        {
+            var text = string.Join("\n", document.GetPages().Select(p => p.Text));
+            
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                _logger.LogInformation("Extracted {Length} characters from PDF", text.Length);
+                return text;
+            }
+        }
+        
+        // If no text found, it might be a scanned PDF
+        _logger.LogWarning("PDF contains no extractable text - may be scanned");
+        
+        // TODO: Convert PDF to images and use AI OCR
+        // This would require PdfiumViewer or similar for rendering
+        
+        throw new NotSupportedException("Scanned PDFs not yet supported");
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error extracting text from PDF");
+        throw;
+    }
+}
+```
 
 ## References
 

@@ -6,9 +6,8 @@ A production-quality .NET 8 web application that helps you track and analyze the
 
 ### 📤 Receipt Upload & Processing
 - **Drag & drop interface** for easy file uploads
-- Support for multiple file formats: JPG, PNG, PDF, TXT
+- Support for multiple file formats: JPG, PNG, TXT (PDF support requires additional library)
 - **AI-Powered OCR** using GitHub Copilot SDK with GPT-4 Vision for image text extraction
-- **AI-Powered PDF Extraction** for accurate text extraction from PDF receipts
 - **Intelligent Receipt Parsing** using GPT-4 to understand and structure receipt data
 - **Duplicate detection** via SHA256 hashing  - uploads are idempotent
 - Real-time processing status (Processing → Processed/Failed)
@@ -51,10 +50,13 @@ When `UseAI: true` is configured, the application leverages the GitHub Copilot S
    - Maintains original layout and structure
    - Far superior accuracy compared to traditional OCR libraries
 
-2. **AI-Powered PDF Extraction**
-   - Uses GPT-4 Vision to extract and structure text from PDF receipts
-   - Handles various PDF formats and layouts
-   - Intelligent extraction of structured data
+2. **PDF Support (Requires Additional Library)**
+   - Note: AI vision models work best with images, not PDF binary data
+   - For PDF support, install a PDF library such as:
+     - `PdfPig` - Open source, actively maintained
+     - `iTextSharp` - Commercial, feature-rich
+   - Alternative: Convert PDF to images first, then use AI OCR
+   - See `AI_INTEGRATION.md` for implementation guidance
 
 3. **Intelligent Receipt Parsing**
    - Uses GPT-4.1 to understand receipt structure
@@ -252,6 +254,8 @@ decimal weight = item.Category switch
 - [x] **OCR Integration**: ✅ Implemented using GitHub Copilot SDK with GPT-4 Vision
 - [x] **PDF Text Extraction**: ✅ Implemented using GitHub Copilot SDK
 - [x] **Intelligent Receipt Parsing**: ✅ Implemented using GPT-4.1 for structured data extraction
+- [ ] **PDF Support**: Add PdfPig or iTextSharp for PDF text extraction (see AI_INTEGRATION.md)
+- [ ] **PDF-to-Image Conversion**: For scanned PDFs, convert to images and use AI OCR
 - [ ] **AI-Powered Categorization**: Enhance category detection using AI instead of keywords
 - [ ] **Vendor Bias**: Apply vendor-level category adjustments
 - [ ] **Weekly/Yearly Analytics**: Expand time-based aggregations
