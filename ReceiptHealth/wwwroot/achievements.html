@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Achievements - ReceiptHealth</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        nav {
+            margin-top: 20px;
+        }
+
+        nav a {
+            color: #667eea;
+            text-decoration: none;
+            margin-right: 20px;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .achievements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .achievement-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .achievement-card.unlocked {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .achievement-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .achievement-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .achievement-description {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .achievement-date {
+            font-size: 0.8em;
+            color: #999;
+            margin-top: 10px;
+        }
+
+        .challenges-list {
+            margin-top: 20px;
+        }
+
+        .challenge-item {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .challenge-item.completed {
+            background: #d4edda;
+            border: 2px solid #28a745;
+        }
+
+        .challenge-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .challenge-name {
+            font-weight: bold;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .challenge-status {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background: #cfe2ff;
+            color: #084298;
+        }
+
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .challenge-description {
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 25px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 500;
+            font-size: 0.85em;
+            transition: width 0.3s;
+        }
+
+        .challenge-dates {
+            font-size: 0.85em;
+            color: #999;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏆 Achievements & Challenges</h1>
+            <p>Track your progress and unlock rewards for healthy shopping!</p>
+            <nav>
+                <a href="/">Dashboard</a>
+                <a href="/receipts.html">Receipts</a>
+                <a href="/insights.html">Insights</a>
+                <a href="/shopping-lists.html">Shopping Lists</a>
+                <a href="/achievements.html">Achievements</a>
+            </nav>
+        </header>
+
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalAchievements">0</div>
+                <div class="stat-label">Achievements Unlocked</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeChallenges">0</div>
+                <div class="stat-label">Active Challenges</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="completedChallenges">0</div>
+                <div class="stat-label">Completed Challenges</div>
+            </div>
+        </div>
+
+        <!-- Achievements -->
+        <div class="card">
+            <h2>🎖️ Your Achievements</h2>
+            <button class="btn" onclick="checkAchievements()">🔄 Check for New Achievements</button>
+            <div id="achievementsContainer" class="achievements-grid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading achievements...
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Challenges -->
+        <div class="card">
+            <h2>🎯 Active Challenges</h2>
+            <div id="challengesContainer" class="challenges-list">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading challenges...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAchievements();
+            loadChallenges();
+        });
+
+        async function loadAchievements() {
+            const container = document.getElementById('achievementsContainer');
+            try {
+                const response = await fetch('/api/achievements');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const achievements = await response.json();
+
+                document.getElementById('totalAchievements').textContent = achievements?.length || 0;
+
+                if (!achievements || achievements.length === 0) {
+                    container.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: #999; padding: 40px;">🏆 No achievements yet. Keep shopping healthy to unlock your first badge!</p>';
+                    return;
+                }
+
+                container.innerHTML = achievements.map(achievement => {
+                    const unlocked = achievement.isUnlocked ? 'unlocked' : '';
+                    return `
+                        <div class="achievement-card ${unlocked}">
+                            <div class="achievement-icon">${achievement.icon}</div>
+                            <div class="achievement-name">${achievement.name}</div>
+                            <div class="achievement-description">${achievement.description}</div>
+                            ${achievement.isUnlocked ? `
+                                <div class="achievement-date">
+                                    Unlocked: ${new Date(achievement.unlockedAt).toLocaleDateString()}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading achievements:', error);
+                container.innerHTML = `<p style="grid-column: 1 / -1; color: red; text-align: center; padding: 20px;">⚠️ Unable to load achievements. Please ensure the server is running.<br><small>${error.message}</small></p>`;
+            }
+        }
+
+        async function loadChallenges() {
+            const container = document.getElementById('challengesContainer');
+            try {
+                const response = await fetch('/api/challenges');
+                const challenges = await response.json();
+
+                const active = challenges.filter(c => !c.isCompleted);
+                const completed = challenges.filter(c => c.isCompleted);
+
+                document.getElementById('activeChallenges').textContent = active.length;
+                document.getElementById('completedChallenges').textContent = completed.length;
+
+                if (challenges.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">No challenges available. Check back later for new challenges!</p>';
+                    return;
+                }
+
+                container.innerHTML = challenges.map(challenge => {
+                    const progress = challenge.targetValue > 0 
+                        ? Math.min((challenge.currentValue / challenge.targetValue) * 100, 100) 
+                        : 0;
+                    const statusClass = challenge.isCompleted ? 'completed' : '';
+                    const statusBadge = challenge.isCompleted ? 'completed' : 'active';
+                    const statusText = challenge.isCompleted ? 'Completed ✓' : 'In Progress';
+
+                    return `
+                        <div class="challenge-item ${statusClass}">
+                            <div class="challenge-header">
+                                <div class="challenge-name">${challenge.name}</div>
+                                <div class="challenge-status status-${statusBadge}">${statusText}</div>
+                            </div>
+                            <div class="challenge-description">${challenge.description}</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${progress}%">
+                                    ${progress.toFixed(0)}%
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                <span style="font-size: 0.9em; color: #666;">
+                                    Current: ${challenge.currentValue.toFixed(1)}
+                                </span>
+                                <span style="font-size: 0.9em; color: #666;">
+                                    Target: ${challenge.targetValue.toFixed(1)}
+                                </span>
+                            </div>
+                            <div class="challenge-dates">
+                                ${new Date(challenge.startDate).toLocaleDateString()} - ${new Date(challenge.endDate).toLocaleDateString()}
+                                ${challenge.isCompleted ? ` • Completed: ${new Date(challenge.completedAt).toLocaleDateString()}` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                container.innerHTML = `<p style="color: red;">Failed to load challenges: ${error.message}</p>`;
+            }
+        }
+
+        async function checkAchievements() {
+            try {
+                const response = await fetch('/api/achievements/check', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    await loadAchievements();
+                    await loadChallenges();
+                    alert('✅ Achievements updated! Check if you unlocked any new badges.');
+                } else {
+                    alert('Failed to check achievements');
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

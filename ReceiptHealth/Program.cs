@@ -47,6 +47,14 @@ else
 builder.Services.AddScoped<IHealthScoreService, HealthScoreService>();
 builder.Services.AddScoped<IReceiptProcessingService, ReceiptProcessingService>();
 
+// Register new feature services
+builder.Services.AddScoped<IPriceComparisonService, PriceComparisonService>();
+builder.Services.AddScoped<IRecommendationService, RecommendationService>();
+builder.Services.AddScoped<IShoppingListService, ShoppingListService>();
+builder.Services.AddScoped<IGamificationService, GamificationService>();
+builder.Services.AddScoped<IInsightsService, InsightsService>();
+builder.Services.AddScoped<INutritionService, NutritionService>();
+
 var app = builder.Build();
 
 // Enable static files (for serving HTML/JS/CSS)
@@ -368,6 +376,30 @@ app.MapGet("/api/receipts/{id}", async (int id, ReceiptHealthContext context) =>
     });
 });
 
+// Analytics: Get available years
+app.MapGet("/api/analytics/available-years", async (ReceiptHealthContext context) =>
+{
+    var years = await context.Receipts
+        .Select(r => r.Date.Year)
+        .Distinct()
+        .OrderByDescending(y => y)
+        .ToListAsync();
+    
+    var currentYear = DateTime.Now.Year;
+    if (!years.Contains(currentYear) && years.Count > 0)
+    {
+        // Add current year if no receipts yet for easier navigation
+        years.Insert(0, currentYear);
+    }
+    else if (years.Count == 0)
+    {
+        // No receipts at all, just return current year
+        years.Add(currentYear);
+    }
+    
+    return Results.Ok(new { years });
+});
+
 // Analytics: Monthly spend
 app.MapGet("/api/analytics/monthly-spend", async (ReceiptHealthContext context, int? year) =>
 {
@@ -414,6 +446,242 @@ app.MapGet("/api/analytics/category-breakdown", async (ReceiptHealthContext cont
     };
 
     return Results.Ok(breakdown);
+});
+
+// === Price Comparison Endpoints ===
+
+// Compare prices for an item
+app.MapGet("/api/price-comparison/{itemName}", async (string itemName, IPriceComparisonService priceComparisonService) =>
+{
+    var comparisons = await priceComparisonService.CompareItemPricesAsync(itemName);
+    return Results.Ok(comparisons);
+});
+
+// Get price trends for an item
+app.MapGet("/api/price-trends/{itemName}", async (string itemName, int days, IPriceComparisonService priceComparisonService) =>
+{
+    var trends = await priceComparisonService.GetPriceTrendsAsync(itemName, days);
+    return Results.Ok(trends);
+});
+
+// === Recommendations Endpoints ===
+
+// Get healthy alternatives for a junk item
+app.MapGet("/api/recommendations/alternatives/{itemName}", async (string itemName, IRecommendationService recommendationService) =>
+{
+    var alternatives = await recommendationService.GetHealthyAlternativesAsync(itemName);
+    return Results.Ok(alternatives);
+});
+
+// Get personalized category recommendations
+app.MapGet("/api/recommendations/category", async (IRecommendationService recommendationService) =>
+{
+    var recommendations = await recommendationService.GetCategoryRecommendationsAsync();
+    return Results.Ok(new { recommendations });
+});
+
+// === Shopping List Endpoints ===
+
+// Get all shopping lists
+app.MapGet("/api/shopping-lists", async (IShoppingListService shoppingListService) =>
+{
+    var lists = await shoppingListService.GetAllShoppingListsAsync();
+    return Results.Ok(lists);
+});
+
+// Get a specific shopping list
+app.MapGet("/api/shopping-lists/{id}", async (int id, IShoppingListService shoppingListService) =>
+{
+    try
+    {
+        var list = await shoppingListService.GetShoppingListAsync(id);
+        return Results.Ok(list);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+// Create a new shopping list
+app.MapPost("/api/shopping-lists", async (HttpRequest request, IShoppingListService shoppingListService) =>
+{
+    var body = await request.ReadFromJsonAsync<CreateShoppingListRequest>();
+    if (body == null || string.IsNullOrEmpty(body.Name))
+    {
+        return Results.BadRequest(new { error = "Name is required" });
+    }
+    
+    var list = await shoppingListService.CreateShoppingListAsync(body.Name);
+    return Results.Created($"/api/shopping-lists/{list.Id}", list);
+});
+
+// Generate shopping list from healthy items
+app.MapPost("/api/shopping-lists/generate", async (int daysBack, IShoppingListService shoppingListService) =>
+{
+    var list = await shoppingListService.GenerateFromHealthyItemsAsync(daysBack);
+    return Results.Created($"/api/shopping-lists/{list.Id}", list);
+});
+
+// Add item to shopping list
+app.MapPost("/api/shopping-lists/{listId}/items", async (int listId, HttpRequest request, IShoppingListService shoppingListService) =>
+{
+    var body = await request.ReadFromJsonAsync<AddShoppingListItemRequest>();
+    if (body == null || string.IsNullOrEmpty(body.ItemName))
+    {
+        return Results.BadRequest(new { error = "ItemName is required" });
+    }
+    
+    try
+    {
+        var item = await shoppingListService.AddItemAsync(listId, body.ItemName, body.Quantity);
+        return Results.Created($"/api/shopping-lists/{listId}/items/{item.Id}", item);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+// Mark item as purchased/unpurchased
+app.MapPatch("/api/shopping-lists/items/{itemId}", async (int itemId, HttpRequest request, IShoppingListService shoppingListService) =>
+{
+    var body = await request.ReadFromJsonAsync<UpdateItemStatusRequest>();
+    if (body == null)
+    {
+        return Results.BadRequest(new { error = "Request body required" });
+    }
+    
+    var success = await shoppingListService.MarkItemPurchasedAsync(itemId, body.IsPurchased);
+    return success ? Results.Ok(new { success = true }) : Results.NotFound();
+});
+
+// Remove item from shopping list
+app.MapDelete("/api/shopping-lists/items/{itemId}", async (int itemId, IShoppingListService shoppingListService) =>
+{
+    var success = await shoppingListService.RemoveItemAsync(itemId);
+    return success ? Results.Ok(new { success = true }) : Results.NotFound();
+});
+
+// Delete shopping list
+app.MapDelete("/api/shopping-lists/{listId}", async (int listId, IShoppingListService shoppingListService) =>
+{
+    try
+    {
+        var success = await shoppingListService.DeleteShoppingListAsync(listId);
+        return success ? Results.Ok(new { success = true }) : Results.NotFound(new { error = "Shopping list not found" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error deleting shopping list {listId}: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
+// Get price alerts for shopping list
+app.MapGet("/api/shopping-lists/{listId}/price-alerts", async (int listId, IShoppingListService shoppingListService) =>
+{
+    var alerts = await shoppingListService.GetPriceAlertsAsync(listId);
+    return Results.Ok(alerts);
+});
+
+// === Gamification Endpoints ===
+
+// Get all achievements
+app.MapGet("/api/achievements", async (IGamificationService gamificationService) =>
+{
+    var achievements = await gamificationService.GetAchievementsAsync();
+    return Results.Ok(achievements);
+});
+
+// Get active challenges
+app.MapGet("/api/challenges", async (IGamificationService gamificationService) =>
+{
+    var challenges = await gamificationService.GetActiveChallengesAsync();
+    return Results.Ok(challenges);
+});
+
+// Create a new challenge
+app.MapPost("/api/challenges", async (HttpRequest request, IGamificationService gamificationService) =>
+{
+    var body = await request.ReadFromJsonAsync<CreateChallengeRequest>();
+    if (body == null)
+    {
+        return Results.BadRequest(new { error = "Invalid request" });
+    }
+    
+    var challenge = await gamificationService.CreateChallengeAsync(
+        body.Name, body.Description, body.Type, body.TargetValue, body.DurationDays);
+    return Results.Created($"/api/challenges/{challenge.Id}", challenge);
+});
+
+// Trigger achievement check (can be called after receipt processing)
+app.MapPost("/api/achievements/check", async (IGamificationService gamificationService) =>
+{
+    await gamificationService.CheckAndUnlockAchievementsAsync();
+    await gamificationService.UpdateChallengeProgressAsync();
+    return Results.Ok(new { message = "Achievements and challenges updated" });
+});
+
+// === AI Insights Endpoints ===
+
+// Natural language query
+app.MapPost("/api/insights/query", async (HttpRequest request, IInsightsService insightsService) =>
+{
+    var body = await request.ReadFromJsonAsync<NaturalLanguageQueryRequest>();
+    if (body == null || string.IsNullOrEmpty(body.Query))
+    {
+        return Results.BadRequest(new { error = "Query is required" });
+    }
+    
+    var answer = await insightsService.ProcessNaturalLanguageQueryAsync(body.Query);
+    return Results.Ok(new { query = body.Query, answer });
+});
+
+// Detect anomalies
+app.MapGet("/api/insights/anomalies", async (IInsightsService insightsService) =>
+{
+    var alerts = await insightsService.DetectAnomaliesAsync();
+    return Results.Ok(alerts);
+});
+
+// Budget prediction
+app.MapGet("/api/insights/budget-prediction", async (IInsightsService insightsService) =>
+{
+    var prediction = await insightsService.PredictMonthlyBudgetAsync();
+    return Results.Ok(prediction);
+});
+
+// === Nutrition Endpoints ===
+
+// Get daily nutrition summary
+app.MapGet("/api/nutrition/daily", async (DateTime date, INutritionService nutritionService) =>
+{
+    var summary = await nutritionService.GetDailyNutritionAsync(date);
+    return Results.Ok(summary);
+});
+
+// Get weekly nutrition summary
+app.MapGet("/api/nutrition/weekly", async (DateTime weekStart, INutritionService nutritionService) =>
+{
+    var summary = await nutritionService.GetWeeklyNutritionAsync(weekStart);
+    return Results.Ok(summary);
+});
+
+// Populate nutrition data for a receipt
+app.MapPost("/api/nutrition/populate/{receiptId}", async (int receiptId, ReceiptHealthContext context, INutritionService nutritionService) =>
+{
+    var receipt = await context.Receipts
+        .Include(r => r.LineItems)
+        .FirstOrDefaultAsync(r => r.Id == receiptId);
+    
+    if (receipt == null)
+    {
+        return Results.NotFound(new { error = "Receipt not found" });
+    }
+    
+    await nutritionService.PopulateNutritionDataAsync(receipt);
+    return Results.Ok(new { message = "Nutrition data populated" });
 });
 
 // Delete receipt
@@ -496,4 +764,11 @@ public record ProcessingStatusDetails(
     int? CategorizedCount = null,
     int? TotalItems = null
 );
+
+// Request DTOs for new endpoints
+public record CreateShoppingListRequest(string Name);
+public record AddShoppingListItemRequest(string ItemName, int Quantity = 1);
+public record UpdateItemStatusRequest(bool IsPurchased);
+public record CreateChallengeRequest(string Name, string Description, string Type, decimal TargetValue, int DurationDays);
+public record NaturalLanguageQueryRequest(string Query);
 
