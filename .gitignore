@@ -11,6 +11,11 @@ obj/
 .vs/
 .vscode/
 
+# ReceiptHealth specific
+ReceiptHealth/storage/
+ReceiptHealth/*.db
+ReceiptHealth/*.db-*
+
 # Common
 .DS_Store
 .env

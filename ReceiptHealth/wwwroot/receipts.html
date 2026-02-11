@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReceiptHealth - Receipts</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            color: #667eea;
+            font-size: 32px;
+        }
+
+        nav {
+            display: flex;
+            gap: 20px;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: #667eea;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background 0.3s;
+        }
+
+        nav a:hover, nav a.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .receipts-section {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .receipts-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .search-bar {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-bar input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f9fafb;
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        tbody tr:hover {
+            background: #f9fafb;
+            cursor: pointer;
+        }
+
+        .health-score {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .health-score.excellent {
+            background: #10b981;
+        }
+
+        .health-score.good {
+            background: #3b82f6;
+        }
+
+        .health-score.fair {
+            background: #f59e0b;
+        }
+
+        .health-score.poor {
+            background: #ef4444;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .receipt-details h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .receipt-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .receipt-info .field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .receipt-info .label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .receipt-info .value {
+            font-size: 16px;
+            color: #333;
+        }
+
+        .line-items {
+            margin-top: 30px;
+        }
+
+        .line-items h4 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .line-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .line-item:last-child {
+            border-bottom: none;
+        }
+
+        .category-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .category-badge.healthy {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .category-badge.junk {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .category-badge.other {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .category-badge.unknown {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            margin-bottom: 20px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary:hover {
+            background: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🩺 ReceiptHealth</h1>
+            <nav>
+                <a href="/">Dashboard</a>
+                <a href="/receipts.html" class="active">Receipts</a>
+            </nav>
+        </header>
+
+        <div class="receipts-section">
+            <h2>All Receipts</h2>
+            
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="Search by vendor, date, or amount...">
+            </div>
+
+            <div id="loadingIndicator" class="loading">
+                Loading receipts...
+            </div>
+
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <h3>No receipts yet</h3>
+                <p>Upload your first receipt to get started!</p>
+                <a href="/" class="btn-primary">Go to Dashboard</a>
+            </div>
+
+            <table id="receiptsTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Vendor</th>
+                        <th>Date</th>
+                        <th>Total</th>
+                        <th>Health Score</th>
+                        <th>Items</th>
+                    </tr>
+                </thead>
+                <tbody id="receiptsBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Receipt Details Modal -->
+    <div id="receiptModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <div id="receiptDetails" class="receipt-details">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let receipts = [];
+
+        async function loadReceipts() {
+            try {
+                const response = await fetch('/api/receipts');
+                receipts = await response.json();
+                
+                document.getElementById('loadingIndicator').style.display = 'none';
+                
+                if (receipts.length === 0) {
+                    document.getElementById('emptyState').style.display = 'block';
+                } else {
+                    document.getElementById('receiptsTable').style.display = 'table';
+                    renderReceipts(receipts);
+                }
+            } catch (error) {
+                console.error('Error loading receipts:', error);
+                document.getElementById('loadingIndicator').textContent = 'Error loading receipts';
+            }
+        }
+
+        function renderReceipts(receiptsToRender) {
+            const tbody = document.getElementById('receiptsBody');
+            tbody.innerHTML = '';
+
+            receiptsToRender.forEach(receipt => {
+                const row = document.createElement('tr');
+                row.onclick = () => showReceiptDetails(receipt.id);
+                
+                const healthScoreClass = 
+                    receipt.healthScore >= 75 ? 'excellent' :
+                    receipt.healthScore >= 50 ? 'good' :
+                    receipt.healthScore >= 25 ? 'fair' : 'poor';
+
+                row.innerHTML = `
+                    <td>${receipt.vendor}</td>
+                    <td>${new Date(receipt.date).toLocaleDateString()}</td>
+                    <td>$${receipt.total.toFixed(2)}</td>
+                    <td><span class="health-score ${healthScoreClass}">${receipt.healthScore.toFixed(0)}</span></td>
+                    <td>${receipt.lineItemCount} items</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        async function showReceiptDetails(receiptId) {
+            try {
+                const response = await fetch(`/api/receipts/${receiptId}`);
+                const receipt = await response.json();
+                
+                const healthScoreClass = 
+                    receipt.healthScore >= 75 ? 'excellent' :
+                    receipt.healthScore >= 50 ? 'good' :
+                    receipt.healthScore >= 25 ? 'fair' : 'poor';
+
+                let lineItemsHtml = '';
+                receipt.lineItems.forEach(item => {
+                    const categoryClass = item.category.toLowerCase();
+                    lineItemsHtml += `
+                        <div class="line-item">
+                            <div>
+                                <strong>${item.description}</strong>
+                                <span class="category-badge ${categoryClass}">${item.category}</span>
+                            </div>
+                            <div>
+                                $${item.price.toFixed(2)} × ${item.quantity}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                const detailsHtml = `
+                    <h3>Receipt Details</h3>
+                    <div class="receipt-info">
+                        <div class="field">
+                            <span class="label">Vendor</span>
+                            <span class="value">${receipt.vendor}</span>
+                        </div>
+                        <div class="field">
+                            <span class="label">Date</span>
+                            <span class="value">${new Date(receipt.date).toLocaleDateString()}</span>
+                        </div>
+                        <div class="field">
+                            <span class="label">Subtotal</span>
+                            <span class="value">$${receipt.subtotal.toFixed(2)}</span>
+                        </div>
+                        <div class="field">
+                            <span class="label">Tax</span>
+                            <span class="value">$${receipt.tax.toFixed(2)}</span>
+                        </div>
+                        <div class="field">
+                            <span class="label">Total</span>
+                            <span class="value"><strong>$${receipt.total.toFixed(2)}</strong></span>
+                        </div>
+                        <div class="field">
+                            <span class="label">Health Score</span>
+                            <span class="value">
+                                <span class="health-score ${healthScoreClass}">${receipt.healthScore.toFixed(0)}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="line-items">
+                        <h4>Line Items (${receipt.lineItems.length})</h4>
+                        ${lineItemsHtml}
+                    </div>
+                `;
+
+                document.getElementById('receiptDetails').innerHTML = detailsHtml;
+                document.getElementById('receiptModal').classList.add('active');
+            } catch (error) {
+                console.error('Error loading receipt details:', error);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('receiptModal').classList.remove('active');
+        }
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filtered = receipts.filter(r => 
+                r.vendor.toLowerCase().includes(searchTerm) ||
+                r.total.toString().includes(searchTerm) ||
+                new Date(r.date).toLocaleDateString().includes(searchTerm)
+            );
+            renderReceipts(filtered);
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('receiptModal').addEventListener('click', (e) => {
+            if (e.target.id === 'receiptModal') {
+                closeModal();
+            }
+        });
+
+        // Load receipts on page load
+        loadReceipts();
+    </script>
+</body>
+</html>
