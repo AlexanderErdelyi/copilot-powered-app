@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Assistant - ReceiptHealth</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        nav {
+            margin-top: 20px;
+        }
+
+        nav a {
+            color: #667eea;
+            text-decoration: none;
+            margin-right: 20px;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .voice-controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .voice-btn {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: none;
+            font-size: 3em;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .voice-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .voice-btn:active {
+            transform: scale(0.95);
+        }
+
+        .mic-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .mic-btn.listening {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .chat-container {
+            max-height: 500px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 18px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .assistant-message {
+            background: white;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .status.idle {
+            background: #e9ecef;
+            color: #666;
+        }
+
+        .status.listening {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.processing {
+            background: #cfe2ff;
+            color: #084298;
+        }
+
+        .status.speaking {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            flex: 1;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .transcript-box {
+            margin-bottom: 20px;
+        }
+
+        .transcript {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+
+        .help-text {
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .help-text ul {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+
+        .settings {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .setting-item label {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .setting-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎤 Voice Assistant</h1>
+            <p>Talk to ReceiptHealth AI - Ask questions, create shopping lists, and manage your receipts with voice commands</p>
+            <nav>
+                <a href="/">Dashboard</a>
+                <a href="/receipts.html">Receipts</a>
+                <a href="/insights.html">Insights</a>
+                <a href="/shopping-lists.html">Shopping Lists</a>
+                <a href="/voice-assistant.html">Voice Assistant</a>
+            </nav>
+        </header>
+
+        <div class="card">
+            <h2>Voice Controls</h2>
+            
+            <div class="status idle" id="status">
+                Ready to listen. Click the microphone to start.
+            </div>
+
+            <div class="voice-controls">
+                <button class="voice-btn mic-btn" id="micBtn" title="Start/Stop Voice Input">
+                    🎤
+                </button>
+            </div>
+
+            <div class="settings">
+                <div class="setting-item">
+                    <input type="checkbox" id="autoSpeak" checked>
+                    <label for="autoSpeak">Auto-speak responses</label>
+                </div>
+                <div class="setting-item">
+                    <input type="checkbox" id="continuousListening">
+                    <label for="continuousListening">Continuous listening</label>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn" id="stopSpeakBtn" disabled>🔇 Stop Speaking</button>
+                <button class="btn" id="clearBtn">🗑️ Clear Chat</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Conversation</h2>
+            <div class="chat-container" id="chatContainer">
+                <div class="message assistant-message">
+                    👋 Hello! I'm your ReceiptHealth voice assistant. You can ask me to:
+                    <ul style="margin-top: 10px;">
+                        <li>Create shopping lists</li>
+                        <li>Add items to shopping lists</li>
+                        <li>Ask about your receipts and spending</li>
+                        <li>Get health insights</li>
+                        <li>Check price comparisons</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="transcript-box">
+                <textarea class="transcript" id="transcript" placeholder="Your voice input will appear here..."></textarea>
+            </div>
+
+            <div class="input-group">
+                <input type="text" id="textInput" placeholder="Or type your message here...">
+                <button class="btn" id="sendBtn">Send</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>ℹ️ Voice Commands</h2>
+            <div class="help-text">
+                <p><strong>Try these voice commands:</strong></p>
+                <ul>
+                    <li>"Create a shopping list called Weekly Groceries"</li>
+                    <li>"Add bananas to my shopping list"</li>
+                    <li>"Generate a healthy shopping list"</li>
+                    <li>"How much did I spend this month?"</li>
+                    <li>"Show me my receipts"</li>
+                    <li>"What's my health score?"</li>
+                    <li>"Compare prices for apples"</li>
+                </ul>
+                <p style="margin-top: 10px;"><strong>Note:</strong> Speech recognition uses your browser's built-in capabilities (Web Speech API). Chrome, Edge, and Safari have the best support.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check for Web Speech API support
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const SpeechSynthesis = window.speechSynthesis;
+        
+        if (!SpeechRecognition) {
+            alert('⚠️ Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.');
+        }
+
+        // Initialize speech recognition
+        let recognition = null;
+        let isListening = false;
+        let currentShoppingListId = null;
+
+        // Elements
+        const micBtn = document.getElementById('micBtn');
+        const status = document.getElementById('status');
+        const chatContainer = document.getElementById('chatContainer');
+        const transcript = document.getElementById('transcript');
+        const autoSpeak = document.getElementById('autoSpeak');
+        const continuousListening = document.getElementById('continuousListening');
+        const stopSpeakBtn = document.getElementById('stopSpeakBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const textInput = document.getElementById('textInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        // Initialize recognition
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.classList.add('listening');
+                updateStatus('Listening...', 'listening');
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                micBtn.classList.remove('listening');
+                
+                if (continuousListening.checked && transcript.value.trim()) {
+                    // Auto-restart if continuous listening is enabled
+                    setTimeout(() => {
+                        if (continuousListening.checked) {
+                            startListening();
+                        }
+                    }, 1000);
+                } else {
+                    updateStatus('Ready to listen', 'idle');
+                }
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    if (result.isFinal) {
+                        finalTranscript += result[0].transcript;
+                    } else {
+                        interimTranscript += result[0].transcript;
+                    }
+                }
+
+                transcript.value = finalTranscript || interimTranscript;
+
+                if (finalTranscript) {
+                    console.log('📝 Final transcript:', finalTranscript);
+                    processVoiceCommand(finalTranscript);
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('❌ Speech recognition error:', event.error);
+                updateStatus(`Error: ${event.error}`, 'error');
+                micBtn.classList.remove('listening');
+                isListening = false;
+            };
+        }
+
+        // Start/stop listening
+        micBtn.addEventListener('click', () => {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        });
+
+        function startListening() {
+            if (!recognition) {
+                alert('Speech recognition not available');
+                return;
+            }
+            
+            transcript.value = '';
+            recognition.start();
+        }
+
+        function stopListening() {
+            if (recognition) {
+                recognition.stop();
+            }
+        }
+
+        // Process voice command
+        async function processVoiceCommand(text) {
+            updateStatus('Processing...', 'processing');
+            addMessage(text, 'user');
+
+            try {
+                // Check for shopping list commands
+                if (text.toLowerCase().includes('create') && text.toLowerCase().includes('shopping list')) {
+                    await handleCreateShoppingList(text);
+                } else if (text.toLowerCase().includes('add') && (text.toLowerCase().includes('to list') || text.toLowerCase().includes('to my list') || text.toLowerCase().includes('shopping list'))) {
+                    await handleAddItem(text);
+                } else if (text.toLowerCase().includes('generate') && text.toLowerCase().includes('shopping list')) {
+                    await handleGenerateShoppingList();
+                } else {
+                    // General query - use insights API
+                    await handleGeneralQuery(text);
+                }
+            } catch (error) {
+                console.error('❌ Error processing command:', error);
+                const errorMsg = `Sorry, I encountered an error: ${error.message}`;
+                addMessage(errorMsg, 'assistant');
+                speak(errorMsg);
+            }
+            
+            updateStatus('Ready to listen', 'idle');
+        }
+
+        // Handle creating a shopping list
+        async function handleCreateShoppingList(text) {
+            // Extract list name from command
+            const match = text.match(/(?:create|make).*?shopping list.*?(?:called|named)?\s*["']?([^"']+)["']?/i);
+            let listName = match ? match[1].trim() : 'My Shopping List';
+            
+            // Clean up the name
+            listName = listName.replace(/shopping list/gi, '').trim();
+            if (!listName) {
+                listName = 'My Shopping List';
+            }
+
+            console.log('📝 Creating shopping list:', listName);
+
+            const response = await fetch('/api/shopping-lists', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: listName })
+            });
+
+            if (response.ok) {
+                const list = await response.json();
+                currentShoppingListId = list.id;
+                const message = `✅ Created shopping list "${list.name}". You can now add items to it!`;
+                addMessage(message, 'assistant');
+                speak(message);
+            } else {
+                throw new Error('Failed to create shopping list');
+            }
+        }
+
+        // Handle adding item to shopping list
+        async function handleAddItem(text) {
+            if (!currentShoppingListId) {
+                // Get the most recent shopping list
+                const response = await fetch('/api/shopping-lists');
+                const lists = await response.json();
+                if (lists.length > 0) {
+                    currentShoppingListId = lists[0].id;
+                } else {
+                    const message = 'No shopping list found. Please create one first.';
+                    addMessage(message, 'assistant');
+                    speak(message);
+                    return;
+                }
+            }
+
+            // Extract item name
+            const match = text.match(/add\s+(.+?)\s+to/i);
+            const itemName = match ? match[1].trim() : text.replace(/add|to.*list/gi, '').trim();
+
+            if (!itemName) {
+                const message = 'Please specify what item you want to add.';
+                addMessage(message, 'assistant');
+                speak(message);
+                return;
+            }
+
+            console.log('📝 Adding item:', itemName, 'to list', currentShoppingListId);
+
+            const response = await fetch(`/api/shopping-lists/${currentShoppingListId}/items`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ itemName, quantity: 1 })
+            });
+
+            if (response.ok) {
+                const item = await response.json();
+                const message = `✅ Added ${itemName} to your shopping list!`;
+                addMessage(message, 'assistant');
+                speak(message);
+            } else {
+                throw new Error('Failed to add item');
+            }
+        }
+
+        // Handle generating a shopping list
+        async function handleGenerateShoppingList() {
+            console.log('🥗 Generating healthy shopping list...');
+
+            const response = await fetch('/api/shopping-lists/generate?daysBack=30', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const list = await response.json();
+                currentShoppingListId = list.id;
+                const itemCount = list.items?.length || 0;
+                const message = itemCount > 0 
+                    ? `✅ Generated healthy shopping list "${list.name}" with ${itemCount} items based on your past purchases!`
+                    : `✅ Created a new shopping list "${list.name}". I didn't find any recent healthy purchases, but you can start adding items now.`;
+                addMessage(message, 'assistant');
+                speak(message);
+            } else {
+                throw new Error('Failed to generate shopping list');
+            }
+        }
+
+        // Handle general queries
+        async function handleGeneralQuery(text) {
+            const response = await fetch('/api/insights/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: text })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                addMessage(result.answer, 'assistant');
+                speak(result.answer);
+            } else {
+                throw new Error('Failed to process query');
+            }
+        }
+
+        // Add message to chat
+        function addMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            messageDiv.textContent = text;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Text-to-speech
+        function speak(text) {
+            if (!autoSpeak.checked || !SpeechSynthesis) {
+                return;
+            }
+
+            // Stop any ongoing speech
+            SpeechSynthesis.cancel();
+
+            updateStatus('Speaking...', 'speaking');
+            stopSpeakBtn.disabled = false;
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+
+            utterance.onend = () => {
+                updateStatus('Ready to listen', 'idle');
+                stopSpeakBtn.disabled = true;
+            };
+
+            utterance.onerror = (event) => {
+                console.error('❌ Speech synthesis error:', event);
+                updateStatus('Ready to listen', 'idle');
+                stopSpeakBtn.disabled = true;
+            };
+
+            SpeechSynthesis.speak(utterance);
+        }
+
+        // Stop speaking
+        stopSpeakBtn.addEventListener('click', () => {
+            if (SpeechSynthesis) {
+                SpeechSynthesis.cancel();
+                updateStatus('Ready to listen', 'idle');
+                stopSpeakBtn.disabled = true;
+            }
+        });
+
+        // Clear chat
+        clearBtn.addEventListener('click', () => {
+            chatContainer.innerHTML = `
+                <div class="message assistant-message">
+                    👋 Chat cleared. How can I help you?
+                </div>
+            `;
+            transcript.value = '';
+        });
+
+        // Text input
+        sendBtn.addEventListener('click', () => {
+            const text = textInput.value.trim();
+            if (text) {
+                processVoiceCommand(text);
+                textInput.value = '';
+            }
+        });
+
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendBtn.click();
+            }
+        });
+
+        // Update status
+        function updateStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        // Load most recent shopping list on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/api/shopping-lists');
+                const lists = await response.json();
+                if (lists.length > 0) {
+                    currentShoppingListId = lists[0].id;
+                    console.log('📋 Loaded shopping list:', currentShoppingListId);
+                }
+            } catch (error) {
+                console.error('Failed to load shopping lists:', error);
+            }
+        });
+    </script>
+</body>
+</html>

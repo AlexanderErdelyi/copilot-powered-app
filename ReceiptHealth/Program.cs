@@ -486,7 +486,26 @@ app.MapGet("/api/recommendations/category", async (IRecommendationService recomm
 app.MapGet("/api/shopping-lists", async (IShoppingListService shoppingListService) =>
 {
     var lists = await shoppingListService.GetAllShoppingListsAsync();
-    return Results.Ok(lists);
+    // Project to anonymous objects to avoid circular reference
+    return Results.Ok(lists.Select(list => new
+    {
+        list.Id,
+        list.Name,
+        list.CreatedAt,
+        list.LastModifiedAt,
+        list.IsActive,
+        Items = list.Items.Select(item => new
+        {
+            item.Id,
+            item.ItemName,
+            item.Quantity,
+            item.IsPurchased,
+            item.AddedAt,
+            item.LastKnownPrice,
+            item.LastKnownVendor,
+            item.Category
+        }).ToList()
+    }).ToList());
 });
 
 // Get a specific shopping list
@@ -495,7 +514,26 @@ app.MapGet("/api/shopping-lists/{id}", async (int id, IShoppingListService shopp
     try
     {
         var list = await shoppingListService.GetShoppingListAsync(id);
-        return Results.Ok(list);
+        // Project to anonymous object to avoid circular reference
+        return Results.Ok(new
+        {
+            list.Id,
+            list.Name,
+            list.CreatedAt,
+            list.LastModifiedAt,
+            list.IsActive,
+            Items = list.Items.Select(item => new
+            {
+                item.Id,
+                item.ItemName,
+                item.Quantity,
+                item.IsPurchased,
+                item.AddedAt,
+                item.LastKnownPrice,
+                item.LastKnownVendor,
+                item.Category
+            }).ToList()
+        });
     }
     catch (InvalidOperationException ex)
     {
@@ -513,14 +551,52 @@ app.MapPost("/api/shopping-lists", async (HttpRequest request, IShoppingListServ
     }
     
     var list = await shoppingListService.CreateShoppingListAsync(body.Name);
-    return Results.Created($"/api/shopping-lists/{list.Id}", list);
+    // Project to anonymous object to avoid circular reference
+    return Results.Created($"/api/shopping-lists/{list.Id}", new
+    {
+        list.Id,
+        list.Name,
+        list.CreatedAt,
+        list.LastModifiedAt,
+        list.IsActive,
+        Items = list.Items.Select(item => new
+        {
+            item.Id,
+            item.ItemName,
+            item.Quantity,
+            item.IsPurchased,
+            item.AddedAt,
+            item.LastKnownPrice,
+            item.LastKnownVendor,
+            item.Category
+        }).ToList()
+    });
 });
 
 // Generate shopping list from healthy items
 app.MapPost("/api/shopping-lists/generate", async (int daysBack, IShoppingListService shoppingListService) =>
 {
     var list = await shoppingListService.GenerateFromHealthyItemsAsync(daysBack);
-    return Results.Created($"/api/shopping-lists/{list.Id}", list);
+    // Project to anonymous object to avoid circular reference
+    return Results.Created($"/api/shopping-lists/{list.Id}", new
+    {
+        list.Id,
+        list.Name,
+        list.CreatedAt,
+        list.LastModifiedAt,
+        list.IsActive,
+        Items = list.Items.Select(item => new
+        {
+            item.Id,
+            item.ItemName,
+            item.Quantity,
+            item.IsPurchased,
+            item.AddedAt,
+            item.LastKnownPrice,
+            item.LastKnownVendor,
+            item.Category
+        }).ToList()
+    });
 });
 
 // Add item to shopping list
