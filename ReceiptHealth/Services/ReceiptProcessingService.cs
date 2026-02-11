@@ -180,6 +180,33 @@ public class ReceiptProcessingService : IReceiptProcessingService
             // Save all changes in a single database transaction
             await context.SaveChangesAsync();
 
+            // Populate price comparisons for the receipt
+            try
+            {
+                var priceComparisonService = scope.ServiceProvider.GetRequiredService<IPriceComparisonService>();
+                await priceComparisonService.PopulatePriceComparisonsAsync(receipt);
+                _logger.LogInformation("Populated price comparisons for receipt {Id}", receipt.Id);
+            }
+            catch (Exception pcEx)
+            {
+                _logger.LogWarning(pcEx, "Failed to populate price comparisons for receipt {Id}", receipt.Id);
+                // Don't fail the entire processing if price comparison fails
+            }
+
+            // Check and unlock achievements
+            try
+            {
+                var gamificationService = scope.ServiceProvider.GetRequiredService<IGamificationService>();
+                await gamificationService.CheckAndUnlockAchievementsAsync();
+                await gamificationService.UpdateChallengeProgressAsync();
+                _logger.LogInformation("Updated achievements and challenges");
+            }
+            catch (Exception gamEx)
+            {
+                _logger.LogWarning(gamEx, "Failed to update gamification data");
+                // Don't fail the entire processing if gamification fails
+            }
+
             statusUpdater?.Invoke("Completed", $"Receipt processed: {lineItems.Count} items categorized", 
                 new { ocrText = text, itemCount = lineItems.Count, totalItems = lineItems.Count, categorizedCount = lineItems.Count, receiptId = receipt.Id });
             _logger.LogInformation("Successfully processed document {Id}", documentId);
