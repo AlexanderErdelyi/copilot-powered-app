@@ -254,17 +254,104 @@ decimal weight = item.Category switch
 - [x] **OCR Integration**: ✅ Implemented using GitHub Copilot SDK with GPT-4 Vision
 - [x] **PDF Text Extraction**: ✅ Implemented using GitHub Copilot SDK
 - [x] **Intelligent Receipt Parsing**: ✅ Implemented using GPT-4.1 for structured data extraction
+- [x] **Price Comparison**: ✅ Track prices across stores and over time
+- [x] **AI-Powered Insights**: ✅ Natural language queries, anomaly detection, budget predictions
+- [x] **Shopping Lists**: ✅ Generate lists, track prices, get alerts
+- [x] **Gamification**: ✅ Achievements and challenges system
+- [x] **Nutritional Analysis**: ✅ AI-powered calorie/nutrient estimation
+- [x] **Category Insights**: ✅ Spending trends and healthy recommendations
 - [ ] **PDF Support**: Add PdfPig or iTextSharp for PDF text extraction (see AI_INTEGRATION.md)
 - [ ] **PDF-to-Image Conversion**: For scanned PDFs, convert to images and use AI OCR
 - [ ] **AI-Powered Categorization**: Enhance category detection using AI instead of keywords
 - [ ] **Vendor Bias**: Apply vendor-level category adjustments
 - [ ] **Weekly/Yearly Analytics**: Expand time-based aggregations
-- [ ] **Price Inflation Tracking**: Monitor unit price changes over time
 - [ ] **Export to CSV/Excel**: Download receipt data
 - [ ] **Background Job Queue**: Use Hangfire or Azure Functions for processing
 - [ ] **User Authentication**: Multi-user support
-- [ ] **Mobile App**: React Native or Xamarin client
+- [ ] **Mobile App**: React Native or Xamarin client with camera integration
 - [ ] **Batch Processing**: Process multiple receipts simultaneously with AI
+- [ ] **Nutrition Dashboard**: Visual charts for daily/weekly nutrition
+- [ ] **Price Alerts Notifications**: Email/push notifications for price drops
+
+## New Features (Advanced)
+
+### 🔍 Receipt Comparison
+- **Cross-Store Price Comparison**: Compare prices for the same items across different stores
+- **Price Trends**: Track how prices change over time at specific stores
+- **Example**: "You bought Pepsi at LIDL for €2.50, but it was €2.00 at Aldi last week"
+
+### 📊 Category Insights & Analytics
+- **Spending Trends**: Weekly/monthly trends by category
+- **Health Score Trends**: Track your health score over time
+- **Personalized Recommendations**: Get suggestions for healthier alternatives
+- **Smart Alerts**: "You spent 23% more on junk food this month"
+
+### 🛒 Shopping Lists
+- **Smart List Generation**: Auto-generate shopping lists from your healthy purchases
+- **Price Tracking**: Track prices for items on your list
+- **Price Alerts**: Get notified when items are cheaper than usual
+- **Junk Food Warnings**: Alerts when buying too much unhealthy food
+
+### 🤖 AI-Powered Insights
+- **Natural Language Queries**: Ask questions like "How much did I spend on vegetables last month?"
+- **Anomaly Detection**: Automatically detect unusual spending patterns
+- **Predictive Budgeting**: AI predicts your monthly spending based on patterns
+- **Smart Recommendations**: Context-aware suggestions based on your shopping history
+
+### 🥗 Nutritional Analysis
+- **AI Nutrition Estimation**: Estimate calories and nutrients for purchased items
+- **Daily/Weekly Dashboards**: Track your nutrition intake
+- **RDI Comparison**: Compare against recommended daily intake values
+- **Health Insights**: Understand nutritional impact of your purchases
+
+### 🏆 Gamification
+- **Achievement System**: Unlock badges for healthy shopping habits
+  - 🌱 Healthy Start (3 healthy trips)
+  - 🔥 Week of Health (7 healthy trips)
+  - 💪 Two Week Warrior (14 healthy trips)
+  - 🏆 Health Champion (30 healthy trips)
+- **Challenges**: Set and track personal goals
+  - Improve health score by X points
+  - Reduce junk food spending by X%
+  - Build healthy shopping streaks
+- **Progress Tracking**: Visual progress bars and statistics
+
+## API Endpoints (New)
+
+### Price Comparison
+- `GET /api/price-comparison/{itemName}` - Compare prices across stores
+- `GET /api/price-trends/{itemName}?days={n}` - Get price trends over time
+
+### Recommendations
+- `GET /api/recommendations/alternatives/{itemName}` - Get healthy alternatives
+- `GET /api/recommendations/category` - Get personalized recommendations
+
+### Shopping Lists
+- `GET /api/shopping-lists` - Get all shopping lists
+- `POST /api/shopping-lists` - Create a new shopping list
+- `GET /api/shopping-lists/{id}` - Get specific list with items
+- `POST /api/shopping-lists/generate?daysBack={n}` - Generate list from healthy items
+- `POST /api/shopping-lists/{listId}/items` - Add item to list
+- `PATCH /api/shopping-lists/items/{itemId}` - Mark item as purchased
+- `DELETE /api/shopping-lists/items/{itemId}` - Remove item from list
+- `GET /api/shopping-lists/{listId}/price-alerts` - Get price alerts for list items
+
+### Gamification
+- `GET /api/achievements` - Get all achievements
+- `GET /api/challenges` - Get active challenges
+- `POST /api/challenges` - Create a new challenge
+- `POST /api/achievements/check` - Trigger achievement check
+
+### AI Insights
+- `POST /api/insights/query` - Natural language query
+- `GET /api/insights/anomalies` - Detect spending anomalies
+- `GET /api/insights/budget-prediction` - Get budget prediction
+
+### Nutrition
+- `GET /api/nutrition/daily?date={date}` - Get daily nutrition summary
+- `GET /api/nutrition/weekly?weekStart={date}` - Get weekly nutrition summary
+- `POST /api/nutrition/populate/{receiptId}` - Populate nutrition data for receipt
+
 
 ## Development
 
