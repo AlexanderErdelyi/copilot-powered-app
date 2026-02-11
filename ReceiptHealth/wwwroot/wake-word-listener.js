@@ -29,6 +29,7 @@
     let conversationHistory = [];
     let availableVoices = [];
     let selectedVoice = null;
+    let isEnabled = true; // Wake word listener enabled state
 
     // DOM Elements (will be created dynamically)
     let floatingIndicator = null;
@@ -36,6 +37,43 @@
     let modalStatus = null;
     let modalTranscript = null;
     let modalResponse = null;
+
+    /**
+     * Load enabled state from localStorage
+     */
+    function loadEnabledState() {
+        const saved = localStorage.getItem('wakeWordEnabled');
+        isEnabled = saved === null ? true : saved === 'true';
+        return isEnabled;
+    }
+
+    /**
+     * Save enabled state to localStorage
+     */
+    function saveEnabledState(enabled) {
+        isEnabled = enabled;
+        localStorage.setItem('wakeWordEnabled', enabled.toString());
+    }
+
+    /**
+     * Toggle wake word listener on/off
+     */
+    function toggleWakeWordListener() {
+        const newState = !isEnabled;
+        saveEnabledState(newState);
+        
+        if (newState) {
+            // Enable
+            console.log('🎤 Wake word listener enabled');
+            requestMicrophonePermission();
+            updateIndicatorState();
+        } else {
+            // Disable
+            console.log('🔇 Wake word listener disabled');
+            stopWakeWordRecognition();
+            updateIndicatorState();
+        }
+    }
 
     /**
      * Initialize the wake word listener
@@ -48,6 +86,9 @@
         }
 
         console.log('🎤 Initializing wake word listener...');
+        
+        // Load enabled state
+        loadEnabledState();
         
         // Load voices
         loadVoices();
@@ -62,8 +103,10 @@
         // Initialize wake word recognition
         initWakeWordRecognition();
 
-        // Request microphone permission and start listening
-        requestMicrophonePermission();
+        // Request microphone permission and start listening if enabled
+        if (isEnabled) {
+            requestMicrophonePermission();
+        }
     }
 
     /**
@@ -181,10 +224,10 @@
             isWakeWordListening = false;
             console.log('👂 Wake word listener ended');
             
-            // Auto-restart if not in command mode
-            if (!isCommandMode) {
+            // Auto-restart if not in command mode and if enabled
+            if (!isCommandMode && isEnabled) {
                 setTimeout(() => {
-                    if (!isCommandMode) {
+                    if (!isCommandMode && isEnabled) {
                         startWakeWordListening();
                     }
                 }, 1000);
@@ -224,7 +267,7 @@
      * Start listening for wake word
      */
     function startWakeWordListening() {
-        if (isWakeWordListening || isCommandMode) {
+        if (isWakeWordListening || isCommandMode || !isEnabled) {
             return;
         }
 
@@ -233,7 +276,7 @@
         } catch (err) {
             console.error('❌ Failed to start wake word listener:', err);
             setTimeout(() => {
-                if (!isWakeWordListening && !isCommandMode) {
+                if (!isWakeWordListening && !isCommandMode && isEnabled) {
                     startWakeWordListening();
                 }
             }, 2000);
@@ -251,6 +294,14 @@
                 console.error('❌ Failed to stop wake word listener:', err);
             }
         }
+    }
+
+    /**
+     * Completely stop wake word recognition
+     */
+    function stopWakeWordRecognition() {
+        stopWakeWordListening();
+        isWakeWordListening = false;
     }
 
     /**
@@ -529,10 +580,39 @@
         floatingIndicator = document.createElement('div');
         floatingIndicator.id = 'wake-word-indicator';
         floatingIndicator.className = 'wake-word-indicator';
-        floatingIndicator.innerHTML = '🎤';
-        floatingIndicator.title = 'Say "Hey Assistant" to activate';
+        floatingIndicator.title = isEnabled ? 'Click to disable voice listening' : 'Click to enable voice listening';
+        
+        // Add click handler to toggle
+        floatingIndicator.addEventListener('click', toggleWakeWordListener);
+        
+        // Add right-click context menu prevention (use click to toggle instead)
+        floatingIndicator.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            toggleWakeWordListener();
+        });
+        
+        updateIndicatorState();
         
         document.body.appendChild(floatingIndicator);
+    }
+
+    /**
+     * Update indicator visual state
+     */
+    function updateIndicatorState() {
+        if (!floatingIndicator) return;
+        
+        if (isEnabled) {
+            floatingIndicator.innerHTML = '🎤';
+            floatingIndicator.className = 'wake-word-indicator';
+            floatingIndicator.title = 'Voice listening enabled - Click to disable';
+            floatingIndicator.style.opacity = '1';
+        } else {
+            floatingIndicator.innerHTML = '🔇';
+            floatingIndicator.className = 'wake-word-indicator disabled';
+            floatingIndicator.title = 'Voice listening disabled - Click to enable';
+            floatingIndicator.style.opacity = '0.5';
+        }
     }
 
     /**

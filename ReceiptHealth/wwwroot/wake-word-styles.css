@@ -42,6 +42,15 @@
     background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
 }
 
+.wake-word-indicator.disabled {
+    background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+    opacity: 0.5;
+}
+
+.wake-word-indicator.disabled:hover {
+    opacity: 0.7;
+}
+
 @keyframes wake-word-pulse {
     0%, 100% {
         transform: scale(1);
