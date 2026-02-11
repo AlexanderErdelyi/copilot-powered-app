@@ -67,8 +67,17 @@ public class ShoppingListService : IShoppingListService
             throw new InvalidOperationException($"Shopping list {listId} not found");
         }
 
-        // Get category for the item
-        var category = _categoryService.CategorizeItem(itemName);
+        // Get category for the item (with fallback to Unknown)
+        string category = "Unknown";
+        try
+        {
+            category = _categoryService.CategorizeItem(itemName);
+        }
+        catch
+        {
+            // If categorization fails, default to Unknown
+            category = "Unknown";
+        }
         
         // Get last known price
         var normalizedName = NormalizeItemName(itemName);
