@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ReceiptHealth.Data;
 using ReceiptHealth.Services;
+using ReceiptHealth.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -54,6 +55,7 @@ builder.Services.AddScoped<IShoppingListService, ShoppingListService>();
 builder.Services.AddScoped<IGamificationService, GamificationService>();
 builder.Services.AddScoped<IInsightsService, InsightsService>();
 builder.Services.AddScoped<INutritionService, NutritionService>();
+builder.Services.AddScoped<VoiceAssistantService>();
 
 var app = builder.Build();
 
@@ -486,7 +488,7 @@ app.MapGet("/api/recommendations/category", async (IRecommendationService recomm
 app.MapGet("/api/shopping-lists", async (IShoppingListService shoppingListService) =>
 {
     var lists = await shoppingListService.GetAllShoppingListsAsync();
-    return Results.Ok(lists);
+    return Results.Ok(lists.Select(MapShoppingListToDto).ToList());
 });
 
 // Get a specific shopping list
@@ -495,7 +497,7 @@ app.MapGet("/api/shopping-lists/{id}", async (int id, IShoppingListService shopp
     try
     {
         var list = await shoppingListService.GetShoppingListAsync(id);
-        return Results.Ok(list);
+        return Results.Ok(MapShoppingListToDto(list));
     }
     catch (InvalidOperationException ex)
     {
@@ -513,14 +515,14 @@ app.MapPost("/api/shopping-lists", async (HttpRequest request, IShoppingListServ
     }
     
     var list = await shoppingListService.CreateShoppingListAsync(body.Name);
-    return Results.Created($"/api/shopping-lists/{list.Id}", list);
+    return Results.Created($"/api/shopping-lists/{list.Id}", MapShoppingListToDto(list));
 });
 
 // Generate shopping list from healthy items
 app.MapPost("/api/shopping-lists/generate", async (int daysBack, IShoppingListService shoppingListService) =>
 {
     var list = await shoppingListService.GenerateFromHealthyItemsAsync(daysBack);
-    return Results.Created($"/api/shopping-lists/{list.Id}", list);
+    return Results.Created($"/api/shopping-lists/{list.Id}", MapShoppingListToDto(list));
 });
 
 // Add item to shopping list
@@ -535,7 +537,20 @@ app.MapPost("/api/shopping-lists/{listId}/items", async (int listId, HttpRequest
     try
     {
         var item = await shoppingListService.AddItemAsync(listId, body.ItemName, body.Quantity);
-        return Results.Created($"/api/shopping-lists/{listId}/items/{item.Id}", item);
+        // Project to anonymous object to avoid circular reference
+        return Results.Created($"/api/shopping-lists/{listId}/items/{item.Id}", new
+        {
+            item.Id,
+            item.ShoppingListId,
+            item.ItemName,
+            item.NormalizedName,
+            item.Quantity,
+            item.IsPurchased,
+            item.AddedAt,
+            item.LastKnownPrice,
+            item.LastKnownVendor,
+            item.Category
+        });
     }
     catch (InvalidOperationException ex)
     {
@@ -652,6 +667,27 @@ app.MapGet("/api/insights/budget-prediction", async (IInsightsService insightsSe
     return Results.Ok(prediction);
 });
 
+// === Voice Assistant Endpoints ===
+
+// Process voice command with AI
+app.MapPost("/api/voice/process-command", async (HttpRequest request, VoiceAssistantService voiceAssistant) =>
+{
+    var body = await request.ReadFromJsonAsync<VoiceCommandRequest>();
+    if (body == null || string.IsNullOrEmpty(body.Transcript))
+    {
+        return Results.BadRequest(new { error = "Transcript is required" });
+    }
+    
+    Console.WriteLine($"🎤 Voice command received: {body.Transcript}");
+    
+    var response = await voiceAssistant.ProcessVoiceCommandAsync(
+        body.Transcript, 
+        body.SessionId, 
+        body.ConversationHistory);
+    
+    return Results.Ok(response);
+});
+
 // === Nutrition Endpoints ===
 
 // Get daily nutrition summary
@@ -754,6 +790,30 @@ app.Logger.LogInformation("ReceiptHealth API is running on http://localhost:5002
 
 app.Run();
 
+// Helper method to project ShoppingList to DTO to avoid circular references
+static object MapShoppingListToDto(ShoppingList list)
+{
+    return new
+    {
+        list.Id,
+        list.Name,
+        list.CreatedAt,
+        list.LastModifiedAt,
+        list.IsActive,
+        Items = list.Items.Select(item => new
+        {
+            item.Id,
+            item.ItemName,
+            item.Quantity,
+            item.IsPurchased,
+            item.AddedAt,
+            item.LastKnownPrice,
+            item.LastKnownVendor,
+            item.Category
+        }).ToList()
+    };
+}
+
 // Record types must be defined after top-level statements
 public record ProcessingStatusDetails(
     string Status,
@@ -771,4 +831,5 @@ public record AddShoppingListItemRequest(string ItemName, int Quantity = 1);
 public record UpdateItemStatusRequest(bool IsPurchased);
 public record CreateChallengeRequest(string Name, string Description, string Type, decimal TargetValue, int DurationDays);
 public record NaturalLanguageQueryRequest(string Query);
+public record VoiceCommandRequest(string Transcript, string? SessionId = null, List<ReceiptHealth.Services.ConversationMessage>? ConversationHistory = null);
 

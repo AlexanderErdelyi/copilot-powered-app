@@ -21,6 +21,7 @@ public class ShoppingListService : IShoppingListService
 {
     private readonly ReceiptHealthContext _context;
     private readonly ICategoryService _categoryService;
+    private const int CATEGORIZATION_TIMEOUT_MS = 5000; // 5 seconds timeout for AI categorization
 
     public ShoppingListService(ReceiptHealthContext context, ICategoryService categoryService)
     {
@@ -72,11 +73,21 @@ public class ShoppingListService : IShoppingListService
         }
 
         // Get category for the item (with fallback to Unknown)
+        // Use Task.Run with timeout to avoid deadlocks with synchronous category service calls
         string category = "Unknown";
         try
         {
-            category = _categoryService.CategorizeItem(itemName);
-            Console.WriteLine($"✅ Categorized '{itemName}' as '{category}'");
+            var categoryTask = Task.Run(() => _categoryService.CategorizeItem(itemName));
+            if (await Task.WhenAny(categoryTask, Task.Delay(CATEGORIZATION_TIMEOUT_MS)) == categoryTask)
+            {
+                category = await categoryTask;
+                Console.WriteLine($"✅ Categorized '{itemName}' as '{category}'");
+            }
+            else
+            {
+                Console.WriteLine($"⚠️ Categorization timed out for '{itemName}', using 'Unknown'");
+                category = "Unknown";
+            }
         }
         catch (Exception ex)
         {
