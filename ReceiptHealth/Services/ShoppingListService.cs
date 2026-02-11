@@ -72,11 +72,21 @@ public class ShoppingListService : IShoppingListService
         }
 
         // Get category for the item (with fallback to Unknown)
+        // Use Task.Run with timeout to avoid deadlocks with synchronous category service calls
         string category = "Unknown";
         try
         {
-            category = _categoryService.CategorizeItem(itemName);
-            Console.WriteLine($"✅ Categorized '{itemName}' as '{category}'");
+            var categoryTask = Task.Run(() => _categoryService.CategorizeItem(itemName));
+            if (await Task.WhenAny(categoryTask, Task.Delay(5000)) == categoryTask)
+            {
+                category = await categoryTask;
+                Console.WriteLine($"✅ Categorized '{itemName}' as '{category}'");
+            }
+            else
+            {
+                Console.WriteLine($"⚠️ Categorization timed out for '{itemName}', using 'Unknown'");
+                category = "Unknown";
+            }
         }
         catch (Exception ex)
         {

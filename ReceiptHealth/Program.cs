@@ -535,7 +535,20 @@ app.MapPost("/api/shopping-lists/{listId}/items", async (int listId, HttpRequest
     try
     {
         var item = await shoppingListService.AddItemAsync(listId, body.ItemName, body.Quantity);
-        return Results.Created($"/api/shopping-lists/{listId}/items/{item.Id}", item);
+        // Project to anonymous object to avoid circular reference
+        return Results.Created($"/api/shopping-lists/{listId}/items/{item.Id}", new
+        {
+            item.Id,
+            item.ShoppingListId,
+            item.ItemName,
+            item.NormalizedName,
+            item.Quantity,
+            item.IsPurchased,
+            item.AddedAt,
+            item.LastKnownPrice,
+            item.LastKnownVendor,
+            item.Category
+        });
     }
     catch (InvalidOperationException ex)
     {
