@@ -25,30 +25,43 @@
 
         header {
             background: white;
-            border-radius: 15px;
-            padding: 30px;
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
+        header h1 {
+            color: #667eea;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        header p {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 15px;
         }
 
         nav {
-            margin-top: 20px;
+            display: flex;
+            gap: 20px;
         }
 
         nav a {
-            color: #667eea;
             text-decoration: none;
-            margin-right: 20px;
-            font-weight: 500;
+            color: #667eea;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background 0.3s;
         }
 
-        nav a:hover {
-            text-decoration: underline;
+        nav a:hover, nav a.active {
+            background: #667eea;
+            color: white;
         }
 
         .card {
@@ -253,6 +266,9 @@
             cursor: pointer;
         }
     </style>
+    <!-- Wake Word Listener (auto-disabled on this page) -->
+    <link rel="stylesheet" href="/wake-word-styles.css">
+    <script src="/wake-word-listener.js"></script>
 </head>
 <body>
     <div class="container">
@@ -264,6 +280,7 @@
                 <a href="/receipts.html">Receipts</a>
                 <a href="/insights.html">Insights</a>
                 <a href="/shopping-lists.html">Shopping Lists</a>
+                <a href="/meal-planner.html">Meal Planner</a>
                 <a href="/voice-assistant.html">Voice Assistant</a>
             </nav>
         </header>
@@ -403,36 +420,70 @@
 
         // Select the most natural-sounding voice
         function selectBestVoice() {
-            // Preferred voices in order (natural-sounding, neural voices)
-            const preferredVoicePatterns = [
-                /google.*us.*english.*female/i,
-                /google.*uk.*english.*female/i,
-                /microsoft.*zira/i,
-                /microsoft.*aria/i,
-                /microsoft.*jenny/i,
-                /samantha/i,
-                /karen/i,
-                /female/i,
-                /en-us/i,
-                /en-gb/i
+            // Priority list for best natural voices (same as wake-word-listener)
+            const premiumVoices = [
+                'Google US English',
+                'Google UK English Female',
+                'Microsoft Zira - English (United States)',
+                'Microsoft Mark - English (United States)',
+                'Samantha',  // macOS/iOS premium voice
+                'Alex',      // macOS/iOS premium voice
+                'Moira',     // macOS/iOS UK voice
             ];
-
-            for (const pattern of preferredVoicePatterns) {
-                const voice = availableVoices.find(v => pattern.test(v.name) || pattern.test(v.lang));
+            
+            // Try premium voices first
+            for (const premiumName of premiumVoices) {
+                const voice = availableVoices.find(v => 
+                    v.lang.startsWith('en') && v.name.includes(premiumName)
+                );
                 if (voice) {
                     const index = availableVoices.indexOf(voice);
                     selectedVoice = voice;
                     voiceSelect.value = index;
-                    console.log('🎤 Selected natural voice:', voice.name);
-                    
-                    // Save preference
+                    console.log('🎤 Selected premium voice:', voice.name);
                     localStorage.setItem('preferredVoiceIndex', index);
                     return;
                 }
             }
+            
+            // Try Enhanced/Natural/Neural voices
+            const voice = availableVoices.find(v => 
+                v.lang.startsWith('en') && 
+                (v.name.toLowerCase().includes('enhanced') || 
+                 v.name.toLowerCase().includes('natural') || 
+                 v.name.toLowerCase().includes('neural'))
+            );
+            
+            if (voice) {
+                const index = availableVoices.indexOf(voice);
+                selectedVoice = voice;
+                voiceSelect.value = index;
+                console.log('🎤 Selected natural voice:', voice.name);
+                localStorage.setItem('preferredVoiceIndex', index);
+                return;
+            }
+            
+            // Try Google voices (generally high quality)
+            const googleVoice = availableVoices.find(v => 
+                v.lang.startsWith('en') && v.name.includes('Google')
+            );
+            
+            if (googleVoice) {
+                const index = availableVoices.indexOf(googleVoice);
+                selectedVoice = googleVoice;
+                voiceSelect.value = index;
+                console.log('🎤 Selected Google voice:', googleVoice.name);
+                localStorage.setItem('preferredVoiceIndex', index);
+                return;
+            }
 
-            // Fallback: use first available voice
-            if (availableVoices.length > 0) {
+            // Fallback: use first English voice or first available
+            const englishVoice = availableVoices.find(v => v.lang.startsWith('en'));
+            if (englishVoice) {
+                const index = availableVoices.indexOf(englishVoice);
+                selectedVoice = englishVoice;
+                voiceSelect.value = index;
+            } else if (availableVoices.length > 0) {
                 selectedVoice = availableVoices[0];
                 voiceSelect.value = 0;
             }
@@ -832,6 +883,38 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
+        // Process text for more natural speech delivery
+        function processTextForSpeech(text) {
+            // Add natural pauses after punctuation for breathing and clarity
+            let processed = text
+                .replace(/\. /g, '.  ')      // Longer pause after sentences
+                .replace(/, /g, ',  ')       // Pause after commas
+                .replace(/! /g, '!  ')       // Pause after exclamations
+                .replace(/\? /g, '?  ')      // Pause after questions
+                .replace(/: /g, ':  ')       // Pause after colons
+                .replace(/; /g, ';  ');      // Pause after semicolons
+            
+            // Handle currency more naturally (including decimals)
+            processed = processed.replace(/\$(\d+(?:\.\d{2})?)/g, (match, amount) => {
+                const [dollars, cents] = amount.split('.');
+                if (cents) {
+                    return `${dollars} dollars and ${cents} cents`;
+                }
+                return `${dollars} dollars`;
+            });
+            
+            // Handle percentages (including decimals)
+            processed = processed.replace(/\b(\d+(?:\.\d+)?)%/g, '$1 percent');
+            
+            // Handle common abbreviations (case-insensitive)
+            processed = processed
+                .replace(/\bAI\b/gi, 'A I')
+                .replace(/\bAPI\b/gi, 'A P I')
+                .replace(/\bURL\b/gi, 'U R L');
+            
+            return processed;
+        }
+
         // Text-to-speech with natural voice
         function speak(text) {
             if (!autoSpeak.checked || !SpeechSynthesis) {
@@ -844,27 +927,20 @@
             updateStatus('Speaking...', 'speaking');
             stopSpeakBtn.disabled = false;
 
-            const utterance = new SpeechSynthesisUtterance(text);
+            // Process text for more natural delivery
+            const processedText = processTextForSpeech(text);
+
+            const utterance = new SpeechSynthesisUtterance(processedText);
             
             // Use selected voice for natural sound
             if (selectedVoice) {
                 utterance.voice = selectedVoice;
             }
             
-            // Natural speech parameters
-            utterance.rate = 0.95;     // Slightly slower = more natural and clear
-            utterance.pitch = 1.05;    // Slightly higher = friendlier tone
-            utterance.volume = 1.0;    // Full volume
-
-            // Add natural pauses by processing text
-            // Replace commas and periods with longer pauses
-            let processedText = text
-                .replace(/,/g, ',  ')      // Pause after commas
-                .replace(/\./g, '.  ')     // Pause after periods
-                .replace(/!/g, '!  ')      // Pause after exclamations
-                .replace(/\?/g, '?  ');    // Pause after questions
-
-            utterance.text = processedText;
+            // Natural speech parameters (tuned for human-like quality)
+            utterance.rate = 0.92;     // Slightly slower = more natural and clear
+            utterance.pitch = 1.08;    // Slightly higher = friendlier, more engaging tone
+            utterance.volume = 0.95;   // Slightly lower = less robotic
 
             utterance.onend = () => {
                 updateStatus('Ready to listen', 'idle');

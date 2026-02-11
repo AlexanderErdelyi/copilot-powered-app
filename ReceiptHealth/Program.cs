@@ -55,6 +55,7 @@ builder.Services.AddScoped<IShoppingListService, ShoppingListService>();
 builder.Services.AddScoped<IGamificationService, GamificationService>();
 builder.Services.AddScoped<IInsightsService, InsightsService>();
 builder.Services.AddScoped<INutritionService, NutritionService>();
+builder.Services.AddScoped<IMealPlannerService, MealPlannerService>();
 builder.Services.AddScoped<VoiceAssistantService>();
 
 var app = builder.Build();
@@ -600,6 +601,256 @@ app.MapGet("/api/shopping-lists/{listId}/price-alerts", async (int listId, IShop
     return Results.Ok(alerts);
 });
 
+// === Meal Planner Endpoints ===
+
+// Get all meal plans
+app.MapGet("/api/meal-plans", async (IMealPlannerService mealPlannerService) =>
+{
+    try
+    {
+        var mealPlans = await mealPlannerService.GetAllMealPlansAsync();
+        
+        // Project to avoid circular references
+        var result = mealPlans.Select(mp => new
+        {
+            mp.Id,
+            mp.Name,
+            mp.CreatedAt,
+            mp.StartDate,
+            mp.EndDate,
+            mp.DietaryPreference,
+            mp.IsActive,
+            DaysCount = mp.Days.Count,
+            Days = mp.Days.Select(d => new
+            {
+                d.Id,
+                d.DayOfWeek,
+                d.Date,
+                Recipe = new
+                {
+                    d.Recipe.Id,
+                    d.Recipe.Name,
+                    d.Recipe.CookingTimeMinutes,
+                    d.Recipe.ImageUrl
+                }
+            }).ToList()
+        }).ToList();
+        
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error fetching meal plans: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
+// Get specific meal plan
+app.MapGet("/api/meal-plans/{id}", async (int id, IMealPlannerService mealPlannerService) =>
+{
+    try
+    {
+        var mealPlan = await mealPlannerService.GetMealPlanAsync(id);
+        
+        // Project to avoid circular references
+        var result = new
+        {
+            mealPlan.Id,
+            mealPlan.Name,
+            mealPlan.CreatedAt,
+            mealPlan.StartDate,
+            mealPlan.EndDate,
+            mealPlan.DietaryPreference,
+            mealPlan.IsActive,
+            Days = mealPlan.Days.Select(d => new
+            {
+                d.Id,
+                d.DayOfWeek,
+                d.Date,
+                Recipe = new
+                {
+                    d.Recipe.Id,
+                    d.Recipe.Name,
+                    d.Recipe.Description,
+                    d.Recipe.CookingTimeMinutes,
+                    d.Recipe.Servings,
+                    d.Recipe.Instructions,
+                    d.Recipe.ImageUrl,
+                    d.Recipe.Calories,
+                    d.Recipe.ProteinGrams,
+                    d.Recipe.CarbsGrams,
+                    d.Recipe.FatGrams,
+                    Ingredients = d.Recipe.Ingredients.Select(i => new
+                    {
+                        i.Id,
+                        i.IngredientName,
+                        i.Quantity,
+                        i.Category
+                    }).ToList()
+                }
+            }).ToList()
+        };
+        
+        return Results.Ok(result);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error fetching meal plan {id}: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
+// Generate AI-powered meal plan
+app.MapPost("/api/meal-plans/generate", async (HttpRequest request, IMealPlannerService mealPlannerService) =>
+{
+    try
+    {
+        var body = await request.ReadFromJsonAsync<GenerateMealPlanRequest>();
+        if (body == null || string.IsNullOrEmpty(body.DietaryPreference))
+        {
+            return Results.BadRequest(new { error = "Dietary preference is required" });
+        }
+        
+        var startDate = body.StartDate ?? DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek); // Start of current week
+        
+        Console.WriteLine($"🤖 Generating meal plan: {body.DietaryPreference}, starting {startDate:yyyy-MM-dd}");
+        
+        var mealPlan = await mealPlannerService.GenerateWeeklyMealPlanAsync(body.DietaryPreference, startDate);
+        
+        // Project to avoid circular references
+        var result = new
+        {
+            mealPlan.Id,
+            mealPlan.Name,
+            mealPlan.CreatedAt,
+            mealPlan.StartDate,
+            mealPlan.EndDate,
+            mealPlan.DietaryPreference,
+            DaysCount = mealPlan.Days.Count,
+            Days = mealPlan.Days.Select(d => new
+            {
+                d.Id,
+                d.DayOfWeek,
+                d.Date,
+                Recipe = new
+                {
+                    d.Recipe.Id,
+                    d.Recipe.Name,
+                    d.Recipe.Description,
+                    d.Recipe.CookingTimeMinutes,
+                    d.Recipe.ImageUrl
+                }
+            }).ToList()
+        };
+        
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error generating meal plan: {ex.Message}\n{ex.StackTrace}");
+        return Results.Problem(ex.Message);
+    }
+});
+
+// Generate shopping list from meal plan
+app.MapPost("/api/meal-plans/{id}/shopping-list", async (int id, HttpRequest request, IMealPlannerService mealPlannerService) =>
+{
+    try
+    {
+        var body = await request.ReadFromJsonAsync<CreateShoppingListFromMealPlanRequest>();
+        var name = body?.Name ?? "Meal Plan Shopping List";
+        
+        var shoppingList = await mealPlannerService.GenerateShoppingListFromMealPlanAsync(id, name);
+        
+        // Project to avoid circular references
+        var result = new
+        {
+            shoppingList.Id,
+            shoppingList.Name,
+            shoppingList.CreatedAt,
+            shoppingList.IsActive,
+            Items = shoppingList.Items.Select(i => new
+            {
+                i.Id,
+                i.ItemName,
+                i.Quantity,
+                i.Category,
+                i.IsPurchased,
+                i.LastKnownPrice,
+                i.LastKnownVendor
+            }).ToList()
+        };
+        
+        return Results.Ok(result);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error generating shopping list from meal plan {id}: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
+// Delete meal plan
+app.MapDelete("/api/meal-plans/{id}", async (int id, IMealPlannerService mealPlannerService) =>
+{
+    try
+    {
+        var success = await mealPlannerService.DeleteMealPlanAsync(id);
+        return success ? Results.Ok(new { success = true }) : Results.NotFound(new { error = "Meal plan not found" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error deleting meal plan {id}: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
+// Get recipes (optional - for future use)
+app.MapGet("/api/recipes", async (IMealPlannerService mealPlannerService, string? dietaryPreference = null) =>
+{
+    try
+    {
+        var recipes = await mealPlannerService.GetRecipesAsync(dietaryPreference);
+        
+        // Project to avoid circular references
+        var result = recipes.Select(r => new
+        {
+            r.Id,
+            r.Name,
+            r.Description,
+            r.CookingTimeMinutes,
+            r.Servings,
+            r.ImageUrl,
+            r.Calories,
+            r.ProteinGrams,
+            r.CarbsGrams,
+            r.FatGrams,
+            r.IsHealthy,
+            r.IsHighProtein,
+            r.IsLowCarb,
+            r.IsVegetarian,
+            r.IsVegan,
+            r.IsCheatDay,
+            IngredientsCount = r.Ingredients.Count
+        }).ToList();
+        
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error fetching recipes: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
 // === Gamification Endpoints ===
 
 // Get all achievements
@@ -832,4 +1083,6 @@ public record UpdateItemStatusRequest(bool IsPurchased);
 public record CreateChallengeRequest(string Name, string Description, string Type, decimal TargetValue, int DurationDays);
 public record NaturalLanguageQueryRequest(string Query);
 public record VoiceCommandRequest(string Transcript, string? SessionId = null, List<ReceiptHealth.Services.ConversationMessage>? ConversationHistory = null);
+public record GenerateMealPlanRequest(string DietaryPreference, DateTime? StartDate = null);
+public record CreateShoppingListFromMealPlanRequest(string? Name = null);
 

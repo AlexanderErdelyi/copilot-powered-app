@@ -1,0 +1,327 @@
+/**
+ * Wake Word Listener Styles
+ * Floating indicator and modal for voice activation
+ */
+
+/* Floating indicator button */
+.wake-word-indicator {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    z-index: 9998;
+    transition: all 0.3s ease;
+    user-select: none;
+}
+
+.wake-word-indicator:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.wake-word-indicator.listening {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    animation: wake-word-pulse 2s infinite;
+}
+
+.wake-word-indicator.error {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.wake-word-indicator.idle {
+    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+}
+
+.wake-word-indicator.disabled {
+    background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+    opacity: 0.5;
+}
+
+.wake-word-indicator.disabled:hover {
+    opacity: 0.7;
+}
+
+@keyframes wake-word-pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    50% {
+        transform: scale(1.1);
+        box-shadow: 0 6px 24px rgba(16, 185, 129, 0.6);
+    }
+}
+
+/* Modal overlay */
+.wake-word-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: wake-word-fade-in 0.3s ease;
+}
+
+.wake-word-modal.hidden {
+    display: none;
+}
+
+@keyframes wake-word-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Modal content */
+.wake-word-modal-content {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: wake-word-slide-up 0.3s ease;
+}
+
+@keyframes wake-word-slide-up {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Modal header */
+.wake-word-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.wake-word-modal-header h2 {
+    margin: 0;
+    color: #667eea;
+    font-size: 24px;
+}
+
+.wake-word-close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wake-word-close-btn:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+/* Status indicator */
+.wake-word-status {
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.wake-word-status.listening {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 2px solid #3b82f6;
+}
+
+.wake-word-status.processing {
+    background: #fef3c7;
+    color: #92400e;
+    border: 2px solid #f59e0b;
+    animation: wake-word-processing 1s infinite;
+}
+
+.wake-word-status.success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 2px solid #10b981;
+}
+
+.wake-word-status.error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 2px solid #ef4444;
+}
+
+.wake-word-status.idle {
+    background: #f3f4f6;
+    color: #374151;
+    border: 2px solid #9ca3af;
+}
+
+@keyframes wake-word-processing {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Transcript section */
+.wake-word-transcript-section,
+.wake-word-response-section {
+    margin-bottom: 20px;
+}
+
+.wake-word-transcript-section label,
+.wake-word-response-section label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 8px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.wake-word-transcript,
+.wake-word-response {
+    background: #f9fafb;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 15px;
+    min-height: 60px;
+    font-size: 16px;
+    line-height: 1.6;
+    color: #1f2937;
+}
+
+.wake-word-transcript {
+    font-style: italic;
+    color: #6b7280;
+}
+
+.wake-word-response {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.wake-word-response a {
+    color: #667eea;
+    text-decoration: underline;
+}
+
+.wake-word-response a:hover {
+    color: #764ba2;
+}
+
+/* Action buttons */
+.wake-word-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.wake-word-btn {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #667eea;
+    color: white;
+}
+
+.wake-word-btn:hover {
+    background: #5a67d8;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.wake-word-btn:active {
+    transform: translateY(0);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .wake-word-indicator {
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        font-size: 24px;
+    }
+
+    .wake-word-modal-content {
+        width: 95%;
+        padding: 20px;
+    }
+
+    .wake-word-modal-header h2 {
+        font-size: 20px;
+    }
+
+    .wake-word-actions {
+        flex-direction: column;
+    }
+
+    .wake-word-btn {
+        width: 100%;
+    }
+}
+
+/* Accessibility */
+.wake-word-indicator:focus,
+.wake-word-btn:focus,
+.wake-word-close-btn:focus {
+    outline: 3px solid #667eea;
+    outline-offset: 2px;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+    .wake-word-indicator,
+    .wake-word-modal,
+    .wake-word-modal-content,
+    .wake-word-btn {
+        animation: none !important;
+        transition: none !important;
+    }
+}

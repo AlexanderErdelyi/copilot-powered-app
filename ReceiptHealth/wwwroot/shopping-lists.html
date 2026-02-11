@@ -25,30 +25,43 @@
 
         header {
             background: white;
-            border-radius: 15px;
-            padding: 30px;
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
+        header h1 {
+            color: #667eea;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        header p {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 15px;
         }
 
         nav {
-            margin-top: 20px;
+            display: flex;
+            gap: 20px;
         }
 
         nav a {
-            color: #667eea;
             text-decoration: none;
-            margin-right: 20px;
-            font-weight: 500;
+            color: #667eea;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: background 0.3s;
         }
 
-        nav a:hover {
-            text-decoration: underline;
+        nav a:hover, nav a.active {
+            background: #667eea;
+            color: white;
         }
 
         .card {
@@ -304,6 +317,9 @@
             100% { transform: rotate(360deg); }
         }
     </style>
+    <!-- Wake Word Listener -->
+    <link rel="stylesheet" href="/wake-word-styles.css">
+    <script src="/wake-word-listener.js"></script>
 </head>
 <body>
     <div class="container">
@@ -315,6 +331,7 @@
                 <a href="/receipts.html">Receipts</a>
                 <a href="/insights.html">Insights</a>
                 <a href="/shopping-lists.html">Shopping Lists</a>
+                <a href="/meal-planner.html">Meal Planner</a>
                 <a href="/achievements.html">Achievements</a>
                 <a href="/voice-assistant.html">Voice Assistant</a>
             </nav>

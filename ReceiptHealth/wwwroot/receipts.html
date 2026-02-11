@@ -29,19 +29,24 @@
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
 
         header h1 {
             color: #667eea;
             font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 15px;
         }
 
         nav {
             display: flex;
             gap: 20px;
+            flex-wrap: wrap;
         }
 
         nav a {
@@ -317,16 +322,21 @@
             width: 100%;
         }
     </style>
+    <!-- Wake Word Listener -->
+    <link rel="stylesheet" href="/wake-word-styles.css">
+    <script src="/wake-word-listener.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🩺 ReceiptHealth</h1>
+            <h1>📄 Receipts</h1>
+            <p>View and manage all your uploaded receipts with AI-powered analysis</p>
             <nav>
                 <a href="/">Dashboard</a>
                 <a href="/receipts.html" class="active">Receipts</a>
                 <a href="/insights.html">Insights</a>
                 <a href="/shopping-lists.html">Shopping Lists</a>
+                <a href="/meal-planner.html">Meal Planner</a>
                 <a href="/achievements.html">Achievements</a>
                 <a href="/voice-assistant.html">Voice Assistant</a>
             </nav>
