@@ -6,8 +6,9 @@ A production-quality .NET 8 web application that helps you track and analyze the
 
 ### 📤 Receipt Upload & Processing
 - **Drag & drop interface** for easy file uploads
-- Support for multiple file formats: JPG, PNG, PDF, TXT
-- **Automatic text extraction** using OCR (images) and text parsing
+- Support for multiple file formats: JPG, PNG, TXT (PDF support requires additional library)
+- **AI-Powered OCR** using GitHub Copilot SDK with GPT-4 Vision for image text extraction
+- **Intelligent Receipt Parsing** using GPT-4 to understand and structure receipt data
 - **Duplicate detection** via SHA256 hashing  - uploads are idempotent
 - Real-time processing status (Processing → Processed/Failed)
 
@@ -39,11 +40,49 @@ A production-quality .NET 8 web application that helps you track and analyze the
   - Clickable rows to view full receipt details
   - Modal with line items and categorization
 
+### 🤖 AI-Powered Features (GitHub Copilot SDK)
+
+When `UseAI: true` is configured, the application leverages the GitHub Copilot SDK for advanced capabilities:
+
+1. **AI-Powered OCR (Images)**
+   - Uses GPT-4 Vision (`gpt-4o`) to extract text from receipt images
+   - Supports JPG, PNG formats
+   - Maintains original layout and structure
+   - Far superior accuracy compared to traditional OCR libraries
+
+2. **PDF Support (Requires Additional Library)**
+   - Note: AI vision models work best with images, not PDF binary data
+   - For PDF support, install a PDF library such as:
+     - `PdfPig` - Open source, actively maintained
+     - `iTextSharp` - Commercial, feature-rich
+   - Alternative: Convert PDF to images first, then use AI OCR
+   - See `AI_INTEGRATION.md` for implementation guidance
+
+3. **Intelligent Receipt Parsing**
+   - Uses GPT-4.1 to understand receipt structure
+   - Automatically extracts:
+     - Vendor/store name
+     - Purchase date
+     - Line items with descriptions, quantities, and prices
+     - Subtotal, tax, and total amounts
+   - Returns structured JSON data for easy processing
+   - Falls back to regex-based parsing if AI fails
+
+**Implementation Details:**
+- Located in `Services/AICopilotTextExtractionService.cs` and `Services/AICopilotReceiptParserService.cs`
+- Uses `GitHub.Copilot.SDK` and `Microsoft.Extensions.AI` NuGet packages
+- Creates Copilot sessions for each processing request
+- Base64-encodes images for GPT-4 Vision analysis
+- Structured prompts ensure consistent, parseable output
+
 ## Tech Stack
 
 - **.NET 8** - ASP.NET Core minimal APIs
 - **Entity Framework Core 8** with **SQLite** (file-based database)
-- **GitHub Copilot SDK** for AI capabilities
+- **GitHub Copilot SDK 0.1.23** for AI-powered OCR and receipt parsing
+- **GPT-4 Vision (gpt-4o)** for image analysis and text extraction
+- **GPT-4.1** for intelligent receipt structure parsing
+- **Microsoft.Extensions.AI** - AI abstractions and utilities
 - **Chart.js** for data visualization
 - **Vanilla JavaScript** frontend (no framework)
 - **Services pattern** with dependency injection
@@ -54,6 +93,10 @@ A production-quality .NET 8 web application that helps you track and analyze the
 ### Prerequisites
 
 - .NET 8 SDK or later
+- **GitHub Copilot CLI** installed and authenticated (required for AI features)
+  - Install: Follow the [GitHub Copilot CLI installation guide](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli)
+  - Verify: Run `copilot --version` to ensure it's working
+  - Note: If you set `UseAI: false` in appsettings.json, Copilot CLI is not required
 - (Optional) Node.js for future enhancements
 
 ### Installation
@@ -90,10 +133,19 @@ Edit `appsettings.json` to customize:
   "ReceiptHealth": {
     "StorageRoot": "./storage",
     "DatabasePath": "./receipts.db",
-    "MaxFileSizeBytes": 15728640
+    "MaxFileSizeBytes": 15728640,
+    "UseAI": true
   }
 }
 ```
+
+**Configuration Options:**
+- `StorageRoot`: Directory for uploaded files (default: `./storage`)
+- `DatabasePath`: SQLite database file path (default: `./receipts.db`)
+- `MaxFileSizeBytes`: Maximum upload size in bytes (default: 15MB)
+- **`UseAI`**: Enable AI-powered OCR and parsing using GitHub Copilot SDK (default: `true`)
+  - Set to `true` for AI-powered image OCR and intelligent receipt parsing (requires GitHub Copilot CLI authentication)
+  - Set to `false` for basic text extraction (no AI, no authentication required)
 
 ## Usage
 
@@ -199,8 +251,12 @@ decimal weight = item.Category switch
 
 ## Future Enhancements
 
-- [ ] **OCR Integration**: Add Tesseract.NET for image processing
-- [ ] **PDF Text Extraction**: Implement PDF parsing
+- [x] **OCR Integration**: ✅ Implemented using GitHub Copilot SDK with GPT-4 Vision
+- [x] **PDF Text Extraction**: ✅ Implemented using GitHub Copilot SDK
+- [x] **Intelligent Receipt Parsing**: ✅ Implemented using GPT-4.1 for structured data extraction
+- [ ] **PDF Support**: Add PdfPig or iTextSharp for PDF text extraction (see AI_INTEGRATION.md)
+- [ ] **PDF-to-Image Conversion**: For scanned PDFs, convert to images and use AI OCR
+- [ ] **AI-Powered Categorization**: Enhance category detection using AI instead of keywords
 - [ ] **Vendor Bias**: Apply vendor-level category adjustments
 - [ ] **Weekly/Yearly Analytics**: Expand time-based aggregations
 - [ ] **Price Inflation Tracking**: Monitor unit price changes over time
@@ -208,6 +264,7 @@ decimal weight = item.Category switch
 - [ ] **Background Job Queue**: Use Hangfire or Azure Functions for processing
 - [ ] **User Authentication**: Multi-user support
 - [ ] **Mobile App**: React Native or Xamarin client
+- [ ] **Batch Processing**: Process multiple receipts simultaneously with AI
 
 ## Development
 
