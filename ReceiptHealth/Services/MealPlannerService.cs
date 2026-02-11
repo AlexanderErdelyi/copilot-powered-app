@@ -93,7 +93,9 @@ public class MealPlannerService : IMealPlannerService
         try
         {
             // Generate 7 dinner recipes using AI
+            _logger.LogInformation("📝 Requesting 7 recipes from AI...");
             var recipes = await GenerateRecipesWithAIAsync(dietaryPreference, 7);
+            _logger.LogInformation("✅ Received {Count} recipes from AI", recipes.Count);
 
             // Create meal plan days
             for (int i = 0; i < 7; i++)
@@ -121,75 +123,116 @@ public class MealPlannerService : IMealPlannerService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ Error generating meal plan");
-            throw;
+            _logger.LogError(ex, "❌ Error generating meal plan: {Message}", ex.Message);
+            
+            // Delete the partially created meal plan if it was saved
+            try
+            {
+                var entry = _context.Entry(mealPlan);
+                if (entry.State != Microsoft.EntityFrameworkCore.EntityState.Detached)
+                {
+                    _context.MealPlans.Remove(mealPlan);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("🗑️ Cleaned up partial meal plan");
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                _logger.LogError(cleanupEx, "❌ Error cleaning up meal plan");
+            }
+            
+            throw new Exception($"Failed to generate meal plan: {ex.Message}", ex);
         }
     }
 
     private async Task<List<Recipe>> GenerateRecipesWithAIAsync(string dietaryPreference, int count)
     {
-        var prompt = BuildRecipeGenerationPrompt(dietaryPreference, count);
-
-        var session = await _copilotClient.CreateSessionAsync();
-        
-        // Increase timeout to 3 minutes for complex recipe generation
-        var timeout = TimeSpan.FromMinutes(3);
-        var response = await session.SendAndWaitAsync(new MessageOptions { Prompt = prompt }, timeout);
-
-        var content = response?.Data?.Content?.Trim();
-        _logger.LogInformation("📝 AI Response: {Content}", content?.Substring(0, Math.Min(200, content?.Length ?? 0)));
-
-        // Parse the JSON response
-        var recipesData = ParseRecipesFromAI(content);
-
-        // Save recipes to database
-        var recipes = new List<Recipe>();
-        foreach (var recipeData in recipesData)
+        try
         {
-            var recipe = new Recipe
-            {
-                Name = recipeData.Name,
-                Description = recipeData.Description,
-                CookingTimeMinutes = recipeData.CookingTime,
-                Servings = recipeData.Servings,
-                Instructions = recipeData.Instructions,
-                ImageUrl = recipeData.ImageUrl ?? "🍽️",
-                CreatedAt = DateTime.UtcNow,
-                IsHealthy = dietaryPreference.Contains("Healthy", StringComparison.OrdinalIgnoreCase),
-                IsHighProtein = dietaryPreference.Contains("Protein", StringComparison.OrdinalIgnoreCase) || 
-                               dietaryPreference.Contains("Workout", StringComparison.OrdinalIgnoreCase),
-                IsLowCarb = dietaryPreference.Contains("Low Carb", StringComparison.OrdinalIgnoreCase) ||
-                           dietaryPreference.Contains("Keto", StringComparison.OrdinalIgnoreCase),
-                IsVegetarian = dietaryPreference.Contains("Vegetarian", StringComparison.OrdinalIgnoreCase),
-                IsVegan = dietaryPreference.Contains("Vegan", StringComparison.OrdinalIgnoreCase),
-                IsCheatDay = dietaryPreference.Contains("Cheat", StringComparison.OrdinalIgnoreCase),
-                Calories = recipeData.Calories,
-                ProteinGrams = recipeData.Protein,
-                CarbsGrams = recipeData.Carbs,
-                FatGrams = recipeData.Fat
-            };
+            var prompt = BuildRecipeGenerationPrompt(dietaryPreference, count);
+            _logger.LogInformation("📤 Sending prompt to AI ({Length} chars)", prompt.Length);
 
-            _context.Recipes.Add(recipe);
-            await _context.SaveChangesAsync(); // Save to get ID
+            var session = await _copilotClient.CreateSessionAsync();
+            _logger.LogInformation("✅ Copilot session created");
+            
+            // Increase timeout to 3 minutes for complex recipe generation
+            var timeout = TimeSpan.FromMinutes(3);
+            _logger.LogInformation("⏳ Waiting for AI response (timeout: {Timeout})", timeout);
+            var response = await session.SendAndWaitAsync(new MessageOptions { Prompt = prompt }, timeout);
 
-            // Add ingredients
-            foreach (var ingredient in recipeData.Ingredients)
+            var content = response?.Data?.Content?.Trim();
+            if (string.IsNullOrEmpty(content))
             {
-                var recipeIngredient = new RecipeIngredient
+                _logger.LogError("❌ AI returned empty response");
+                throw new Exception("AI returned empty response");
+            }
+            
+            _logger.LogInformation("📝 AI Response received ({Length} chars): {Preview}...", 
+                content.Length, 
+                content[..Math.Min(100, content.Length)]);
+
+            // Parse the JSON response
+            var recipesData = ParseRecipesFromAI(content);
+            _logger.LogInformation("✅ Parsed {Count} recipes from AI response", recipesData.Count);
+
+            // Save recipes to database
+            var recipes = new List<Recipe>();
+            for (int i = 0; i < recipesData.Count; i++)
+            {
+                var recipeData = recipesData[i];
+                _logger.LogInformation("💾 Saving recipe {Index}/{Total}: {Name}", i + 1, recipesData.Count, recipeData.Name);
+                
+                var recipe = new Recipe
                 {
-                    RecipeId = recipe.Id,
-                    IngredientName = ingredient.Name,
-                    Quantity = ingredient.Quantity,
-                    Category = ingredient.Category
+                    Name = recipeData.Name,
+                    Description = recipeData.Description,
+                    CookingTimeMinutes = recipeData.CookingTime,
+                    Servings = recipeData.Servings,
+                    Instructions = recipeData.Instructions,
+                    ImageUrl = recipeData.ImageUrl ?? "🍽️",
+                    CreatedAt = DateTime.UtcNow,
+                    IsHealthy = dietaryPreference.Contains("Healthy", StringComparison.OrdinalIgnoreCase),
+                    IsHighProtein = dietaryPreference.Contains("Protein", StringComparison.OrdinalIgnoreCase) || 
+                                   dietaryPreference.Contains("Workout", StringComparison.OrdinalIgnoreCase),
+                    IsLowCarb = dietaryPreference.Contains("Low Carb", StringComparison.OrdinalIgnoreCase) ||
+                               dietaryPreference.Contains("Keto", StringComparison.OrdinalIgnoreCase),
+                    IsVegetarian = dietaryPreference.Contains("Vegetarian", StringComparison.OrdinalIgnoreCase),
+                    IsVegan = dietaryPreference.Contains("Vegan", StringComparison.OrdinalIgnoreCase),
+                    IsCheatDay = dietaryPreference.Contains("Cheat", StringComparison.OrdinalIgnoreCase),
+                    Calories = recipeData.Calories,
+                    ProteinGrams = recipeData.Protein,
+                    CarbsGrams = recipeData.Carbs,
+                    FatGrams = recipeData.Fat
                 };
-                _context.RecipeIngredients.Add(recipeIngredient);
+
+                _context.Recipes.Add(recipe);
+                await _context.SaveChangesAsync(); // Save to get ID
+
+                // Add ingredients
+                foreach (var ingredient in recipeData.Ingredients)
+                {
+                    var recipeIngredient = new RecipeIngredient
+                    {
+                        RecipeId = recipe.Id,
+                        IngredientName = ingredient.Name,
+                        Quantity = ingredient.Quantity,
+                        Category = ingredient.Category
+                    };
+                    _context.RecipeIngredients.Add(recipeIngredient);
+                }
+
+                await _context.SaveChangesAsync();
+                recipes.Add(recipe);
             }
 
-            await _context.SaveChangesAsync();
-            recipes.Add(recipe);
+            _logger.LogInformation("✅ Successfully saved {Count} recipes to database", recipes.Count);
+            return recipes;
         }
-
-        return recipes;
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error generating recipes with AI: {Message}", ex.Message);
+            throw new Exception($"Failed to generate recipes: {ex.Message}", ex);
+        }
     }
 
     private string BuildRecipeGenerationPrompt(string dietaryPreference, int count)

@@ -18,6 +18,7 @@ public class VoiceAssistantService
     private readonly IShoppingListService _shoppingListService;
     private readonly ReceiptHealthContext _context;
     private readonly IHealthScoreService _healthScoreService;
+    private readonly IMealPlannerService _mealPlannerService;
     
     // Conversation history per session (in production, use distributed cache)
     private static readonly Dictionary<string, List<ConversationMessage>> _conversations = new();
@@ -26,13 +27,15 @@ public class VoiceAssistantService
         ILogger<VoiceAssistantService> logger,
         IShoppingListService shoppingListService,
         ReceiptHealthContext context,
-        IHealthScoreService healthScoreService)
+        IHealthScoreService healthScoreService,
+        IMealPlannerService mealPlannerService)
     {
         _copilotClient = new CopilotClient();
         _logger = logger;
         _shoppingListService = shoppingListService;
         _context = context;
         _healthScoreService = healthScoreService;
+        _mealPlannerService = mealPlannerService;
     }
 
     public async Task<VoiceCommandResponse> ProcessVoiceCommandAsync(
@@ -139,6 +142,11 @@ Shopping Lists:
 - View a specific list in detail (VIEW_SHOPPING_LIST)
 - Build a healthy shopping list from what they usually buy (GENERATE_HEALTHY_LIST)
 
+Meal Planning:
+- Generate a weekly meal plan (GENERATE_MEAL_PLAN)
+- Show their meal plans (LIST_MEAL_PLANS)
+- Go to the meal planner page (NAVIGATE to meal-planner)
+
 Receipts:
 - Look up old receipts (QUERY_RECEIPTS)
 - Find items they bought before (QUERY_ITEMS)
@@ -146,7 +154,7 @@ Receipts:
 - Check how healthy their food choices are (GET_HEALTH_SCORE)
 
 Navigation:
-- Go to different pages (NAVIGATE) - dashboard, receipts, shopping-lists, voice-assistant
+- Go to different pages (NAVIGATE) - dashboard, receipts, shopping-lists, meal-planner, voice-assistant
 
 File Actions:
 - Upload a file/receipt (UPLOAD_FILE)
@@ -178,6 +186,14 @@ Here's what's on your groceries list...
 Them: delete all my lists
 You: ```json{""intent"":""DELETE_ALL_SHOPPING_LISTS"",""parameters"":{}}```
 Okay, clearing everything out...
+
+Them: generate a meal plan
+You: ```json{""intent"":""GENERATE_MEAL_PLAN"",""parameters"":{""dietaryPreference"":""Healthy""}}```
+Awesome! Let me whip up a healthy meal plan for you...
+
+Them: generate a keto meal plan
+You: ```json{""intent"":""GENERATE_MEAL_PLAN"",""parameters"":{""dietaryPreference"":""Low Carb""}}```
+On it! Creating a low carb meal plan...
 
 Them: what did i buy at lidl
 You: ```json{""intent"":""QUERY_RECEIPTS"",""parameters"":{""storeName"":""Lidl"",""daysBack"":7}}```
@@ -306,6 +322,14 @@ Just be human:
 
                 case "OPEN_RECEIPT":
                     await HandleOpenReceipt(parameters, response);
+                    break;
+
+                case "GENERATE_MEAL_PLAN":
+                    await HandleGenerateMealPlan(parameters, response);
+                    break;
+
+                case "LIST_MEAL_PLANS":
+                    await HandleListMealPlans(response);
                     break;
 
                 case "GET_INSIGHTS":
@@ -599,12 +623,17 @@ Just be human:
             { "dashboard", "/" },
             { "home", "/" },
             { "receipts", "/receipts.html" },
-            { "shopping-lists", "/index.html#shopping" },
-            { "shopping", "/index.html#shopping" },
-            { "lists", "/index.html#shopping" },
+            { "shopping-lists", "/shopping-lists.html" },
+            { "shopping", "/shopping-lists.html" },
+            { "lists", "/shopping-lists.html" },
+            { "meal-planner", "/meal-planner.html" },
+            { "meal-plans", "/meal-planner.html" },
+            { "meals", "/meal-planner.html" },
             { "voice", "/voice-assistant.html" },
             { "voice-assistant", "/voice-assistant.html" },
-            { "assistant", "/voice-assistant.html" }
+            { "assistant", "/voice-assistant.html" },
+            { "achievements", "/achievements.html" },
+            { "insights", "/insights.html" }
         };
 
         var url = pageMap.ContainsKey(page ?? "") ? pageMap[page!] : "/";
@@ -688,6 +717,69 @@ Just be human:
         {
             _logger.LogError(ex, "❌ Error opening receipt");
             response.Response = "Oops, trouble finding that receipt. Try again?";
+        }
+    }
+
+    private async Task HandleGenerateMealPlan(JsonElement parameters, VoiceCommandResponse response)
+    {
+        try
+        {
+            var dietaryPreference = parameters.TryGetProperty("dietaryPreference", out var prefElement)
+                ? prefElement.GetString()
+                : "Healthy";
+
+            _logger.LogInformation("🍽️ Generating meal plan with preference: {Preference}", dietaryPreference);
+
+            // Generate the meal plan - start of current week (Monday)
+            var today = DateTime.Today;
+            var startDate = today.AddDays(-(int)today.DayOfWeek + (today.DayOfWeek == DayOfWeek.Sunday ? -6 : 1));
+            var mealPlan = await _mealPlannerService.GenerateWeeklyMealPlanAsync(dietaryPreference ?? "Healthy", startDate);
+
+            response.Success = true;
+            response.Data = new
+            {
+                action = "navigate",
+                url = "/meal-planner.html",
+                mealPlanId = mealPlan.Id,
+                mealPlanName = mealPlan.Name,
+                recipeCount = mealPlan.Days.Count
+            };
+            _logger.LogInformation("✅ Generated meal plan: {Name} with {Count} recipes", mealPlan.Name, mealPlan.Days.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error generating meal plan");
+            response.Response = "Hmm, ran into trouble making that meal plan. Wanna try again?";
+            response.Success = false;
+        }
+    }
+
+    private async Task HandleListMealPlans(VoiceCommandResponse response)
+    {
+        try
+        {
+            var mealPlans = await _mealPlannerService.GetAllMealPlansAsync();
+            
+            response.Success = true;
+            response.Data = new
+            {
+                action = "navigate",
+                url = "/meal-planner.html",
+                planCount = mealPlans.Count,
+                plans = mealPlans.Take(5).Select(mp => new
+                {
+                    mp.Name,
+                    mp.StartDate,
+                    RecipeCount = mp.Days.Count
+                })
+            };
+            _logger.LogInformation("📋 Listed {Count} meal plans", mealPlans.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error listing meal plans");
+            response.Response = "Oops, couldn't load your meal plans. Try again?";
+            response.Success = false;
         }
     }
 
