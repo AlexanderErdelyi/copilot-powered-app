@@ -451,6 +451,29 @@ app.MapGet("/api/analytics/category-breakdown", async (ReceiptHealthContext cont
     return Results.Ok(breakdown);
 });
 
+// Analytics: Get line items by category (for drill-down)
+app.MapGet("/api/analytics/category-items/{category}", async (string category, ReceiptHealthContext context) =>
+{
+    var items = await context.LineItems
+        .Include(li => li.Receipt)
+        .Where(li => li.Category.ToLower() == category.ToLower())
+        .OrderByDescending(li => li.Receipt.Date)
+        .Take(100) // Limit to 100 most recent items
+        .Select(li => new
+        {
+            li.Id,
+            li.Description,
+            li.Price,
+            li.Quantity,
+            li.Category,
+            ReceiptDate = li.Receipt.Date,
+            Vendor = li.Receipt.Vendor
+        })
+        .ToListAsync();
+
+    return Results.Ok(items);
+});
+
 // === Price Comparison Endpoints ===
 
 // Compare prices for an item
