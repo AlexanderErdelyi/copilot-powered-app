@@ -52,30 +52,16 @@ function Dashboard() {
       setTrendData(trendRes.data);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      // Set mock data for demo
+      // Set mock data for demo when backend is not available
       setStats({
-        totalSpent: 2847.50,
-        receiptCount: 42,
-        healthyPercentage: 68,
-        avgPerReceipt: 67.80
+        totalSpent: 0,
+        receiptCount: 0,
+        healthyPercentage: 0,
+        avgPerReceipt: 0
       });
       
-      setCategoryData([
-        { name: 'Groceries', value: 1250, color: '#10b981' },
-        { name: 'Restaurants', value: 680, color: '#f59e0b' },
-        { name: 'Entertainment', value: 420, color: '#8b5cf6' },
-        { name: 'Health', value: 297, color: '#3b82f6' },
-        { name: 'Other', value: 200, color: '#6b7280' }
-      ]);
-      
-      setTrendData([
-        { date: 'Jan', amount: 245 },
-        { date: 'Feb', amount: 312 },
-        { date: 'Mar', amount: 278 },
-        { date: 'Apr', amount: 390 },
-        { date: 'May', amount: 420 },
-        { date: 'Jun', amount: 385 }
-      ]);
+      setCategoryData([]);
+      setTrendData([]);
     } finally {
       setLoading(false);
     }

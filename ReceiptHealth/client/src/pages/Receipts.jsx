@@ -65,11 +65,15 @@ function Receipts() {
 
     try {
       toast.loading('Uploading receipt...', { id: 'upload' });
-      const response = await axios.post('/api/documents/upload', formData, {
+      const response = await axios.post('/api/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       toast.success('Receipt uploaded successfully!', { id: 'upload' });
-      fetchReceipts();
+      
+      // Wait a bit for processing, then refresh
+      setTimeout(() => {
+        fetchReceipts();
+      }, 2000);
     } catch (error) {
       console.error('Error uploading:', error);
       toast.error('Failed to upload receipt', { id: 'upload' });
@@ -213,16 +217,16 @@ function Receipts() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {receipt.itemCount} items
+                      {receipt.lineItemCount || receipt.itemCount || 0} items
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                        ${receipt.total.toFixed(2)}
+                        ${receipt.total?.toFixed(2) || '0.00'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getHealthScoreColor(receipt.healthScore)}`}>
-                        {receipt.healthScore}%
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getHealthScoreColor(receipt.healthScore || 0)}`}>
+                        {receipt.healthScore || 0}%
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
