@@ -11,13 +11,24 @@ builder.Logging.AddConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 // Configure HTTP URL
-builder.WebHost.UseUrls("http://localhost:5002");
+builder.WebHost.UseUrls("http://localhost:5000");
 
 Console.WriteLine("🚀 Starting ReceiptHealth server...");
 
 // Add services to the container
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Add CORS for React development
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ReactDevPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
 // Add DbContext
 var dbPath = builder.Configuration["ReceiptHealth:DatabasePath"] ?? "./receipts.db";
@@ -63,6 +74,9 @@ builder.Services.AddSingleton<IPiperTtsService, PiperTtsService>();
 Console.WriteLine("🎵 Piper TTS service registered - local neural text-to-speech");
 
 var app = builder.Build();
+
+// Enable CORS
+app.UseCors("ReactDevPolicy");
 
 // Enable static files (for serving HTML/JS/CSS)
 app.UseDefaultFiles();
