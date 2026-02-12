@@ -58,6 +58,10 @@ builder.Services.AddScoped<INutritionService, NutritionService>();
 builder.Services.AddScoped<IMealPlannerService, MealPlannerService>();
 builder.Services.AddScoped<VoiceAssistantService>();
 
+// Text-to-Speech service (Piper)
+builder.Services.AddSingleton<IPiperTtsService, PiperTtsService>();
+Console.WriteLine("🎵 Piper TTS service registered - local neural text-to-speech");
+
 var app = builder.Build();
 
 // Enable static files (for serving HTML/JS/CSS)
@@ -1006,6 +1010,47 @@ app.MapPost("/api/voice/process-command", async (HttpRequest request, VoiceAssis
     return Results.Ok(response);
 });
 
+// Get available TTS voices
+app.MapGet("/api/voice/available-voices", (IPiperTtsService ttsService) =>
+{
+    return Results.Ok(ttsService.GetAvailableVoices());
+});
+
+// Generate speech from text using Piper TTS
+app.MapPost("/api/voice/text-to-speech", async (HttpRequest request, IPiperTtsService ttsService) =>
+{
+    var body = await request.ReadFromJsonAsync<TtsRequest>();
+    if (body == null || string.IsNullOrWhiteSpace(body.Text))
+    {
+        return Results.BadRequest(new { error = "Text is required" });
+    }
+
+    if (!ttsService.IsAvailable())
+    {
+        return Results.Problem(
+            detail: "Piper TTS is not configured. Please download Piper from https://github.com/rhasspy/piper/releases",
+            statusCode: 503
+        );
+    }
+
+    try
+    {
+        Console.WriteLine($"🎵 Generating speech for: {body.Text.Substring(0, Math.Min(50, body.Text.Length))}... (Voice: {body.Voice ?? "default"})");
+        
+        var audioData = await ttsService.GenerateSpeechAsync(body.Text, body.Voice);
+        
+        return Results.File(audioData, "audio/mpeg", "speech.mp3");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ TTS error: {ex.Message}");
+        return Results.Problem(
+            detail: $"Failed to generate speech: {ex.Message}",
+            statusCode: 500
+        );
+    }
+});
+
 // === Nutrition Endpoints ===
 
 // Get daily nutrition summary
@@ -1151,6 +1196,7 @@ public record CreateChallengeRequest(string Name, string Description, string Typ
 public record TrackFeatureRequest(string FeatureName, string? Details = null);
 public record NaturalLanguageQueryRequest(string Query);
 public record VoiceCommandRequest(string Transcript, string? SessionId = null, List<ReceiptHealth.Services.ConversationMessage>? ConversationHistory = null);
+public record TtsRequest(string Text, string? Voice = null);
 public record GenerateMealPlanRequest(string DietaryPreference, DateTime? StartDate = null);
 public record CreateShoppingListFromMealPlanRequest(string? Name = null);
 

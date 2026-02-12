@@ -306,12 +306,21 @@
                     <input type="checkbox" id="continuousListening">
                     <label for="continuousListening">Continuous listening</label>
                 </div>
-                <div class="setting-item">
-                    <label for="voiceSelect">🎵 Voice:</label>
-                    <select id="voiceSelect" style="padding: 5px; border-radius: 4px; border: 1px solid #ddd; margin-left: 10px;">
+            </div>
+            
+            <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <label for="voiceSelect" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">
+                    🎵 Voice Selection
+                </label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="voiceSelect" style="flex: 1; padding: 10px; border-radius: 6px; border: 2px solid #ddd; font-size: 1em;">
                         <option value="">Loading voices...</option>
                     </select>
+                    <button class="btn" id="testVoiceBtn" style="flex: 0 0 auto; padding: 10px 20px;">
+                        🔊 Test Voice
+                    </button>
                 </div>
+                <div id="voiceInfo" style="margin-top: 8px; font-size: 0.9em; color: #666;"></div>
             </div>
 
             <div class="controls">
@@ -391,117 +400,124 @@
         const textInput = document.getElementById('textInput');
         const sendBtn = document.getElementById('sendBtn');
         const voiceSelect = document.getElementById('voiceSelect');
+        const testVoiceBtn = document.getElementById('testVoiceBtn');
+        const voiceInfo = document.getElementById('voiceInfo');
+        
+        let edgeTtsVoices = [];  // Available Edge TTS voices from server
 
-        // Load available voices
-        function loadVoices() {
-            availableVoices = SpeechSynthesis.getVoices();
-            
-            if (availableVoices.length === 0) {
-                // Voices not loaded yet, try again
-                setTimeout(loadVoices, 100);
-                return;
-            }
-
-            console.log('🎵 Available voices:', availableVoices.length);
-            
-            // Populate voice selector
-            voiceSelect.innerHTML = '';
-            availableVoices.forEach((voice, index) => {
-                const option = document.createElement('option');
-                option.value = index;
-                option.textContent = `${voice.name} (${voice.lang})`;
-                voiceSelect.appendChild(option);
-            });
-
-            // Select the best natural-sounding voice automatically
-            selectBestVoice();
-        }
-
-        // Select the most natural-sounding voice
-        function selectBestVoice() {
-            // Priority list for best natural voices (same as wake-word-listener)
-            const premiumVoices = [
-                'Google US English',
-                'Google UK English Female',
-                'Microsoft Zira - English (United States)',
-                'Microsoft Mark - English (United States)',
-                'Samantha',  // macOS/iOS premium voice
-                'Alex',      // macOS/iOS premium voice
-                'Moira',     // macOS/iOS UK voice
-            ];
-            
-            // Try premium voices first
-            for (const premiumName of premiumVoices) {
-                const voice = availableVoices.find(v => 
-                    v.lang.startsWith('en') && v.name.includes(premiumName)
-                );
-                if (voice) {
-                    const index = availableVoices.indexOf(voice);
-                    selectedVoice = voice;
-                    voiceSelect.value = index;
-                    console.log('🎤 Selected premium voice:', voice.name);
-                    localStorage.setItem('preferredVoiceIndex', index);
-                    return;
+        // Load available Edge TTS voices from server
+        async function loadVoices() {
+            try {
+                console.log('🎵 Loading Edge TTS voices from server...');
+                const response = await fetch('/api/voice/available-voices');
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load voices');
                 }
+                
+                edgeTtsVoices = await response.json();
+                console.log('🎵 Loaded Edge TTS voices:', edgeTtsVoices.length);
+                
+                // Populate voice selector
+                voiceSelect.innerHTML = '';
+                edgeTtsVoices.forEach((voice) => {
+                    const option = document.createElement('option');
+                    option.value = voice.id;
+                    option.textContent = `${voice.name} - ${voice.gender} (${voice.description})`;
+                    voiceSelect.appendChild(option);
+                });
+
+                // Select saved voice or default to Aria
+                const savedVoice = localStorage.getItem('preferredEdgeVoice') || 'en-US-AriaNeural';
+                voiceSelect.value = savedVoice;
+                updateVoiceInfo();
+                
+            } catch (error) {
+                console.error('❌ Error loading voices:', error);
+                voiceSelect.innerHTML = '<option value="">Error loading voices</option>';
             }
-            
-            // Try Enhanced/Natural/Neural voices
-            const voice = availableVoices.find(v => 
-                v.lang.startsWith('en') && 
-                (v.name.toLowerCase().includes('enhanced') || 
-                 v.name.toLowerCase().includes('natural') || 
-                 v.name.toLowerCase().includes('neural'))
-            );
+        }
+        
+        // Update voice information display
+        function updateVoiceInfo() {
+            const selectedVoiceId = voiceSelect.value;
+            const voice = edgeTtsVoices.find(v => v.id === selectedVoiceId);
             
             if (voice) {
-                const index = availableVoices.indexOf(voice);
-                selectedVoice = voice;
-                voiceSelect.value = index;
-                console.log('🎤 Selected natural voice:', voice.name);
-                localStorage.setItem('preferredVoiceIndex', index);
-                return;
-            }
-            
-            // Try Google voices (generally high quality)
-            const googleVoice = availableVoices.find(v => 
-                v.lang.startsWith('en') && v.name.includes('Google')
-            );
-            
-            if (googleVoice) {
-                const index = availableVoices.indexOf(googleVoice);
-                selectedVoice = googleVoice;
-                voiceSelect.value = index;
-                console.log('🎤 Selected Google voice:', googleVoice.name);
-                localStorage.setItem('preferredVoiceIndex', index);
-                return;
-            }
-
-            // Fallback: use first English voice or first available
-            const englishVoice = availableVoices.find(v => v.lang.startsWith('en'));
-            if (englishVoice) {
-                const index = availableVoices.indexOf(englishVoice);
-                selectedVoice = englishVoice;
-                voiceSelect.value = index;
-            } else if (availableVoices.length > 0) {
-                selectedVoice = availableVoices[0];
-                voiceSelect.value = 0;
+                voiceInfo.textContent = `${voice.language} • ${voice.gender} • ${voice.description}`;
+            } else {
+                voiceInfo.textContent = '';
             }
         }
 
         // Voice selection change
         voiceSelect.addEventListener('change', () => {
-            const index = parseInt(voiceSelect.value);
-            selectedVoice = availableVoices[index];
-            localStorage.setItem('preferredVoiceIndex', index);
-            console.log('🎵 Voice changed to:', selectedVoice.name);
+            const selectedVoiceId = voiceSelect.value;
+            localStorage.setItem('preferredEdgeVoice', selectedVoiceId);
+            updateVoiceInfo();
+            console.log('🎵 Voice changed to:', selectedVoiceId);
+        });
+        
+        // Test voice button
+        testVoiceBtn.addEventListener('click', async () => {
+            const selectedVoiceId = voiceSelect.value;
+            const voice = edgeTtsVoices.find(v => v.id === selectedVoiceId);
+            
+            if (!voice) {
+                alert('Please select a voice first');
+                return;
+            }
+            
+            testVoiceBtn.disabled = true;
+            testVoiceBtn.textContent = '🔄 Testing...';
+            
+            try {
+                const testText = `Hello! I'm ${voice.name.split(' ')[0]}. This is how I sound. I'm a ${voice.gender.toLowerCase()} voice with a ${voice.description.toLowerCase()} style.`;
+                
+                console.log('🔊 Testing voice:', selectedVoiceId);
+                
+                const response = await fetch('/api/voice/text-to-speech', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        text: testText,
+                        voice: selectedVoiceId 
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('TTS service unavailable');
+                }
+                
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                    testVoiceBtn.disabled = false;
+                    testVoiceBtn.textContent = '🔊 Test Voice';
+                };
+                
+                audio.onerror = () => {
+                    URL.revokeObjectURL(audioUrl);
+                    testVoiceBtn.disabled = false;
+                    testVoiceBtn.textContent = '🔊 Test Voice';
+                    alert('Error playing audio');
+                };
+                
+                await audio.play();
+                
+            } catch (error) {
+                console.error('❌ Test voice error:', error);
+                alert('Failed to test voice: ' + error.message);
+                testVoiceBtn.disabled = false;
+                testVoiceBtn.textContent = '🔊 Test Voice';
+            }
         });
 
         // Load voices on page load
-        if (SpeechSynthesis) {
-            loadVoices();
-            // Some browsers need this event
-            SpeechSynthesis.onvoiceschanged = loadVoices;
-        }
+        loadVoices();
 
         // Initialize recognition
         if (SpeechRecognition) {
@@ -914,32 +930,102 @@
             return processed;
         }
 
-        // Text-to-speech with natural voice
-        function speak(text) {
-            if (!autoSpeak.checked || !SpeechSynthesis) {
+        // Text-to-speech using Piper (server-side neural TTS)
+        let currentAudio = null;
+
+        async function speak(text) {
+            if (!autoSpeak.checked) {
                 return;
             }
 
             // Stop any ongoing speech
-            SpeechSynthesis.cancel();
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
 
-            updateStatus('Speaking...', 'speaking');
+            updateStatus('Generating speech...', 'speaking');
             stopSpeakBtn.disabled = false;
 
-            // Process text for more natural delivery
-            const processedText = processTextForSpeech(text);
+            try {
+                // Process text for more natural delivery
+                const processedText = processTextForSpeech(text);
 
-            const utterance = new SpeechSynthesisUtterance(processedText);
+                console.log('🎵 Requesting Piper TTS for:', processedText.substring(0, 50) + '...');
+
+                // Get selected voice
+                const selectedVoiceId = voiceSelect.value || 'en-US-AriaNeural';
+
+                // Call server-side TTS API with selected voice
+                const response = await fetch('/api/voice/text-to-speech', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        text: processedText,
+                        voice: selectedVoiceId 
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({ detail: 'TTS service unavailable' }));
+                    console.warn('⚠️ Piper TTS not available, falling back to browser TTS:', error.detail);
+                    
+                    // Fallback to browser TTS if Piper is not available
+                    speakWithBrowserTTS(processedText);
+                    return;
+                }
+
+                // Get audio data
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+
+                // Play audio
+                currentAudio = new Audio(audioUrl);
+                currentAudio.onended = () => {
+                    updateStatus('Ready to listen', 'idle');
+                    stopSpeakBtn.disabled = true;
+                    URL.revokeObjectURL(audioUrl);
+                };
+
+                currentAudio.onerror = (event) => {
+                    console.error('❌ Audio playback error:', event);
+                    updateStatus('Ready to listen', 'idle');
+                    stopSpeakBtn.disabled = true;
+                    URL.revokeObjectURL(audioUrl);
+                };
+
+                updateStatus('Speaking...', 'speaking');
+                console.log('🔊 Playing Piper TTS audio');
+                await currentAudio.play();
+
+            } catch (error) {
+                console.error('❌ TTS error:', error);
+                updateStatus('Ready to listen', 'idle');
+                stopSpeakBtn.disabled = true;
+                
+                // Fallback to browser TTS on error
+                speakWithBrowserTTS(processedText);
+            }
+        }
+
+        // Fallback browser TTS (used when Piper is not available)
+        function speakWithBrowserTTS(text) {
+            if (!SpeechSynthesis) {
+                console.warn('⚠️ Browser TTS not available');
+                return;
+            }
+
+            SpeechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
             
-            // Use selected voice for natural sound
             if (selectedVoice) {
                 utterance.voice = selectedVoice;
             }
             
-            // Natural speech parameters (tuned for human-like quality)
-            utterance.rate = 0.92;     // Slightly slower = more natural and clear
-            utterance.pitch = 1.08;    // Slightly higher = friendlier, more engaging tone
-            utterance.volume = 0.95;   // Slightly lower = less robotic
+            utterance.rate = 1.1;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
 
             utterance.onend = () => {
                 updateStatus('Ready to listen', 'idle');
@@ -952,17 +1038,25 @@
                 stopSpeakBtn.disabled = true;
             };
 
-            console.log('🔊 Speaking with voice:', selectedVoice ? selectedVoice.name : 'default');
+            console.log('🔊 Speaking with browser voice:', selectedVoice ? selectedVoice.name : 'default');
             SpeechSynthesis.speak(utterance);
         }
 
         // Stop speaking
         stopSpeakBtn.addEventListener('click', () => {
+            // Stop Piper audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+            
+            // Stop browser TTS
             if (SpeechSynthesis) {
                 SpeechSynthesis.cancel();
-                updateStatus('Ready to listen', 'idle');
-                stopSpeakBtn.disabled = true;
             }
+            
+            updateStatus('Ready to listen', 'idle');
+            stopSpeakBtn.disabled = true;
         });
 
         // Clear chat
