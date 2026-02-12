@@ -156,49 +156,93 @@
             font-size: 0.9em;
         }
 
-        .item-list {
-            list-style: none;
-            margin-top: 20px;
-            max-height: 500px;
-            overflow-y: auto;
+        .list-section {
+            margin-bottom: 30px;
         }
 
-        .item {
-            display: flex;
-            align-items: center;
-            padding: 15px;
-            border-bottom: 1px solid #e9ecef;
+        .list-section h4 {
+            color: #667eea;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
         }
 
-        .item:last-child {
-            border-bottom: none;
+        .items-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
         }
 
-        .item.purchased {
-            opacity: 0.5;
-            text-decoration: line-through;
-        }
-
-        .item-checkbox {
-            margin-right: 15px;
-            width: 20px;
-            height: 20px;
+        .item-tile {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 15px;
+            border-radius: 12px;
+            text-align: center;
             cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            position: relative;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
-        .item-details {
-            flex: 1;
+        .item-tile:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
-        .item-name {
-            font-weight: 500;
-            color: #333;
+        .item-tile.purchased {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            opacity: 0.7;
         }
 
-        .item-meta {
+        .item-tile.frequent {
+            background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+            opacity: 0.8;
+        }
+
+        .item-tile-icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            display: block;
+            line-height: 1;
+        }
+
+        .item-tile-icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            display: block;
+            line-height: 1;
+        }
+
+        .item-tile-name {
+            font-weight: 600;
+            font-size: 1em;
+            margin-bottom: 8px;
+            word-wrap: break-word;
+        }
+
+        .item-tile-qty {
             font-size: 0.85em;
-            color: #666;
+            opacity: 0.9;
+        }
+
+        .item-tile-price {
+            font-size: 0.8em;
+            opacity: 0.85;
             margin-top: 5px;
+        }
+
+        .empty-section {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+            font-style: italic;
         }
 
         .category-badge {
@@ -391,7 +435,7 @@
 
     <!-- View List Modal -->
     <div id="viewListModal" class="modal">
-        <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-content" style="max-width: 900px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h3 id="listTitle" style="margin: 0;"></h3>
                 <button class="btn btn-danger btn-small" onclick="deleteList()">🗑️ Delete List</button>
@@ -400,12 +444,117 @@
                 <button class="btn btn-success" onclick="showAddItemModal()">➕ Add Item</button>
                 <button class="btn btn-secondary" onclick="hideViewListModal()">Close</button>
             </div>
-            <ul id="itemsList" class="item-list"></ul>
+            
+            <!-- To Buy Section -->
+            <div class="list-section">
+                <h4>🛒 To Buy</h4>
+                <div id="toBuyItems" class="items-grid"></div>
+            </div>
+            
+            <!-- Purchased Section -->
+            <div class="list-section" id="purchasedSection" style="display: none;">
+                <h4>✅ Purchased</h4>
+                <div id="purchasedItems" class="items-grid"></div>
+            </div>
+            
+            <!-- Frequently Bought Section -->
+            <div class="list-section" id="frequentSection" style="display: none;">
+                <h4>🔁 Frequently Bought</h4>
+                <div id="frequentItems" class="items-grid"></div>
+            </div>
         </div>
     </div>
 
     <script>
         let currentListId = null;
+
+        // Get emoji icon for item
+        function getItemIcon(itemName) {
+            const name = itemName.toLowerCase();
+            
+            // Fruits
+            if (name.includes('apple')) return '🍎';
+            if (name.includes('banana')) return '🍌';
+            if (name.includes('orange')) return '🍊';
+            if (name.includes('lemon')) return '🍋';
+            if (name.includes('strawberry') || name.includes('berries')) return '🍓';
+            if (name.includes('grape')) return '🍇';
+            if (name.includes('watermelon')) return '🍉';
+            if (name.includes('peach')) return '🍑';
+            if (name.includes('cherry')) return '🍒';
+            if (name.includes('pineapple')) return '🍍';
+            if (name.includes('mango')) return '🥭';
+            if (name.includes('avocado')) return '🥑';
+            
+            // Vegetables
+            if (name.includes('tomato')) return '🍅';
+            if (name.includes('carrot')) return '🥕';
+            if (name.includes('broccoli')) return '🥦';
+            if (name.includes('lettuce') || name.includes('salad')) return '🥬';
+            if (name.includes('potato')) return '🥔';
+            if (name.includes('corn')) return '🌽';
+            if (name.includes('pepper')) return '🌶️';
+            if (name.includes('cucumber')) return '🥒';
+            if (name.includes('onion')) return '🧅';
+            if (name.includes('garlic')) return '🧄';
+            if (name.includes('mushroom')) return '🍄';
+            if (name.includes('spinach')) return '🥬';
+            
+            // Dairy & Eggs
+            if (name.includes('milk')) return '🥛';
+            if (name.includes('cheese')) return '🧀';
+            if (name.includes('butter')) return '🧈';
+            if (name.includes('egg')) return '🥚';
+            if (name.includes('yogurt')) return '🥛';
+            
+            // Meat & Protein
+            if (name.includes('chicken')) return '🍗';
+            if (name.includes('beef') || name.includes('steak')) return '🥩';
+            if (name.includes('bacon')) return '🥓';
+            if (name.includes('fish')) return '🐟';
+            if (name.includes('shrimp')) return '🍤';
+            
+            // Bread & Bakery
+            if (name.includes('bread')) return '🍞';
+            if (name.includes('bagel')) return '🥯';
+            if (name.includes('croissant')) return '🥐';
+            if (name.includes('cookie')) return '🍪';
+            if (name.includes('cake')) return '🍰';
+            if (name.includes('donut')) return '🍩';
+            
+            // Beverages
+            if (name.includes('coffee')) return '☕';
+            if (name.includes('tea')) return '🍵';
+            if (name.includes('juice')) return '🧃';
+            if (name.includes('water')) return '💧';
+            if (name.includes('soda') || name.includes('cola')) return '🥤';
+            if (name.includes('beer')) return '🍺';
+            if (name.includes('wine')) return '🍷';
+            
+            // Snacks & Sweets
+            if (name.includes('chips') || name.includes('crisp')) return '🍟';
+            if (name.includes('chocolate')) return '🍫';
+            if (name.includes('candy')) return '🍬';
+            if (name.includes('ice cream')) return '🍦';
+            if (name.includes('popcorn')) return '🍿';
+            
+            // Meals
+            if (name.includes('pizza')) return '🍕';
+            if (name.includes('burger')) return '🍔';
+            if (name.includes('taco')) return '🌮';
+            if (name.includes('pasta')) return '🍝';
+            if (name.includes('rice')) return '🍚';
+            if (name.includes('soup')) return '🍲';
+            if (name.includes('sandwich')) return '🥪';
+            
+            // Other
+            if (name.includes('honey')) return '🍯';
+            if (name.includes('oil')) return '🫒';
+            if (name.includes('salt') || name.includes('spice')) return '🧂';
+            
+            // Default
+            return '🛒';
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             loadLists();
@@ -452,43 +601,153 @@
                 const list = await response.json();
 
                 document.getElementById('listTitle').textContent = list.name;
-                const itemsList = document.getElementById('itemsList');
                 
-                if (list.items.length === 0) {
-                    itemsList.innerHTML = '<li style="text-align: center; padding: 20px; color: #999;">No items in this list yet.</li>';
+                // Separate items into categories
+                const toBuy = list.items.filter(item => !item.isPurchased);
+                const purchased = list.items.filter(item => item.isPurchased);
+                
+                // Render To Buy section
+                const toBuyContainer = document.getElementById('toBuyItems');
+                if (toBuy.length === 0) {
+                    toBuyContainer.innerHTML = '<div class="empty-section">No items to buy. Add some items! 🛒</div>';
                 } else {
-                    itemsList.innerHTML = list.items.map(item => {
-                        const categoryClass = `category-${item.category.toLowerCase()}`;
-                        return `
-                            <li class="item ${item.isPurchased ? 'purchased' : ''}">
-                                <input type="checkbox" 
-                                       class="item-checkbox" 
-                                       ${item.isPurchased ? 'checked' : ''}
-                                       onchange="toggleItemPurchased(${item.id}, this.checked)">
-                                <div class="item-details">
-                                    <div class="item-name">
-                                        ${item.itemName} 
-                                        <span class="category-badge ${categoryClass}">${item.category}</span>
-                                    </div>
-                                    <div class="item-meta">
-                                        Qty: ${item.quantity}
-                                        ${item.lastKnownPrice ? ` • Last price: $${item.lastKnownPrice.toFixed(2)}` : ''}
-                                        ${item.lastKnownVendor ? ` @ ${item.lastKnownVendor}` : ''}
-                                    </div>
-                                </div>
-                                <button class="btn btn-danger" style="padding: 8px 15px; font-size: 0.9em;" 
-                                        onclick="event.stopPropagation(); removeItem(${item.id})">
-                                    🗑️
-                                </button>
-                            </li>
-                        `;
-                    }).join('');
+                    toBuyContainer.innerHTML = toBuy.map(item => `
+                        <div class="item-tile" onclick="toggleItemPurchased(${item.id}, true)" title="Click to mark as purchased">
+                            <span class="item-tile-icon">${getItemIcon(item.itemName)}</span>
+                            <div class="item-tile-name">${item.itemName}</div>
+                            <div class="item-tile-qty">Qty: ${item.quantity}</div>
+                            ${item.lastKnownPrice ? `<div class="item-tile-price">$${item.lastKnownPrice.toFixed(2)}</div>` : ''}
+                        </div>
+                    `).join('');
                 }
+                
+                // Render Purchased section
+                const purchasedSection = document.getElementById('purchasedSection');
+                const purchasedContainer = document.getElementById('purchasedItems');
+                if (purchased.length === 0) {
+                    purchasedSection.style.display = 'none';
+                } else {
+                    purchasedSection.style.display = 'block';
+                    purchasedContainer.innerHTML = purchased.map(item => `
+                        <div class="item-tile purchased" onclick="toggleItemPurchased(${item.id}, false)" title="Click to move back to To Buy">
+                            <span class="item-tile-icon">${getItemIcon(item.itemName)}</span>
+                            <div class="item-tile-name">${item.itemName}</div>
+                            <div class="item-tile-qty">Qty: ${item.quantity}</div>
+                            ${item.lastKnownPrice ? `<div class="item-tile-price">$${item.lastKnownPrice.toFixed(2)}</div>` : ''}
+                        </div>
+                    `).join('');
+                }
+                
+                // Load frequently bought items
+                await loadFrequentlyBought(listId);
 
                 document.getElementById('viewListModal').classList.add('show');
                 loadPriceAlerts(listId);
             } catch (error) {
                 alert(`Failed to load list: ${error.message}`);
+            }
+        }
+        
+        async function loadFrequentlyBought(listId) {
+            const frequentSection = document.getElementById('frequentSection');
+            const frequentContainer = document.getElementById('frequentItems');
+            
+            try {
+                // Fetch frequently bought items from receipts
+                const response = await fetch('/api/receipts');
+                const receipts = await response.json();
+                
+                console.log('📊 Loaded receipts:', receipts.length);
+                
+                if (receipts.length === 0) {
+                    frequentSection.style.display = 'block';
+                    frequentContainer.innerHTML = '<div class="empty-section">Upload some receipts to see frequently bought items! 📊<br><small>The system will analyze your purchase history and suggest commonly bought items.</small></div>';
+                    return;
+                }
+                
+                // Count item frequencies from all receipts
+                const itemFrequency = {};
+                receipts.forEach(receipt => {
+                    if (receipt.lineItems && receipt.lineItems.length > 0) {
+                        receipt.lineItems.forEach(lineItem => {
+                            const name = lineItem.description.toLowerCase().trim();
+                            if (!itemFrequency[name]) {
+                                itemFrequency[name] = {
+                                    name: lineItem.description,
+                                    count: 0,
+                                    avgPrice: 0,
+                                    totalPrice: 0,
+                                    vendor: receipt.vendor
+                                };
+                            }
+                            itemFrequency[name].count++;
+                            itemFrequency[name].totalPrice += lineItem.price || 0;
+                        });
+                    }
+                });
+                
+                console.log('📦 Item frequencies:', Object.keys(itemFrequency).length);
+                
+                // Calculate average prices
+                Object.values(itemFrequency).forEach(item => {
+                    item.avgPrice = item.totalPrice / item.count;
+                });
+                
+                // Get current list items to exclude them
+                const currentListResponse = await fetch(`/api/shopping-lists/${listId}`);
+                const currentList = await currentListResponse.json();
+                const currentItemNames = currentList.items.map(i => i.itemName.toLowerCase().trim());
+                
+                // Filter and sort by frequency (exclude items already in list)
+                const frequentItems = Object.values(itemFrequency)
+                    .filter(item => item.count >= 2 && !currentItemNames.includes(item.name.toLowerCase().trim()))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 12); // Show top 12
+                
+                console.log('🔁 Frequent items to show:', frequentItems.length);
+                
+                if (frequentItems.length === 0) {
+                    frequentSection.style.display = 'block';
+                    frequentContainer.innerHTML = '<div class="empty-section">No frequently bought items to suggest yet.<br><small>Items you\'ve bought 2+ times will appear here!</small></div>';
+                } else {
+                    frequentSection.style.display = 'block';
+                    frequentContainer.innerHTML = frequentItems.map(item => `
+                        <div class="item-tile frequent" onclick="addFrequentItem('${item.name.replace(/'/g, "\\'")}', ${item.avgPrice})" title="Click to add to your list">
+                            <span class="item-tile-icon">${getItemIcon(item.name)}</span>
+                            <div class="item-tile-name">${item.name}</div>
+                            <div class="item-tile-qty">Bought ${item.count}×</div>
+                            ${item.avgPrice > 0 ? `<div class="item-tile-price">~$${item.avgPrice.toFixed(2)}</div>` : ''}
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('❌ Failed to load frequently bought items:', error);
+                frequentSection.style.display = 'block';
+                frequentContainer.innerHTML = '<div class="empty-section">Unable to load suggestions. Upload receipts to enable this feature! 📊</div>';
+            }
+        }
+        
+        async function addFrequentItem(itemName, avgPrice) {
+            if (!currentListId) return;
+            
+            try {
+                const response = await fetch(`/api/shopping-lists/${currentListId}/items`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        itemName: itemName,
+                        quantity: 1
+                    })
+                });
+                
+                if (response.ok) {
+                    // Reload the list to show the new item
+                    await viewList(currentListId);
+                } else {
+                    alert('Failed to add item');
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
             }
         }
 
@@ -634,6 +893,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ isPurchased })
                 });
+                // Reload the list to update the view
+                await viewList(currentListId);
             } catch (error) {
                 alert(`Error: ${error.message}`);
             }
