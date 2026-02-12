@@ -167,10 +167,12 @@ app.MapGet("/api/dashboard/spending-trends", async (ReceiptHealthContext context
         .GroupBy(r => new { r.Date.Year, r.Date.Month })
         .Select(g => new
         {
+            year = g.Key.Year,
+            month = g.Key.Month,
             date = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMM"),
             amount = g.Sum(r => r.Total)
         })
-        .OrderBy(x => x.date)
+        .OrderBy(x => x.year).ThenBy(x => x.month)
         .ToList();
     
     return Results.Ok(monthlyData);

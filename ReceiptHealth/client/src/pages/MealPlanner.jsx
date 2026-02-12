@@ -85,8 +85,7 @@ function MealPlanner() {
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white">{plan.name || 'Weekly Meal Plan'}</h2>
                   <p className="text-sm text-gray-500">
-                    {plan.startDate && new Date(plan.startDate).toLocaleDateString()} - 
-                    {plan.endDate && new Date(plan.endDate).toLocaleDateString()}
+                    {plan.startDate && new Date(plan.startDate).toLocaleDateString()} - {plan.endDate && new Date(plan.endDate).toLocaleDateString()}
                   </p>
                 </div>
                 <span className="px-3 py-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-sm font-semibold rounded-full">
