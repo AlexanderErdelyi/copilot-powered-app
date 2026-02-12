@@ -6,10 +6,14 @@ echo.
 echo 🚀 Starting ReceiptHealth Development Servers...
 echo.
 
+REM Build backend first
+echo 🔨 Building .NET Backend...
+cd %~dp0
+dotnet build
+
 REM Start backend server
 echo 📡 Starting .NET Backend on http://localhost:5000...
-cd %~dp0
-start "ReceiptHealth Backend" cmd /k "dotnet run"
+start "ReceiptHealth Backend" cmd /k "dotnet bin\Debug\net8.0\ReceiptHealth.dll"
 
 REM Wait a moment for backend to start
 timeout /t 3 /nobreak >nul
