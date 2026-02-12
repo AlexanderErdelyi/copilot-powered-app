@@ -5,7 +5,8 @@ import {
   DollarSign, 
   ShoppingBag, 
   Apple,
-  AlertCircle
+  AlertCircle,
+  Heart
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -27,11 +28,15 @@ function Dashboard() {
     totalSpent: 0,
     receiptCount: 0,
     healthyPercentage: 0,
-    avgPerReceipt: 0
+    avgPerReceipt: 0,
+    healthScore: 0
   });
   const [loading, setLoading] = useState(true);
   const [categoryData, setCategoryData] = useState([]);
   const [trendData, setTrendData] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryItems, setCategoryItems] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -41,7 +46,10 @@ function Dashboard() {
     try {
       // Fetch stats from API
       const statsRes = await axios.get('/api/dashboard/stats');
-      setStats(statsRes.data);
+      const statsData = statsRes.data;
+      // Calculate health score (0-100 based on healthy percentage)
+      statsData.healthScore = statsData.healthyPercentage || 0;
+      setStats(statsData);
 
       // Fetch category breakdown
       const categoryRes = await axios.get('/api/dashboard/category-breakdown');
@@ -57,13 +65,26 @@ function Dashboard() {
         totalSpent: 0,
         receiptCount: 0,
         healthyPercentage: 0,
-        avgPerReceipt: 0
+        avgPerReceipt: 0,
+        healthScore: 0
       });
       
       setCategoryData([]);
       setTrendData([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCategoryClick = async (data) => {
+    const category = data.name;
+    try {
+      const response = await axios.get(`/api/analytics/category-items/${category}`);
+      setCategoryItems(response.data);
+      setSelectedCategory(category);
+      setShowCategoryModal(true);
+    } catch (error) {
+      console.error('Error fetching category items:', error);
     }
   };
 
@@ -120,7 +141,7 @@ function Dashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <KPICard
           title="Total Spent"
           value={stats.totalSpent.toFixed(2)}
@@ -152,6 +173,32 @@ function Dashboard() {
           colorClass="text-orange-500"
           prefix="$"
         />
+        {/* Health Score Card */}
+        <div className="card relative overflow-hidden">
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Health Score</span>
+              <Heart className="w-5 h-5 text-red-500" />
+            </div>
+            <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+              {stats.healthScore || 0}
+            </div>
+            <div className="text-xs text-gray-500">out of 100</div>
+            {/* Progress Bar */}
+            <div className="mt-4 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  stats.healthScore >= 70
+                    ? 'bg-green-500'
+                    : stats.healthScore >= 40
+                    ? 'bg-yellow-500'
+                    : 'bg-red-500'
+                }`}
+                style={{ width: `${stats.healthScore || 0}%` }}
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Charts row */}
@@ -203,6 +250,8 @@ function Dashboard() {
                 outerRadius={100}
                 fill="#8884d8"
                 dataKey="value"
+                onClick={handleCategoryClick}
+                style={{ cursor: 'pointer' }}
               >
                 {categoryData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -255,6 +304,54 @@ function Dashboard() {
           ))}
         </div>
       </div>
+
+      {/* Category Items Modal */}
+      {showCategoryModal && selectedCategory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {selectedCategory} Items
+              </h2>
+              <button
+                onClick={() => setShowCategoryModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6">
+              {categoryItems.length > 0 ? (
+                <div className="space-y-2">
+                  {categoryItems.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="flex-1">
+                        <span className="font-medium text-gray-900 dark:text-white">{item.description || item.name}</span>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {item.vendor && <span>{item.vendor} • </span>}
+                          {item.date && <span>{new Date(item.date).toLocaleDateString()}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-gray-900 dark:text-white">
+                          ${item.price?.toFixed(2) || '0.00'}
+                        </div>
+                        {item.quantity > 1 && (
+                          <div className="text-xs text-gray-500">Qty: {item.quantity}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+                  No items found in this category
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
