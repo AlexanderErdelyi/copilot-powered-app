@@ -1,6 +1,30 @@
 # ReceiptHealth 🩺
 
+> **🎉 New in v2.0: Modern React Frontend!** - The app has been completely redesigned with a beautiful React interface. See [README_REACT.md](README_REACT.md) for the new frontend documentation.
+
 A production-quality .NET 8 web application that helps you track and analyze the healthiness of your grocery shopping receipts. Upload receipts, automatically extract structured data, categorize line items, and visualize spending patterns.
+
+## 🚀 Quick Start
+
+### Run the Modern React App (Recommended)
+```bash
+# Start both backend and frontend
+./start-dev.sh        # Linux/Mac
+start-dev.bat         # Windows
+
+# Or manually:
+# Terminal 1: dotnet run
+# Terminal 2: cd client && npm run dev
+# Open http://localhost:5173
+```
+
+### Run the Classic HTML Version
+```bash
+dotnet run
+# Open http://localhost:5000
+```
+
+---
 
 ## Features
 
