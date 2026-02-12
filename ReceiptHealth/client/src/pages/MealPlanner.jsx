@@ -7,7 +7,25 @@ function MealPlanner() {
   const [mealPlans, setMealPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const [mealOptions, setMealOptions] = useState({
+    dietaryPreference: 'balanced',
+    servings: 2,
+    includeBreakfast: true,
+    includeLunch: true,
+    includeDinner: true
+  });
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  
+  const dietaryPreferences = [
+    { value: 'balanced', label: 'Balanced' },
+    { value: 'high-protein', label: 'High Protein' },
+    { value: 'low-carb', label: 'Low Carb' },
+    { value: 'vegetarian', label: 'Vegetarian' },
+    { value: 'vegan', label: 'Vegan' },
+    { value: 'keto', label: 'Keto' },
+    { value: 'cheat-day', label: 'Cheat Day' },
+  ];
   
   useEffect(() => {
     fetchMealPlans();
@@ -28,14 +46,9 @@ function MealPlanner() {
     setGenerating(true);
     try {
       toast.loading('Generating meal plan with AI...', { id: 'generate' });
-      const response = await axios.post('/api/meal-plans/generate', {
-        dietaryPreference: 'balanced',
-        servings: 2,
-        includeBreakfast: true,
-        includeLunch: true,
-        includeDinner: true
-      });
+      const response = await axios.post('/api/meal-plans/generate', mealOptions);
       toast.success('Meal plan generated!', { id: 'generate' });
+      setShowOptionsModal(false);
       fetchMealPlans();
     } catch (error) {
       console.error('Error generating meal plan:', error);
@@ -55,11 +68,22 @@ function MealPlanner() {
           </p>
         </div>
         <button 
-          onClick={generateMealPlan}
+          onClick={() => setShowOptionsModal(true)}
           disabled={generating}
           className="btn-primary flex items-center space-x-2"
         >
           {generating ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Generating...</span>
+            </>
+          ) : (
+            <>
+              <Plus className="w-5 h-5" />
+              <span>Generate Plan</span>
+            </>
+          )}
+        </button>
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
               <span>Generating...</span>
@@ -131,6 +155,103 @@ function MealPlanner() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Meal Plan Options Modal */}
+      {showOptionsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
+              Meal Plan Options
+            </h2>
+            
+            {/* Dietary Preference */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Dietary Preference
+              </label>
+              <select
+                value={mealOptions.dietaryPreference}
+                onChange={(e) => setMealOptions({ ...mealOptions, dietaryPreference: e.target.value })}
+                className="input"
+              >
+                {dietaryPreferences.map((pref) => (
+                  <option key={pref.value} value={pref.value}>
+                    {pref.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Servings */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Servings
+              </label>
+              <input
+                type="number"
+                value={mealOptions.servings}
+                onChange={(e) => setMealOptions({ ...mealOptions, servings: parseInt(e.target.value) || 1 })}
+                min="1"
+                max="8"
+                className="input"
+              />
+            </div>
+
+            {/* Meal Types */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Include Meals
+              </label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={mealOptions.includeBreakfast}
+                    onChange={(e) => setMealOptions({ ...mealOptions, includeBreakfast: e.target.checked })}
+                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500 mr-2"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">Breakfast</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={mealOptions.includeLunch}
+                    onChange={(e) => setMealOptions({ ...mealOptions, includeLunch: e.target.checked })}
+                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500 mr-2"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">Lunch</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={mealOptions.includeDinner}
+                    onChange={(e) => setMealOptions({ ...mealOptions, includeDinner: e.target.checked })}
+                    className="rounded border-gray-300 text-primary-500 focus:ring-primary-500 mr-2"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">Dinner</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={generateMealPlan}
+                disabled={generating}
+                className="btn-primary flex-1"
+              >
+                {generating ? 'Generating...' : 'Generate'}
+              </button>
+              <button
+                onClick={() => setShowOptionsModal(false)}
+                disabled={generating}
+                className="btn-secondary flex-1"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
