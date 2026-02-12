@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Upload, Search, Filter, Trash2, Eye, Calendar } from 'lucide-react';
+import { Upload, Search, Filter, Trash2, Eye, Calendar, X } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -8,6 +8,8 @@ function Receipts() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   useEffect(() => {
     fetchReceipts();
@@ -19,15 +21,20 @@ function Receipts() {
       setReceipts(response.data);
     } catch (error) {
       console.error('Error fetching receipts:', error);
-      // Mock data for demo
-      setReceipts([
-        { id: 1, vendor: 'Whole Foods', date: '2026-02-10', total: 87.50, itemCount: 12, healthScore: 85 },
-        { id: 2, vendor: 'Trader Joe\'s', date: '2026-02-08', total: 54.30, itemCount: 8, healthScore: 78 },
-        { id: 3, vendor: 'Target', date: '2026-02-05', total: 142.99, itemCount: 15, healthScore: 45 },
-        { id: 4, vendor: 'Costco', date: '2026-02-03', total: 215.40, itemCount: 24, healthScore: 62 }
-      ]);
+      setReceipts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const viewReceipt = async (id) => {
+    try {
+      const response = await axios.get(`/api/receipts/${id}`);
+      setSelectedReceipt(response.data);
+      setShowReceiptModal(true);
+    } catch (error) {
+      console.error('Error fetching receipt details:', error);
+      toast.error('Failed to load receipt details');
     }
   };
 
@@ -231,12 +238,17 @@ function Receipts() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
-                        <button className="text-primary-500 hover:text-primary-600 transition-colors p-2">
+                        <button 
+                          onClick={() => viewReceipt(receipt.id)}
+                          className="text-primary-500 hover:text-primary-600 transition-colors p-2"
+                          title="View Receipt Details"
+                        >
                           <Eye className="w-5 h-5" />
                         </button>
                         <button 
                           onClick={() => deleteReceipt(receipt.id)}
                           className="text-red-500 hover:text-red-600 transition-colors p-2"
+                          title="Delete Receipt"
                         >
                           <Trash2 className="w-5 h-5" />
                         </button>
@@ -253,6 +265,128 @@ function Receipts() {
               <p className="text-gray-500 dark:text-gray-400">No receipts found</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Receipt Details Modal */}
+      {showReceiptModal && selectedReceipt && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex justify-between items-start">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                  {selectedReceipt.vendor}
+                </h2>
+                <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+                  <span>📅 {new Date(selectedReceipt.date).toLocaleDateString()}</span>
+                  <span>💰 ${selectedReceipt.total?.toFixed(2)}</span>
+                  <span className={`px-2 py-1 rounded ${getHealthScoreColor(selectedReceipt.healthScore || 0)}`}>
+                    Health: {selectedReceipt.healthScore || 0}%
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowReceiptModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* Line Items */}
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Line Items</h3>
+              <div className="space-y-2">
+                {selectedReceipt.lineItems && selectedReceipt.lineItems.length > 0 ? (
+                  selectedReceipt.lineItems.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="flex-1">
+                        <span className="font-medium text-gray-900 dark:text-white">{item.description}</span>
+                        <span className={`ml-2 px-2 py-1 text-xs rounded ${
+                          item.category === 'Healthy' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                          item.category === 'Junk' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
+                          'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300'
+                        }`}>
+                          {item.category}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-gray-600 dark:text-gray-400 text-sm">Qty: {item.quantity}</div>
+                        <div className="font-semibold text-gray-900 dark:text-white">${item.price?.toFixed(2)}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-4">No line items available</p>
+                )}
+              </div>
+
+              {/* Category Summary */}
+              {selectedReceipt.categorySummary && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Category Summary</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="text-sm text-green-600 dark:text-green-400">Healthy</div>
+                      <div className="text-xl font-bold text-green-700 dark:text-green-300">
+                        ${selectedReceipt.categorySummary.healthyTotal?.toFixed(2) || '0.00'}
+                      </div>
+                      <div className="text-xs text-green-600 dark:text-green-400">
+                        {selectedReceipt.categorySummary.healthyCount || 0} items
+                      </div>
+                    </div>
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                      <div className="text-sm text-red-600 dark:text-red-400">Junk</div>
+                      <div className="text-xl font-bold text-red-700 dark:text-red-300">
+                        ${selectedReceipt.categorySummary.junkTotal?.toFixed(2) || '0.00'}
+                      </div>
+                      <div className="text-xs text-red-600 dark:text-red-400">
+                        {selectedReceipt.categorySummary.junkCount || 0} items
+                      </div>
+                    </div>
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="text-sm text-blue-600 dark:text-blue-400">Other</div>
+                      <div className="text-xl font-bold text-blue-700 dark:text-blue-300">
+                        ${selectedReceipt.categorySummary.otherTotal?.toFixed(2) || '0.00'}
+                      </div>
+                      <div className="text-xs text-blue-600 dark:text-blue-400">
+                        {selectedReceipt.categorySummary.otherCount || 0} items
+                      </div>
+                    </div>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">Unknown</div>
+                      <div className="text-xl font-bold text-gray-700 dark:text-gray-300">
+                        ${selectedReceipt.categorySummary.unknownTotal?.toFixed(2) || '0.00'}
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        {selectedReceipt.categorySummary.unknownCount || 0} items
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Totals */}
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex justify-between text-lg font-semibold text-gray-900 dark:text-white">
+                  <span>Total</span>
+                  <span>${selectedReceipt.total?.toFixed(2)}</span>
+                </div>
+                {selectedReceipt.subtotal && (
+                  <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    <span>Subtotal</span>
+                    <span>${selectedReceipt.subtotal?.toFixed(2)}</span>
+                  </div>
+                )}
+                {selectedReceipt.tax && (
+                  <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    <span>Tax</span>
+                    <span>${selectedReceipt.tax?.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
