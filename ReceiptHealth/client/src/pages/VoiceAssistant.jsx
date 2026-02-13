@@ -277,7 +277,6 @@ function VoiceAssistant() {
         {/* Input Area */}
         <div className="border-t border-gray-200 dark:border-gray-700 pt-3 sm:pt-4">
           {useTextMode ? (
-            /* Text Input */}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <input
                 type="text"
@@ -297,7 +296,6 @@ function VoiceAssistant() {
               </button>
             </div>
           ) : (
-            /* Voice Input */
             <div className="flex flex-col items-center">
               <button
                 onClick={listening ? stopListening : startListening}
