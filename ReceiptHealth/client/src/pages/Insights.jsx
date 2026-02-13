@@ -57,56 +57,56 @@ function Insights() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Insights</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Insights</h1>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
           Analyze your spending patterns and health trends
         </p>
       </div>
 
       {/* Ask Me Anything */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white flex items-center">
+        <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white flex items-center">
           💬 Ask Me Anything
         </h2>
-        <div className="flex space-x-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && !asking && askQuery()}
             placeholder="e.g., How much did I spend on vegetables last month?"
-            className="input flex-1"
+            className="input flex-1 text-sm sm:text-base"
             disabled={asking}
           />
           <button
             onClick={askQuery}
             disabled={asking}
-            className="btn-primary flex items-center space-x-2"
+            className="btn-primary flex items-center justify-center space-x-2 text-sm sm:text-base w-full sm:w-auto"
           >
             {asking ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                 <span>Thinking...</span>
               </>
             ) : (
               <>
-                <Send className="w-5 h-5" />
+                <Send className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span>Ask</span>
               </>
             )}
           </button>
         </div>
         {answer && (
-          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
-            <p className="text-gray-900 dark:text-white">{answer}</p>
+          <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
+            <p className="text-sm sm:text-base text-gray-900 dark:text-white">{answer}</p>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Anomaly Alerts */}
         <div className="card">
-          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white flex items-center">
+          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white flex items-center">
             ⚠️ Anomaly Alerts
           </h2>
           {loading ? (
@@ -114,17 +114,17 @@ function Insights() {
               <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
             </div>
           ) : anomalies.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {anomalies.map((anomaly, idx) => (
-                <div key={idx} className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border-l-4 border-orange-500">
-                  <div className="font-semibold text-orange-700 dark:text-orange-300">
+                <div key={idx} className="p-2 sm:p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border-l-4 border-orange-500">
+                  <div className="text-sm sm:text-base font-semibold text-orange-700 dark:text-orange-300">
                     {anomaly.category || 'Spending Alert'}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
                     {anomaly.message || anomaly.description}
                   </div>
                   {anomaly.amount && (
-                    <div className="text-lg font-bold text-orange-600 dark:text-orange-400 mt-2">
+                    <div className="text-base sm:text-lg font-bold text-orange-600 dark:text-orange-400 mt-2">
                       ${anomaly.amount.toFixed(2)}
                     </div>
                   )}
@@ -141,7 +141,7 @@ function Insights() {
 
         {/* Budget Prediction */}
         <div className="card">
-          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white flex items-center">
+          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white flex items-center">
             📊 Budget Prediction
           </h2>
           {loading ? (
@@ -149,12 +149,12 @@ function Insights() {
               <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
             </div>
           ) : prediction ? (
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <div className="text-sm text-blue-600 dark:text-blue-400 mb-1">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 mb-1">
                   Predicted Spending (Next Month)
                 </div>
-                <div className="text-3xl font-bold text-blue-700 dark:text-blue-300">
+                <div className="text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-300">
                   ${prediction.predictedAmount?.toFixed(2) || '0.00'}
                 </div>
                 {prediction.confidence && (
@@ -191,7 +191,7 @@ function Insights() {
 
       {/* Personalized Recommendations */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white flex items-center">
+        <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white flex items-center">
           💡 Personalized Recommendations
         </h2>
         {loading ? (
@@ -199,17 +199,17 @@ function Insights() {
             <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
           </div>
         ) : recommendations.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {recommendations.map((rec, idx) => (
-              <div key={idx} className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
-                <div className="font-semibold text-green-700 dark:text-green-300 mb-1">
+              <div key={idx} className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
+                <div className="text-sm sm:text-base font-semibold text-green-700 dark:text-green-300 mb-1">
                   {rec.title || rec.category}
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   {rec.suggestion || rec.recommendation}
                 </div>
                 {rec.potentialSavings && (
-                  <div className="text-sm font-semibold text-green-600 dark:text-green-400 mt-2">
+                  <div className="text-xs sm:text-sm font-semibold text-green-600 dark:text-green-400 mt-2">
                     Save up to ${rec.potentialSavings.toFixed(2)}
                   </div>
                 )}
@@ -225,44 +225,44 @@ function Insights() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <div className="card">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-green-500" />
+          <div className="flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
+            <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900 rounded-lg flex-shrink-0">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
             </div>
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Health Score</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">68%</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Health Score</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">68%</p>
             </div>
           </div>
-          <p className="text-sm text-green-500">+5% from last month</p>
+          <p className="text-xs sm:text-sm text-green-500">+5% from last month</p>
         </div>
         
         <div className="card">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
-              <BarChart3 className="w-6 h-6 text-blue-500" />
+          <div className="flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
+            <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900 rounded-lg flex-shrink-0">
+              <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
             </div>
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Avg Spending</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">$420</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Avg Spending</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">$420</p>
             </div>
           </div>
-          <p className="text-sm text-gray-500">per week</p>
+          <p className="text-xs sm:text-sm text-gray-500">per week</p>
         </div>
         
         <div className="card">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="p-3 bg-orange-100 dark:bg-orange-900 rounded-lg">
-              <TrendingDown className="w-6 h-6 text-orange-500" />
+          <div className="flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
+            <div className="p-2 sm:p-3 bg-orange-100 dark:bg-orange-900 rounded-lg flex-shrink-0">
+              <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500" />
             </div>
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Top Category</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">Groceries</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Top Category</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate">Groceries</p>
             </div>
           </div>
-          <p className="text-sm text-gray-500">44% of spending</p>
+          <p className="text-xs sm:text-sm text-gray-500">44% of spending</p>
         </div>
       </div>
     </div>

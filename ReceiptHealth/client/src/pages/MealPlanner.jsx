@@ -88,26 +88,26 @@ function MealPlanner() {
   
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Meal Planner</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Meal Planner</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
             Plan your meals for the week with AI-generated recipes
           </p>
         </div>
         <button 
           onClick={() => setShowOptionsModal(true)}
           disabled={generating}
-          className="btn-primary flex items-center space-x-2"
+          className="btn-primary flex items-center justify-center space-x-2 text-sm sm:text-base w-full sm:w-auto"
         >
           {generating ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
               <span>Generating...</span>
             </>
           ) : (
             <>
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>Generate Plan</span>
             </>
           )}
@@ -122,18 +122,18 @@ function MealPlanner() {
         <div className="space-y-6">
           {mealPlans.map(plan => (
             <div key={plan.id} className="card">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">{plan.name || 'Weekly Meal Plan'}</h2>
-                  <p className="text-sm text-gray-500">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate">{plan.name || 'Weekly Meal Plan'}</h2>
+                  <p className="text-xs sm:text-sm text-gray-500">
                     {plan.startDate && new Date(plan.startDate).toLocaleDateString()} - {plan.endDate && new Date(plan.endDate).toLocaleDateString()}
                   </p>
                 </div>
-                <span className="px-3 py-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-sm font-semibold rounded-full">
+                <span className="px-2 sm:px-3 py-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-xs sm:text-sm font-semibold rounded-full flex-shrink-0 self-start">
                   {plan.dietaryPreference || 'Balanced'}
                 </span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                 {plan.recipes?.map((recipe, idx) => (
                   <div 
                     key={idx} 
@@ -141,16 +141,16 @@ function MealPlanner() {
                       setSelectedRecipe(recipe);
                       setShowRecipeModal(true);
                     }}
-                    className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-200"
+                    className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-200"
                     style={{ boxShadow: '0 0 0 0 rgba(99, 102, 241, 0)' }}
                     onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 0 15px 2px rgba(99, 102, 241, 0.3)'}
                     onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 0 0 0 rgba(99, 102, 241, 0)'}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-primary-500">{recipe.mealType || 'Meal'}</span>
-                      <ChefHat className="w-4 h-4 text-gray-400" />
+                      <span className="text-xs font-semibold text-primary-500 truncate">{recipe.mealType || 'Meal'}</span>
+                      <ChefHat className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
                     </div>
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-1">{recipe.name}</h4>
+                    <h4 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white mb-1 truncate">{recipe.name}</h4>
                     <p className="text-xs text-gray-500">Day {recipe.dayOfWeek || idx + 1}</p>
                     <p className="text-xs text-primary-500 mt-2">Click to view recipe</p>
                   </div>
@@ -160,23 +160,23 @@ function MealPlanner() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {days.map(day => (
             <div key={day} className="card">
-              <div className="flex items-center space-x-2 mb-4">
-                <Calendar className="w-5 h-5 text-primary-500" />
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{day}</h3>
+              <div className="flex items-center space-x-2 mb-3 sm:mb-4">
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary-500 flex-shrink-0" />
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate">{day}</h3>
               </div>
               
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {['Breakfast', 'Lunch', 'Dinner'].map(meal => (
-                  <div key={meal} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <ChefHat className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{meal}</span>
+                  <div key={meal} className="p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center space-x-2 flex-1 min-w-0">
+                        <ChefHat className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{meal}</span>
                       </div>
-                      <Plus className="w-4 h-4 text-gray-400" />
+                      <Plus className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
                     </div>
                   </div>
                 ))}
@@ -188,9 +188,9 @@ function MealPlanner() {
 
       {/* Meal Plan Options Modal */}
       {showOptionsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4 text-gray-900 dark:text-white">
               Meal Plan Options
             </h2>
             
@@ -263,18 +263,18 @@ function MealPlanner() {
               </div>
             </div>
 
-            <div className="flex space-x-3">
+            <div className="flex gap-2 sm:gap-3">
               <button
                 onClick={generateMealPlan}
                 disabled={generating}
-                className="btn-primary flex-1"
+                className="btn-primary flex-1 text-sm sm:text-base"
               >
                 {generating ? 'Generating...' : 'Generate'}
               </button>
               <button
                 onClick={() => setShowOptionsModal(false)}
                 disabled={generating}
-                className="btn-secondary flex-1"
+                className="btn-secondary flex-1 text-sm sm:text-base"
               >
                 Cancel
               </button>
@@ -285,14 +285,14 @@ function MealPlanner() {
       
       {/* Recipe Detail Modal */}
       {showRecipeModal && selectedRecipe && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex justify-between items-start">
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 break-words">
                   {selectedRecipe.name}
                 </h2>
-                <div className="flex items-center space-x-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
                   <span className="px-2 py-1 bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 rounded-full font-semibold">
                     {selectedRecipe.mealType || 'Meal'}
                   </span>
@@ -313,17 +313,17 @@ function MealPlanner() {
                   setShowRecipeModal(false);
                   setSelectedRecipe(null);
                 }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               {/* Description */}
               {selectedRecipe.description && (
                 <div>
-                  <p className="text-gray-600 dark:text-gray-400">
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
                     {selectedRecipe.description}
                   </p>
                 </div>
@@ -332,14 +332,14 @@ function MealPlanner() {
               {/* Ingredients */}
               {selectedRecipe.ingredients && selectedRecipe.ingredients.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">
                     Ingredients
                   </h3>
-                  <ul className="space-y-2">
+                  <ul className="space-y-1 sm:space-y-2">
                     {selectedRecipe.ingredients.map((ingredient, idx) => (
                       <li key={idx} className="flex items-start space-x-2">
-                        <span className="text-primary-500 mt-1">•</span>
-                        <span className="text-gray-700 dark:text-gray-300">
+                        <span className="text-primary-500 mt-1 flex-shrink-0">•</span>
+                        <span className="text-sm sm:text-base text-gray-700 dark:text-gray-300">
                           {typeof ingredient === 'string' ? ingredient : `${ingredient.quantity} ${ingredient.unit || ''} ${ingredient.name}`}
                         </span>
                       </li>
@@ -351,16 +351,16 @@ function MealPlanner() {
               {/* Instructions */}
               {selectedRecipe.instructions && selectedRecipe.instructions.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">
                     Instructions
                   </h3>
-                  <ol className="space-y-3">
+                  <ol className="space-y-2 sm:space-y-3">
                     {selectedRecipe.instructions.map((instruction, idx) => (
-                      <li key={idx} className="flex items-start space-x-3">
-                        <span className="flex-shrink-0 w-6 h-6 bg-primary-500 text-white rounded-full flex items-center justify-center text-sm font-semibold">
+                      <li key={idx} className="flex items-start space-x-2 sm:space-x-3">
+                        <span className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 bg-primary-500 text-white rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold">
                           {idx + 1}
                         </span>
-                        <span className="text-gray-700 dark:text-gray-300 flex-1">
+                        <span className="text-sm sm:text-base text-gray-700 dark:text-gray-300 flex-1">
                           {instruction}
                         </span>
                       </li>
@@ -372,13 +372,13 @@ function MealPlanner() {
               {/* Nutrition Info */}
               {selectedRecipe.nutrition && (
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">
                     Nutrition Information
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                     {Object.entries(selectedRecipe.nutrition).map(([key, value]) => (
-                      <div key={key} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
-                        <div className="text-2xl font-bold text-primary-500">{value}</div>
+                      <div key={key} className="p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
+                        <div className="text-lg sm:text-2xl font-bold text-primary-500">{value}</div>
                         <div className="text-xs text-gray-600 dark:text-gray-400 capitalize">{key}</div>
                       </div>
                     ))}
