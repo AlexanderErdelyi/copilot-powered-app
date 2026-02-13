@@ -796,6 +796,32 @@ app.MapGet("/api/shopping-lists/{listId}/price-alerts", async (int listId, IShop
     return Results.Ok(alerts);
 });
 
+// Add recipe ingredients to shopping list
+app.MapPost("/api/shopping-lists/add-from-recipe", async (HttpRequest request, IShoppingListService shoppingListService) =>
+{
+    try
+    {
+        var body = await request.ReadFromJsonAsync<AddRecipeToShoppingListRequest>();
+        if (body == null)
+        {
+            return Results.BadRequest(new { error = "Invalid request body" });
+        }
+
+        var shoppingList = await shoppingListService.AddRecipeIngredientsAsync(body.RecipeId, body.ShoppingListId);
+        return Results.Ok(MapShoppingListToDto(shoppingList));
+    }
+    catch (InvalidOperationException ex)
+    {
+        Console.WriteLine($"❌ {ex.Message}");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error adding recipe to shopping list: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
 // === Meal Planner Endpoints ===
 
 // Get all meal plans
@@ -1168,6 +1194,60 @@ app.MapGet("/api/recipes/{id}", async (int id, IMealPlannerService mealPlannerSe
     }
 });
 
+// Add recipe to a specific meal slot
+app.MapPost("/api/meal-plans/{mealPlanId}/add-recipe", async (int mealPlanId, HttpRequest request, IMealPlannerService mealPlannerService) =>
+{
+    try
+    {
+        var body = await request.ReadFromJsonAsync<AddRecipeToMealSlotRequest>();
+        if (body == null)
+        {
+            return Results.BadRequest(new { error = "Invalid request body" });
+        }
+
+        var mealPlanDay = await mealPlannerService.AddRecipeToMealSlotAsync(
+            mealPlanId, 
+            body.RecipeId, 
+            body.DayOfWeek, 
+            body.MealType);
+
+        return Results.Ok(new
+        {
+            mealPlanDay.Id,
+            mealPlanDay.MealPlanId,
+            mealPlanDay.DayOfWeek,
+            mealPlanDay.Date,
+            mealPlanDay.MealType,
+            mealPlanDay.RecipeId
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        Console.WriteLine($"❌ {ex.Message}");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error adding recipe to meal slot: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
+// Remove recipe from meal slot
+app.MapDelete("/api/meal-plan-days/{mealPlanDayId}", async (int mealPlanDayId, IMealPlannerService mealPlannerService) =>
+{
+    try
+    {
+        var success = await mealPlannerService.RemoveRecipeFromMealSlotAsync(mealPlanDayId);
+        return success ? Results.Ok(new { success = true }) : Results.NotFound(new { error = "Meal plan day not found" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error removing recipe from meal slot: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
 // === Gamification Endpoints ===
 
 // Get all achievements
@@ -1481,4 +1561,6 @@ public record TtsRequest(string Text, string? Voice = null);
 public record GenerateMealPlanRequest(string DietaryPreference, DateTime? StartDate = null);
 public record GenerateMealPlanNLRequest(string UserRequest, DateTime? StartDate = null);
 public record CreateShoppingListFromMealPlanRequest(string? Name = null);
+public record AddRecipeToMealSlotRequest(int RecipeId, DayOfWeek DayOfWeek, MealType MealType);
+public record AddRecipeToShoppingListRequest(int RecipeId, int? ShoppingListId = null);
 

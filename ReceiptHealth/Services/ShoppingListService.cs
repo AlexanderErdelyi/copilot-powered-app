@@ -20,6 +20,7 @@ public interface IShoppingListService
     Task<ShoppingList> GenerateQuickMealListAsync();
     Task<ShoppingList> GenerateFromTextAsync(string text);
     Task<List<PriceAlert>> GetPriceAlertsAsync(int listId);
+    Task<ShoppingList> AddRecipeIngredientsAsync(int recipeId, int? shoppingListId = null);
 }
 
 public class ShoppingListService : IShoppingListService
@@ -751,6 +752,65 @@ CRITICAL RULES:
             normalized = normalized.Replace(word, " ");
         }
         return string.Join(" ", normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    public async Task<ShoppingList> AddRecipeIngredientsAsync(int recipeId, int? shoppingListId = null)
+    {
+        Console.WriteLine($"📝 Adding ingredients from recipe {recipeId} to shopping list {shoppingListId?.ToString() ?? "(new)"}");
+
+        // Get the recipe with ingredients
+        var recipe = await _context.Recipes
+            .Include(r => r.Ingredients)
+            .FirstOrDefaultAsync(r => r.Id == recipeId);
+
+        if (recipe == null)
+        {
+            throw new InvalidOperationException($"Recipe {recipeId} not found");
+        }
+
+        // Get or create shopping list
+        ShoppingList shoppingList;
+        if (shoppingListId.HasValue)
+        {
+            shoppingList = await GetShoppingListAsync(shoppingListId.Value);
+        }
+        else
+        {
+            // Create a new shopping list or get the most recent active one
+            var recentList = await _context.ShoppingLists
+                .Where(sl => sl.IsActive)
+                .OrderByDescending(sl => sl.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (recentList != null)
+            {
+                shoppingList = await GetShoppingListAsync(recentList.Id);
+            }
+            else
+            {
+                shoppingList = await CreateShoppingListAsync($"Shopping List - {DateTime.Now:MMM dd}");
+            }
+        }
+
+        // Add ingredients to shopping list
+        var addedCount = 0;
+        foreach (var ingredient in recipe.Ingredients)
+        {
+            try
+            {
+                await AddItemAsync(shoppingList.Id, ingredient.IngredientName, 1);
+                addedCount++;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Failed to add ingredient '{ingredient.IngredientName}': {ex.Message}");
+            }
+        }
+
+        Console.WriteLine($"✅ Added {addedCount} ingredients from recipe '{recipe.Name}' to shopping list '{shoppingList.Name}'");
+
+        // Reload shopping list with items
+        return await GetShoppingListAsync(shoppingList.Id);
     }
 }
 

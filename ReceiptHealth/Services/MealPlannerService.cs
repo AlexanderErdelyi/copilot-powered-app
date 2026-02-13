@@ -19,6 +19,8 @@ public interface IMealPlannerService
     Task<bool> DeleteMealPlanAsync(int id);
     Task<List<Recipe>> GetRecipesAsync(string? dietaryPreference = null);
     Task<Recipe?> GetRecipeByIdAsync(int id);
+    Task<MealPlanDay> AddRecipeToMealSlotAsync(int mealPlanId, int recipeId, DayOfWeek dayOfWeek, MealType mealType);
+    Task<bool> RemoveRecipeFromMealSlotAsync(int mealPlanDayId);
 }
 
 public class MealPlannerService : IMealPlannerService
@@ -647,6 +649,81 @@ Return ONLY a valid JSON array with this exact structure (no markdown, no extra 
         return await _context.Recipes
             .Include(r => r.Ingredients)
             .FirstOrDefaultAsync(r => r.Id == id);
+    }
+
+    public async Task<MealPlanDay> AddRecipeToMealSlotAsync(int mealPlanId, int recipeId, DayOfWeek dayOfWeek, MealType mealType)
+    {
+        _logger.LogInformation("Adding recipe {RecipeId} to meal plan {MealPlanId} for {DayOfWeek} {MealType}", 
+            recipeId, mealPlanId, dayOfWeek, mealType);
+
+        // Verify meal plan exists
+        var mealPlan = await _context.MealPlans.FindAsync(mealPlanId);
+        if (mealPlan == null)
+        {
+            throw new ArgumentException($"Meal plan with ID {mealPlanId} not found");
+        }
+
+        // Verify recipe exists
+        var recipe = await _context.Recipes.FindAsync(recipeId);
+        if (recipe == null)
+        {
+            throw new ArgumentException($"Recipe with ID {recipeId} not found");
+        }
+
+        // Calculate the date for the given day of week
+        var date = mealPlan.StartDate;
+        while (date.DayOfWeek != dayOfWeek)
+        {
+            date = date.AddDays(1);
+        }
+
+        // Check if a meal already exists for this slot
+        var existingMeal = await _context.MealPlanDays
+            .FirstOrDefaultAsync(mpd => 
+                mpd.MealPlanId == mealPlanId && 
+                mpd.DayOfWeek == dayOfWeek && 
+                mpd.MealType == mealType);
+
+        if (existingMeal != null)
+        {
+            // Update existing meal
+            existingMeal.RecipeId = recipeId;
+            existingMeal.Date = date;
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Updated existing meal slot");
+            return existingMeal;
+        }
+
+        // Create new meal plan day
+        var mealPlanDay = new MealPlanDay
+        {
+            MealPlanId = mealPlanId,
+            DayOfWeek = dayOfWeek,
+            Date = date,
+            MealType = mealType,
+            RecipeId = recipeId
+        };
+
+        _context.MealPlanDays.Add(mealPlanDay);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Created new meal slot");
+        return mealPlanDay;
+    }
+
+    public async Task<bool> RemoveRecipeFromMealSlotAsync(int mealPlanDayId)
+    {
+        var mealPlanDay = await _context.MealPlanDays.FindAsync(mealPlanDayId);
+        if (mealPlanDay == null)
+        {
+            return false;
+        }
+
+        _context.MealPlanDays.Remove(mealPlanDay);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Removed meal plan day {MealPlanDayId}", mealPlanDayId);
+        return true;
     }
 }
 
