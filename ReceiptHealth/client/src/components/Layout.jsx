@@ -36,9 +36,9 @@ function Layout({ children }) {
       <div className="lg:ml-64 min-h-screen flex flex-col">
         {/* Top bar */}
         <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-30">
-          <div className="flex items-center justify-between px-4 py-4">
+          <div className="flex items-center justify-between px-2 sm:px-4 py-3 sm:py-4">
             {/* Left side */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4 flex-1 min-w-0">
               <button
                 onClick={toggleSidebar}
                 className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -47,7 +47,7 @@ function Layout({ children }) {
               </button>
               
               {/* Search bar */}
-              <form onSubmit={handleSearch} className="hidden md:flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-2 w-96">
+              <form onSubmit={handleSearch} className="hidden sm:flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 flex-1 max-w-md">
                 <Search className="w-5 h-5 text-gray-400 mr-2" />
                 <input
                   type="text"
@@ -69,7 +69,7 @@ function Layout({ children }) {
             </div>
 
             {/* Right side */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4">
               {/* Notifications */}
               <div className="relative">
                 <button 
@@ -77,9 +77,9 @@ function Layout({ children }) {
                     setShowNotifications(!showNotifications);
                     setShowUserMenu(false);
                   }}
-                  className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  className="relative p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 >
-                  <Bell className="w-6 h-6" />
+                  <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
                   {notifications.some(n => n.unread) && (
                     <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                   )}
@@ -87,7 +87,7 @@ function Layout({ children }) {
                 
                 {/* Notifications Dropdown */}
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                  <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                     <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                       <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
                     </div>
@@ -115,12 +115,12 @@ function Layout({ children }) {
                     setShowUserMenu(!showUserMenu);
                     setShowNotifications(false);
                   }}
-                  className="flex items-center space-x-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  className="flex items-center space-x-1 sm:space-x-2 p-1.5 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-white" />
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
+                    <User className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   </div>
-                  <span className="hidden md:block font-medium">User</span>
+                  <span className="hidden lg:block font-medium text-sm">User</span>
                 </button>
 
                 {/* User Menu Dropdown */}
@@ -148,15 +148,15 @@ function Layout({ children }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-4 md:p-6">
           {children}
         </main>
 
         {/* Footer */}
-        <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-4 px-6">
-          <div className="flex flex-col md:flex-row justify-between items-center text-sm text-gray-600 dark:text-gray-400">
-            <p>© 2026 ReceiptHealth - Track your spending, stay healthy</p>
-            <div className="flex space-x-4 mt-2 md:mt-0">
+        <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-3 px-3 sm:py-4 sm:px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-center md:text-left">© 2026 ReceiptHealth - Track your spending, stay healthy</p>
+            <div className="flex space-x-3 sm:space-x-4 mt-2 md:mt-0">
               <a href="#" className="hover:text-primary-500 transition-colors">Privacy</a>
               <a href="#" className="hover:text-primary-500 transition-colors">Terms</a>
               <a href="#" className="hover:text-primary-500 transition-colors">Support</a>
