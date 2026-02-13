@@ -16,6 +16,8 @@ function Achievements() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebratingAchievement, setCelebratingAchievement] = useState(null);
   const [stats, setStats] = useState({ totalUnlocked: 0, activeChallenges: 0, completedChallenges: 0 });
+  const [clickedAchievements, setClickedAchievements] = useState(new Set());
+  const [selectedGoal, setSelectedGoal] = useState(null);
 
   useEffect(() => {
     fetchAllData();
@@ -172,7 +174,10 @@ function Achievements() {
   };
 
   const handleAchievementClick = (achievement) => {
-    if (achievement.earned) {
+    if (achievement.earned && !clickedAchievements.has(achievement.id)) {
+      // Mark as clicked
+      setClickedAchievements(prev => new Set([...prev, achievement.id]));
+      
       // Show celebration animation
       setCelebratingAchievement(achievement);
       setShowCelebration(true);
@@ -182,6 +187,21 @@ function Achievements() {
         setShowCelebration(false);
       }, 3000);
     }
+  };
+
+  const handleGoalClick = (nextAchievement) => {
+    setSelectedGoal(nextAchievement);
+    // Show celebration for setting a goal
+    setCelebratingAchievement({
+      name: 'Goal Set!',
+      description: `You've set "${nextAchievement.name}" as your goal`
+    });
+    setShowCelebration(true);
+    createConfetti();
+    
+    setTimeout(() => {
+      setShowCelebration(false);
+    }, 3000);
   };
 
   const createConfetti = () => {
@@ -334,31 +354,56 @@ function Achievements() {
       {nextAchievements.length > 0 && (
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Next Available Achievements
+            Next Available Achievements - Set Your Goals
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {nextAchievements.map((achievement, idx) => (
-              <div key={idx} className="card border-2 border-dashed border-primary-500">
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 bg-primary-100 dark:bg-primary-900 rounded-lg">
-                    <Target className="w-6 h-6 text-primary-500" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">
-                      {achievement.name}
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {achievement.description}
-                    </p>
-                    {achievement.targetValue && (
-                      <p className="text-xs text-primary-500 mt-2 font-semibold">
-                        Target: {achievement.targetValue}
+            {nextAchievements.map((achievement, idx) => {
+              const isSelected = selectedGoal?.name === achievement.name;
+              return (
+                <div 
+                  key={idx} 
+                  onClick={() => handleGoalClick(achievement)}
+                  className={`card border-2 border-dashed cursor-pointer transition-all duration-300 hover:scale-102 hover:shadow-2xl ${
+                    isSelected 
+                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20 achievement-earned' 
+                      : 'border-primary-500 hover:border-primary-600'
+                  }`}
+                  style={{ boxShadow: isSelected ? '0 0 20px 2px rgba(34, 197, 94, 0.4)' : undefined }}
+                  onMouseEnter={(e) => !isSelected && (e.currentTarget.style.boxShadow = '0 0 20px 2px rgba(99, 102, 241, 0.3)')}
+                  onMouseLeave={(e) => !isSelected && (e.currentTarget.style.boxShadow = '')}
+                >
+                  <div className="flex items-start space-x-4">
+                    <div className={`p-3 rounded-lg ${
+                      isSelected 
+                        ? 'bg-green-500' 
+                        : 'bg-primary-100 dark:bg-primary-900'
+                    }`}>
+                      <Target className={`w-6 h-6 ${
+                        isSelected ? 'text-white' : 'text-primary-500'
+                      }`} />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">
+                        {achievement.name}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {achievement.description}
                       </p>
-                    )}
+                      {achievement.targetValue && (
+                        <p className="text-xs text-primary-500 mt-2 font-semibold">
+                          Target: {achievement.targetValue}
+                        </p>
+                      )}
+                      {isSelected && (
+                        <p className="text-xs text-green-600 dark:text-green-400 mt-2 font-semibold">
+                          ✓ Goal Set!
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -443,13 +488,16 @@ function Achievements() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {achievements.map(achievement => {
               const Icon = achievement.icon;
+              const hasBeenClicked = clickedAchievements.has(achievement.id);
               return (
                 <div
                   key={achievement.id}
                   onClick={() => handleAchievementClick(achievement)}
                   className={`card transition-all duration-300 cursor-pointer hover:scale-105 ${
                     achievement.earned 
-                      ? 'achievement-earned bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-400' 
+                      ? (hasBeenClicked 
+                          ? 'bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-400'
+                          : 'achievement-earned bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-400')
                       : 'opacity-60 bg-gray-100 dark:bg-gray-800'
                   }`}
                 >
