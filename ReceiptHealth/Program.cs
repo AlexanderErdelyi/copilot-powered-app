@@ -11,13 +11,24 @@ builder.Logging.AddConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 // Configure HTTP URL
-builder.WebHost.UseUrls("http://localhost:5002");
+builder.WebHost.UseUrls("http://localhost:5100");
 
 Console.WriteLine("🚀 Starting ReceiptHealth server...");
 
 // Add services to the container
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Add CORS for React development
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ReactDevPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
 // Add DbContext
 var dbPath = builder.Configuration["ReceiptHealth:DatabasePath"] ?? "./receipts.db";
@@ -64,6 +75,9 @@ Console.WriteLine("🎵 Piper TTS service registered - local neural text-to-spee
 
 var app = builder.Build();
 
+// Enable CORS
+app.UseCors("ReactDevPolicy");
+
 // Enable static files (for serving HTML/JS/CSS)
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -93,6 +107,75 @@ app.MapGet("/api/test", () =>
 {
     Console.WriteLine("🧪 Test endpoint called");
     return Results.Ok(new { status = "OK", message = "Server is running", timestamp = DateTime.UtcNow });
+});
+
+// Dashboard stats endpoint
+app.MapGet("/api/dashboard/stats", async (ReceiptHealthContext context) =>
+{
+    var receipts = await context.Receipts.Include(r => r.LineItems).ToListAsync();
+    var totalSpent = receipts.Sum(r => r.Total);
+    var receiptCount = receipts.Count;
+    var avgPerReceipt = receiptCount > 0 ? totalSpent / receiptCount : 0;
+    
+    // Calculate healthy percentage
+    var totalItems = receipts.Sum(r => r.LineItems.Count);
+    var healthyItems = receipts.Sum(r => r.LineItems.Count(li => li.Category == "Healthy"));
+    var healthyPercentage = totalItems > 0 ? (int)((healthyItems * 100.0) / totalItems) : 0;
+    
+    return Results.Ok(new
+    {
+        totalSpent,
+        receiptCount,
+        healthyPercentage,
+        avgPerReceipt
+    });
+});
+
+// Dashboard category breakdown endpoint  
+app.MapGet("/api/dashboard/category-breakdown", async (ReceiptHealthContext context) =>
+{
+    var lineItems = await context.LineItems.ToListAsync();
+    var categoryTotals = lineItems
+        .GroupBy(li => li.Category)
+        .Select(g => new
+        {
+            name = g.Key,
+            value = g.Sum(li => li.Price * li.Quantity),
+            color = g.Key switch
+            {
+                "Healthy" => "#10b981",
+                "Junk" => "#ef4444",
+                "Other" => "#6b7280",
+                _ => "#9ca3af"
+            }
+        })
+        .Where(c => c.value > 0)
+        .ToList();
+    
+    return Results.Ok(categoryTotals);
+});
+
+// Dashboard spending trends endpoint
+app.MapGet("/api/dashboard/spending-trends", async (ReceiptHealthContext context) =>
+{
+    var sixMonthsAgo = DateTime.Now.AddMonths(-6);
+    var receipts = await context.Receipts
+        .Where(r => r.Date >= sixMonthsAgo)
+        .ToListAsync();
+    
+    var monthlyData = receipts
+        .GroupBy(r => new { r.Date.Year, r.Date.Month })
+        .Select(g => new
+        {
+            year = g.Key.Year,
+            month = g.Key.Month,
+            date = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMM"),
+            amount = g.Sum(r => r.Total)
+        })
+        .OrderBy(x => x.year).ThenBy(x => x.month)
+        .ToList();
+    
+    return Results.Ok(monthlyData);
 });
 
 // Global processing status tracking with detailed progress
