@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Search, Filter, Trash2, Eye, Calendar, X, Camera } from 'lucide-react';
+import { Upload, Search, Filter, Trash2, Calendar, X, Camera } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import UploadStatus from '../components/UploadStatus';
@@ -237,8 +237,8 @@ function Receipts() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Receipts</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Receipts</h1>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
           Upload and manage your receipts
         </p>
       </div>
@@ -255,12 +255,12 @@ function Receipts() {
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
-        <div className="text-center py-12">
-          <Upload className={`w-16 h-16 mx-auto mb-4 ${dragActive ? 'text-primary-500' : 'text-gray-400'}`} />
-          <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
+        <div className="text-center py-3 sm:py-4">
+          <Upload className={`w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 ${dragActive ? 'text-primary-500' : 'text-gray-400'}`} />
+          <h3 className="text-sm sm:text-base font-semibold mb-1 text-gray-900 dark:text-white">
             {dragActive ? 'Drop your receipt here' : 'Upload Receipt'}
           </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
             Drag and drop your receipt image or PDF, or click to browse
           </p>
           <input
@@ -271,34 +271,34 @@ function Receipts() {
             multiple
             onChange={handleFileInput}
           />
-          <div className="flex gap-3 justify-center">
-            <label htmlFor="fileInput" className="btn-primary cursor-pointer inline-block">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
+            <label htmlFor="fileInput" className="btn-primary cursor-pointer inline-block text-sm sm:text-base">
               Choose Files
             </label>
-            <button onClick={openCamera} className="btn-secondary flex items-center space-x-2">
+            <button onClick={openCamera} className="btn-secondary flex items-center justify-center space-x-2 text-sm sm:text-base">
               <Camera className="w-4 h-4" />
               <span>Take Photo</span>
             </button>
           </div>
-          <p className="text-sm text-gray-500 mt-4">
-            Supports: JPG, PNG, PDF (Max 10MB)
+          <p className="text-xs text-gray-500 mt-2">
+            JPG, PNG, PDF (Max 10MB)
           </p>
         </div>
       </div>
 
       {/* Search and filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
           <input
             type="text"
             placeholder="Search by vendor..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="input pl-10"
+            className="input pl-9 sm:pl-10 text-sm sm:text-base"
           />
         </div>
-        <button className="btn-secondary flex items-center space-x-2">
+        <button className="btn-secondary flex items-center justify-center space-x-2 text-sm sm:text-base">
           <Filter className="w-4 h-4" />
           <span>Filters</span>
         </button>
@@ -319,70 +319,69 @@ function Receipts() {
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Vendor
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="hidden md:table-cell px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Items
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Total
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="hidden lg:table-cell px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Health Score
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredReceipts.map((receipt) => (
-                  <tr key={receipt.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                  <tr 
+                    key={receipt.id} 
+                    onClick={() => viewReceipt(receipt.id)}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                  >
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate max-w-[120px] sm:max-w-none">
                         {receipt.vendor}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        {new Date(receipt.date).toLocaleDateString()}
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <div className="flex items-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                        <Calendar className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                        <span className="hidden sm:inline">{new Date(receipt.date).toLocaleDateString()}</span>
+                        <span className="sm:hidden">{new Date(receipt.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td className="hidden md:table-cell px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                       {receipt.lineItemCount || receipt.itemCount || 0} items
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <div className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
                         ${receipt.total?.toFixed(2) || '0.00'}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getHealthScoreColor(receipt.healthScore || 0)}`}>
+                    <td className="hidden lg:table-cell px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <span className={`px-2 sm:px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getHealthScoreColor(receipt.healthScore || 0)}`}>
                         {receipt.healthScore || 0}%
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button 
-                          onClick={() => viewReceipt(receipt.id)}
-                          className="text-primary-500 hover:text-primary-600 transition-colors p-2"
-                          title="View Receipt Details"
-                        >
-                          <Eye className="w-5 h-5" />
-                        </button>
-                        <button 
-                          onClick={() => deleteReceipt(receipt.id)}
-                          className="text-red-500 hover:text-red-600 transition-colors p-2"
-                          title="Delete Receipt"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteReceipt(receipt.id);
+                        }}
+                        className="text-red-500 hover:text-red-600 transition-colors p-1.5 sm:p-2"
+                        title="Delete Receipt"
+                      >
+                        <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -400,38 +399,38 @@ function Receipts() {
 
       {/* Receipt Details Modal */}
       {showReceiptModal && selectedReceipt && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex justify-between items-start">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 truncate">
                   {selectedReceipt.vendor}
                 </h2>
-                <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   <span>📅 {new Date(selectedReceipt.date).toLocaleDateString()}</span>
                   <span>💰 ${selectedReceipt.total?.toFixed(2)}</span>
-                  <span className={`px-2 py-1 rounded ${getHealthScoreColor(selectedReceipt.healthScore || 0)}`}>
+                  <span className={`px-2 py-1 rounded text-xs ${getHealthScoreColor(selectedReceipt.healthScore || 0)}`}>
                     Health: {selectedReceipt.healthScore || 0}%
                   </span>
                 </div>
               </div>
               <button
                 onClick={() => setShowReceiptModal(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {/* Line Items */}
-              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Line Items</h3>
+              <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-white">Line Items</h3>
               <div className="space-y-2">
                 {selectedReceipt.lineItems && selectedReceipt.lineItems.length > 0 ? (
                   selectedReceipt.lineItems.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <div className="flex-1">
-                        <span className="font-medium text-gray-900 dark:text-white">{item.description}</span>
+                    <div key={index} className="flex justify-between items-center p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg gap-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description}</span>
                         <span className={`ml-2 px-2 py-1 text-xs rounded ${
                           item.category === 'Healthy' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
                           item.category === 'Junk' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
@@ -440,9 +439,9 @@ function Receipts() {
                           {item.category}
                         </span>
                       </div>
-                      <div className="text-right">
-                        <div className="text-gray-600 dark:text-gray-400 text-sm">Qty: {item.quantity}</div>
-                        <div className="font-semibold text-gray-900 dark:text-white">${item.price?.toFixed(2)}</div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">Qty: {item.quantity}</div>
+                        <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">${item.price?.toFixed(2)}</div>
                       </div>
                     </div>
                   ))
@@ -453,39 +452,39 @@ function Receipts() {
 
               {/* Category Summary */}
               {selectedReceipt.categorySummary && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Category Summary</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <div className="text-sm text-green-600 dark:text-green-400">Healthy</div>
-                      <div className="text-xl font-bold text-green-700 dark:text-green-300">
+                <div className="mt-4 sm:mt-6">
+                  <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-white">Category Summary</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                    <div className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Healthy</div>
+                      <div className="text-lg sm:text-xl font-bold text-green-700 dark:text-green-300">
                         ${selectedReceipt.categorySummary.healthyTotal?.toFixed(2) || '0.00'}
                       </div>
                       <div className="text-xs text-green-600 dark:text-green-400">
                         {selectedReceipt.categorySummary.healthyCount || 0} items
                       </div>
                     </div>
-                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                      <div className="text-sm text-red-600 dark:text-red-400">Junk</div>
-                      <div className="text-xl font-bold text-red-700 dark:text-red-300">
+                    <div className="p-3 sm:p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                      <div className="text-xs sm:text-sm text-red-600 dark:text-red-400">Junk</div>
+                      <div className="text-lg sm:text-xl font-bold text-red-700 dark:text-red-300">
                         ${selectedReceipt.categorySummary.junkTotal?.toFixed(2) || '0.00'}
                       </div>
                       <div className="text-xs text-red-600 dark:text-red-400">
                         {selectedReceipt.categorySummary.junkCount || 0} items
                       </div>
                     </div>
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <div className="text-sm text-blue-600 dark:text-blue-400">Other</div>
-                      <div className="text-xl font-bold text-blue-700 dark:text-blue-300">
+                    <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="text-xs sm:text-sm text-blue-600 dark:text-blue-400">Other</div>
+                      <div className="text-lg sm:text-xl font-bold text-blue-700 dark:text-blue-300">
                         ${selectedReceipt.categorySummary.otherTotal?.toFixed(2) || '0.00'}
                       </div>
                       <div className="text-xs text-blue-600 dark:text-blue-400">
                         {selectedReceipt.categorySummary.otherCount || 0} items
                       </div>
                     </div>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Unknown</div>
-                      <div className="text-xl font-bold text-gray-700 dark:text-gray-300">
+                    <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Unknown</div>
+                      <div className="text-lg sm:text-xl font-bold text-gray-700 dark:text-gray-300">
                         ${selectedReceipt.categorySummary.unknownTotal?.toFixed(2) || '0.00'}
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">
@@ -522,14 +521,14 @@ function Receipts() {
 
       {/* Camera Modal */}
       {showCameraModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-2xl">
+            <div className="flex justify-between items-center mb-3 sm:mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                 {capturedImage ? 'Preview' : 'Take Photo'}
               </h2>
               <button onClick={closeCamera} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
 
@@ -554,22 +553,22 @@ function Receipts() {
                 </div>
               )}
 
-              <div className="flex gap-3">
+              <div className="flex gap-2 sm:gap-3">
                 {!capturedImage ? (
-                  <button onClick={capturePhoto} className="btn-primary flex-1">
+                  <button onClick={capturePhoto} className="btn-primary flex-1 text-sm sm:text-base">
                     Capture
                   </button>
                 ) : (
                   <>
-                    <button onClick={retakePhoto} className="btn-secondary flex-1">
+                    <button onClick={retakePhoto} className="btn-secondary flex-1 text-sm sm:text-base">
                       Retake
                     </button>
-                    <button onClick={uploadCapturedPhoto} className="btn-primary flex-1">
+                    <button onClick={uploadCapturedPhoto} className="btn-primary flex-1 text-sm sm:text-base">
                       Upload
                     </button>
                   </>
                 )}
-                <button onClick={closeCamera} className="btn-secondary">
+                <button onClick={closeCamera} className="btn-secondary text-sm sm:text-base">
                   Cancel
                 </button>
               </div>

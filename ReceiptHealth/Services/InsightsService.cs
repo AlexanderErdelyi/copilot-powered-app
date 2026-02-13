@@ -26,15 +26,38 @@ public class InsightsService : IInsightsService
 
     public async Task<string> ProcessNaturalLanguageQueryAsync(string query)
     {
+        // Detect if query is asking about specific items/products/purchases
+        var queryLower = query.ToLower();
+        var isDetailedQuery = queryLower.Contains("what did i buy") || 
+                             queryLower.Contains("what i bought") ||
+                             queryLower.Contains("items") ||
+                             queryLower.Contains("products") ||
+                             queryLower.Contains("purchased") ||
+                             queryLower.Contains("list");
+
+        // Try to extract date information from the query
+        var dateRange = ParseDateFromQuery(query);
+
         // Gather relevant data
-        var receipts = await _context.Receipts
+        var receiptsQuery = _context.Receipts
             .Include(r => r.LineItems)
             .Include(r => r.CategorySummary)
+            .AsQueryable();
+
+        // Filter by date if specified
+        if (dateRange.HasValue)
+        {
+            receiptsQuery = receiptsQuery.Where(r => r.Date >= dateRange.Value.start && r.Date <= dateRange.Value.end);
+        }
+
+        var receipts = await receiptsQuery
             .OrderByDescending(r => r.Date)
             .Take(100)
             .ToListAsync();
 
-        var context = BuildDataContext(receipts);
+        var context = isDetailedQuery 
+            ? BuildDetailedDataContext(receipts, dateRange)
+            : BuildDataContext(receipts);
 
         var prompt = $@"You are a helpful shopping and nutrition assistant. Answer the user's question based on their receipt history.
 
@@ -227,6 +250,167 @@ Category Breakdown:
 
 Date Range: {receipts.Min(r => r.Date):yyyy-MM-dd} to {receipts.Max(r => r.Date):yyyy-MM-dd}
 ";
+    }
+
+    private string BuildDetailedDataContext(List<Receipt> receipts, (DateTime start, DateTime end)? dateRange)
+    {
+        if (!receipts.Any())
+        {
+            return "No receipts found for the specified period.";
+        }
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Found {receipts.Count} receipt(s)");
+        
+        if (dateRange.HasValue)
+        {
+            sb.AppendLine($"Date Range: {dateRange.Value.start:yyyy-MM-dd} to {dateRange.Value.end:yyyy-MM-dd}");
+        }
+        
+        sb.AppendLine();
+
+        // Group receipts by date for better organization
+        var receiptsByDate = receipts
+            .OrderByDescending(r => r.Date)
+            .GroupBy(r => r.Date.Date);
+
+        foreach (var dateGroup in receiptsByDate)
+        {
+            sb.AppendLine($"=== {dateGroup.Key:dddd, MMMM d, yyyy} ===");
+            
+            foreach (var receipt in dateGroup)
+            {
+                sb.AppendLine($"\n{receipt.Vendor} - Receipt #{receipt.Id}");
+                sb.AppendLine($"Total: {receipt.Total:C} | Health Score: {receipt.HealthScore:F0}");
+                
+                if (receipt.LineItems?.Any() == true)
+                {
+                    sb.AppendLine("\nItems purchased:");
+                    foreach (var item in receipt.LineItems.OrderBy(li => li.Category))
+                    {
+                        var quantity = item.Quantity > 0 ? $"{item.Quantity}x " : "";
+                        sb.AppendLine($"  • {quantity}{item.Description} - {item.Price:C} ({item.Category})");
+                    }
+                }
+                
+                if (receipt.CategorySummary != null)
+                {
+                    sb.AppendLine($"\nCategory Summary:");
+                    sb.AppendLine($"  Healthy: {receipt.CategorySummary.HealthyTotal:C}");
+                    sb.AppendLine($"  Junk: {receipt.CategorySummary.JunkTotal:C}");
+                }
+                
+                sb.AppendLine();
+            }
+        }
+
+        // Add summary
+        var totalSpent = receipts.Sum(r => r.Total);
+        var totalItems = receipts.Sum(r => r.LineItems?.Count ?? 0);
+        sb.AppendLine($"\n=== Summary ===");
+        sb.AppendLine($"Total Spent: {totalSpent:C}");
+        sb.AppendLine($"Total Items: {totalItems}");
+        sb.AppendLine($"Average Receipt: {(receipts.Count > 0 ? totalSpent / receipts.Count : 0):C}");
+
+        return sb.ToString();
+    }
+
+    private (DateTime start, DateTime end)? ParseDateFromQuery(string query)
+    {
+        var queryLower = query.ToLower();
+        var now = DateTime.Now;
+
+        // Specific date patterns like "6th of feb", "february 6", "6 february"
+        var datePatterns = new[]
+        {
+            @"(\d+)(st|nd|rd|th)?\s+of\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*",
+            @"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d+)",
+            @"(\d+)\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*"
+        };
+
+        foreach (var pattern in datePatterns)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(queryLower, pattern);
+            if (match.Success)
+            {
+                var monthName = match.Groups.Cast<System.Text.RegularExpressions.Group>()
+                    .FirstOrDefault(g => g.Value.Length == 3 && !int.TryParse(g.Value, out _))?.Value;
+                var dayStr = match.Groups.Cast<System.Text.RegularExpressions.Group>()
+                    .FirstOrDefault(g => int.TryParse(g.Value, out _))?.Value;
+
+                if (monthName != null && dayStr != null && int.TryParse(dayStr, out int day))
+                {
+                    var monthMap = new Dictionary<string, int>
+                    {
+                        {"jan", 1}, {"feb", 2}, {"mar", 3}, {"apr", 4},
+                        {"may", 5}, {"jun", 6}, {"jul", 7}, {"aug", 8},
+                        {"sep", 9}, {"oct", 10}, {"nov", 11}, {"dec", 12}
+                    };
+
+                    if (monthMap.TryGetValue(monthName, out int month))
+                    {
+                        var year = now.Year;
+                        // If the month is in the future, assume last year
+                        if (month > now.Month) year--;
+
+                        try
+                        {
+                            var date = new DateTime(year, month, day);
+                            return (date.Date, date.Date.AddDays(1).AddSeconds(-1));
+                        }
+                        catch
+                        {
+                            // Invalid date, continue
+                        }
+                    }
+                }
+            }
+        }
+
+        // Month-based queries like "february", "last month"
+        if (queryLower.Contains("february") || queryLower.Contains("feb"))
+        {
+            var year = now.Month < 2 ? now.Year - 1 : now.Year;
+            return (new DateTime(year, 2, 1), new DateTime(year, 2, DateTime.DaysInMonth(year, 2), 23, 59, 59));
+        }
+
+        if (queryLower.Contains("january") || queryLower.Contains("jan"))
+        {
+            var year = now.Month == 1 ? now.Year : now.Year - 1;
+            return (new DateTime(year, 1, 1), new DateTime(year, 1, 31, 23, 59, 59));
+        }
+
+        // Relative date queries
+        if (queryLower.Contains("today"))
+        {
+            return (now.Date, now.Date.AddDays(1).AddSeconds(-1));
+        }
+
+        if (queryLower.Contains("yesterday"))
+        {
+            var yesterday = now.AddDays(-1).Date;
+            return (yesterday, yesterday.AddDays(1).AddSeconds(-1));
+        }
+
+        if (queryLower.Contains("last week"))
+        {
+            return (now.AddDays(-7).Date, now.Date.AddDays(1).AddSeconds(-1));
+        }
+
+        if (queryLower.Contains("this week"))
+        {
+            var startOfWeek = now.AddDays(-(int)now.DayOfWeek).Date;
+            return (startOfWeek, now.Date.AddDays(1).AddSeconds(-1));
+        }
+
+        if (queryLower.Contains("last month"))
+        {
+            var lastMonth = now.AddMonths(-1);
+            return (new DateTime(lastMonth.Year, lastMonth.Month, 1), 
+                    new DateTime(lastMonth.Year, lastMonth.Month, DateTime.DaysInMonth(lastMonth.Year, lastMonth.Month), 23, 59, 59));
+        }
+
+        return null;
     }
 
     private double CalculateStandardDeviation(List<double> values)

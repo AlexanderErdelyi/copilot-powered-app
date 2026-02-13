@@ -187,32 +187,32 @@ function Dashboard() {
       onClick={onClick}
     >
       <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide truncate">
             {title}
           </p>
-          <p className={`text-3xl font-bold mt-2 ${colorClass}`}>
+          <p className={`text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 ${colorClass} break-words`}>
             {prefix}{value}{suffix}
           </p>
           {trend && (
-            <div className="flex items-center mt-2 text-sm">
+            <div className="flex items-center mt-1 sm:mt-2 text-xs sm:text-sm">
               {trend > 0 ? (
                 <>
-                  <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 mr-1" />
                   <span className="text-green-500">+{trend}%</span>
                 </>
               ) : (
                 <>
-                  <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
+                  <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 mr-1" />
                   <span className="text-red-500">{trend}%</span>
                 </>
               )}
-              <span className="text-gray-500 ml-2">vs last month</span>
+              <span className="text-gray-500 ml-1 sm:ml-2 text-xs sm:text-sm">vs last month</span>
             </div>
           )}
         </div>
-        <div className={`p-3 rounded-lg ${colorClass.replace('text-', 'bg-').replace(/\d+/g, '100')} bg-opacity-20`}>
-          <Icon className={`w-6 h-6 ${colorClass}`} />
+        <div className={`p-2 sm:p-3 rounded-lg ${colorClass.replace('text-', 'bg-').replace(/\d+/g, '100')} bg-opacity-20 flex-shrink-0`}>
+          <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${colorClass}`} />
         </div>
       </div>
     </div>
@@ -229,24 +229,24 @@ function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
             Welcome back! Here's an overview of your spending habits.
           </p>
         </div>
         
         {/* Year Filter */}
         {availableYears.length > 0 && (
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <div className="flex items-center space-x-2 w-full sm:w-auto">
+            <label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
               Year:
             </label>
             <select 
               value={selectedYear || ''}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="input w-32"
+              className="input w-full sm:w-32 text-sm"
             >
               {availableYears.map(year => (
                 <option key={year} value={year}>{year}</option>
@@ -257,7 +257,7 @@ function Dashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-6">
         <KPICard
           title="Total Spent"
           value={stats.totalSpent.toFixed(2)}
@@ -352,13 +352,13 @@ function Dashboard() {
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Spending Trends */}
         <div className="card">
-          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white">
             Spending Trends
           </h2>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
             <LineChart data={trendData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="date" stroke="#9ca3af" />
@@ -386,10 +386,10 @@ function Dashboard() {
 
         {/* Category Breakdown */}
         <div className="card">
-          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white">
             Category Breakdown
           </h2>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
             <PieChart>
               <Pie
                 data={categoryData}
@@ -423,10 +423,10 @@ function Dashboard() {
       {/* Monthly Spending Trends */}
       {monthlySpendData.length > 0 && (
         <div className="card">
-          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white">
             Monthly Spending Trends ({selectedYear})
           </h2>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
             <BarChart data={monthlySpendData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="month" stroke="#9ca3af" />
@@ -455,19 +455,19 @@ function Dashboard() {
 
       {/* Recent activity */}
       <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
             Recent Activity
           </h2>
           <button 
             onClick={() => navigate('/receipts')}
-            className="text-primary-500 hover:text-primary-600 font-medium text-sm"
+            className="text-primary-500 hover:text-primary-600 font-medium text-xs sm:text-sm"
           >
             View All
           </button>
         </div>
         
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {[
             { icon: ShoppingBag, text: 'Receipt from Whole Foods', amount: '$87.50', time: '2 hours ago', clickable: true },
             { icon: Apple, text: 'Healthy meal plan generated', amount: '', time: '5 hours ago', clickable: false },
@@ -476,21 +476,21 @@ function Dashboard() {
             <div 
               key={idx} 
               onClick={() => activity.clickable && handleRecentActivityClick(activity)}
-              className={`flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
+              className={`flex items-center justify-between p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
                 activity.clickable ? 'cursor-pointer' : ''
               }`}
             >
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-primary-100 dark:bg-primary-900 rounded-lg">
-                  <activity.icon className="w-5 h-5 text-primary-500" />
+              <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                <div className="p-1.5 sm:p-2 bg-primary-100 dark:bg-primary-900 rounded-lg flex-shrink-0">
+                  <activity.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary-500" />
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-white">{activity.text}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{activity.time}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-900 dark:text-white text-sm sm:text-base truncate">{activity.text}</p>
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{activity.time}</p>
                 </div>
               </div>
               {activity.amount && (
-                <span className="font-bold text-gray-900 dark:text-white">{activity.amount}</span>
+                <span className="font-bold text-gray-900 dark:text-white text-sm sm:text-base flex-shrink-0 ml-2">{activity.amount}</span>
               )}
             </div>
           ))}
@@ -499,43 +499,43 @@ function Dashboard() {
 
       {/* Spending Breakdown Modal */}
       {showSpendingBreakdown && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-center">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                 Spending Breakdown
               </h2>
               <button
                 onClick={() => setShowSpendingBreakdown(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="space-y-4">
-                <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <span className="font-medium text-gray-900 dark:text-white">Total Spent</span>
-                  <span className="text-2xl font-bold text-primary-500">${stats.totalSpent.toFixed(2)}</span>
+                <div className="flex justify-between items-center p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">Total Spent</span>
+                  <span className="text-xl sm:text-2xl font-bold text-primary-500">${stats.totalSpent.toFixed(2)}</span>
                 </div>
                 
                 {categoryData.length > 0 && (
                   <>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mt-6 mb-3">By Category</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-white mt-4 sm:mt-6 mb-2 sm:mb-3 text-sm sm:text-base">By Category</h3>
                     <div className="space-y-2">
                       {categoryData.map((cat, idx) => (
                         <div
                           key={idx}
-                          className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                          className="flex justify-between items-center p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
                         >
-                          <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
                             <div
-                              className="w-4 h-4 rounded-full"
+                              className="w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0"
                               style={{ backgroundColor: cat.color }}
                             />
-                            <span className="font-medium text-gray-900 dark:text-white">{cat.name}</span>
+                            <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base truncate">{cat.name}</span>
                           </div>
-                          <span className="font-bold text-gray-900 dark:text-white">
+                          <span className="font-bold text-gray-900 dark:text-white text-sm sm:text-base flex-shrink-0 ml-2">
                             ${cat.value?.toFixed(2) || '0.00'}
                           </span>
                         </div>
@@ -551,37 +551,37 @@ function Dashboard() {
 
       {/* Healthy Items Modal */}
       {showHealthyItemsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-center">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                 Healthy Items
               </h2>
               <button
                 onClick={() => setShowHealthyItemsModal(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {healthyItems.length > 0 ? (
                 <div className="space-y-2">
                   {healthyItems.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <div className="flex-1">
-                        <span className="font-medium text-gray-900 dark:text-white">{item.description || item.name}</span>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <div key={index} className="flex justify-between items-center p-2 sm:p-3 bg-green-50 dark:bg-green-900/20 rounded-lg gap-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description || item.name}</span>
+                        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                           {item.vendor && <span>{item.vendor} • </span>}
                           {item.date && <span>{new Date(item.date).toLocaleDateString()}</span>}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-gray-900 dark:text-white">
+                      <div className="text-right flex-shrink-0">
+                        <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
                           ${item.price?.toFixed(2) || '0.00'}
                         </div>
                         {item.quantity > 1 && (
-                          <div className="text-xs text-gray-500">Qty: {item.quantity}</div>
+                          <div className="text-xs sm:text-sm text-gray-500">Qty: {item.quantity}</div>
                         )}
                       </div>
                     </div>
@@ -599,37 +599,37 @@ function Dashboard() {
 
       {/* Category Items Modal */}
       {showCategoryModal && selectedCategory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-center">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                 {selectedCategory} Items
               </h2>
               <button
                 onClick={() => setShowCategoryModal(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl sm:text-2xl"
               >
                 ×
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {categoryItems.length > 0 ? (
                 <div className="space-y-2">
                   {categoryItems.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <div className="flex-1">
-                        <span className="font-medium text-gray-900 dark:text-white">{item.description || item.name}</span>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <div key={index} className="flex justify-between items-center p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg gap-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description || item.name}</span>
+                        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                           {item.vendor && <span>{item.vendor} • </span>}
                           {item.date && <span>{new Date(item.date).toLocaleDateString()}</span>}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-gray-900 dark:text-white">
+                      <div className="text-right flex-shrink-0">
+                        <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
                           ${item.price?.toFixed(2) || '0.00'}
                         </div>
                         {item.quantity > 1 && (
-                          <div className="text-xs text-gray-500">Qty: {item.quantity}</div>
+                          <div className="text-xs sm:text-sm text-gray-500">Qty: {item.quantity}</div>
                         )}
                       </div>
                     </div>

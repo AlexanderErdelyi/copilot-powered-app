@@ -141,6 +141,7 @@ Shopping Lists:
 - Show all their lists (LIST_SHOPPING_LISTS)
 - View a specific list in detail (VIEW_SHOPPING_LIST)
 - Build a healthy shopping list from what they usually buy (GENERATE_HEALTHY_LIST)
+- Create a list with custom name from their purchase history (CREATE_LIST_FROM_HISTORY)
 
 Meal Planning:
 - Generate a weekly meal plan (GENERATE_MEAL_PLAN)
@@ -148,8 +149,9 @@ Meal Planning:
 - Go to the meal planner page (NAVIGATE to meal-planner)
 
 Receipts:
-- Look up old receipts (QUERY_RECEIPTS)
-- Find items they bought before (QUERY_ITEMS)
+- Look up old receipts with FULL ITEM DETAILS (QUERY_RECEIPTS) - you can see every item, price, quantity, and category
+- Find items they bought before and spending patterns (QUERY_ITEMS)
+- Find the most expensive item on a receipt - just use QUERY_RECEIPTS, you'll get all items with prices
 - Open a specific receipt (OPEN_RECEIPT)
 - Check how healthy their food choices are (GET_HEALTH_SCORE)
 
@@ -194,6 +196,10 @@ Awesome! Let me whip up a healthy meal plan for you...
 Them: generate a keto meal plan
 You: ```json{""intent"":""GENERATE_MEAL_PLAN"",""parameters"":{""dietaryPreference"":""Low Carb""}}```
 On it! Creating a low carb meal plan...
+
+Them: create a list called Alex with what I bought this month
+You: ```json{""intent"":""CREATE_LIST_FROM_HISTORY"",""parameters"":{""userRequest"":""create a list called Alex with what I bought this month""}}```
+Sure! Creating Alex with your purchases from this month...
 
 Them: what did i buy at lidl
 You: ```json{""intent"":""QUERY_RECEIPTS"",""parameters"":{""storeName"":""Lidl"",""daysBack"":7}}```
@@ -282,6 +288,10 @@ Just be human:
 
                 case "GENERATE_HEALTHY_LIST":
                     await HandleGenerateHealthyList(parameters, response);
+                    break;
+
+                case "CREATE_LIST_FROM_HISTORY":
+                    await HandleCreateListFromHistory(parameters, response);
                     break;
 
                 case "QUERY_RECEIPTS":
@@ -454,6 +464,41 @@ Just be human:
         _logger.LogInformation("✅ Generated healthy list: {ListName} with {Count} items", list.Name, list.Items.Count);
     }
 
+    private async Task HandleCreateListFromHistory(JsonElement parameters, VoiceCommandResponse response)
+    {
+        var userRequest = parameters.TryGetProperty("userRequest", out var requestElement)
+            ? requestElement.GetString()
+            : null;
+
+        if (string.IsNullOrEmpty(userRequest))
+        {
+            response.Response = "Hmm, I didn't catch what you wanted. Can you try again?";
+            return;
+        }
+
+        _logger.LogInformation("🛒 Creating list from history with request: {Request}", userRequest);
+        
+        try
+        {
+            var list = await _shoppingListService.GenerateFromTextAsync(userRequest);
+            
+            response.Success = true;
+            response.Data = new { 
+                listId = list.Id, 
+                listName = list.Name, 
+                itemCount = list.Items.Count,
+                shouldPromptNavigation = true 
+            };
+            _logger.LogInformation("✅ Created list from history: {ListName} with {Count} items", list.Name, list.Items.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Failed to create list from history");
+            response.Success = false;
+            response.Response = "Oops, couldn't create that list. Wanna try again?";
+        }
+    }
+
     private async Task HandleQueryReceipts(JsonElement parameters, VoiceCommandResponse response)
     {
         // Get all receipts and filter based on parameters
@@ -482,10 +527,25 @@ Just be human:
         var totalAmount = receiptList.Sum(r => r.Total);
         var count = receiptList.Count;
 
+        // Include full receipt details with line items for AI to analyze
+        var detailedReceipts = receiptList.Take(5).Select(r => new {
+            r.Id,
+            r.Vendor,
+            Date = r.Date.ToString("yyyy-MM-dd"),
+            r.Total,
+            r.HealthScore,
+            ItemCount = r.LineItems?.Count ?? 0,
+            LineItems = r.LineItems?.Select(li => new {
+                li.Description,
+                li.Price,
+                li.Quantity,
+                li.Category
+            }).ToList()
+        }).ToList();
+
         response.Success = true;
-        response.Data = new { count, totalAmount, storeName, daysBack, receipts = receiptList.Take(5).Select(r => new { r.Vendor, r.Date, r.Total }) };
-        // Let AI's natural response speak for itself
-        _logger.LogInformation("📊 Found {Count} receipts, total: {Total}", count, totalAmount);
+        response.Data = new { count, totalAmount, storeName, daysBack, receipts = detailedReceipts };
+        _logger.LogInformation("📊 Found {Count} receipts with line items, total: {Total}", count, totalAmount);
     }
 
     private async Task HandleQueryItems(JsonElement parameters, VoiceCommandResponse response)
@@ -789,6 +849,17 @@ Just be human:
         {
             var dataJson = JsonSerializer.Serialize(response.Data, new JsonSerializerOptions { WriteIndented = true });
             
+            // Check if we should prompt for navigation
+            var shouldPromptNavigation = false;
+            if (response.Data != null)
+            {
+                var dataElement = JsonSerializer.SerializeToElement(response.Data);
+                if (dataElement.TryGetProperty("shouldPromptNavigation", out var navProperty))
+                {
+                    shouldPromptNavigation = navProperty.GetBoolean();
+                }
+            }
+            
             var enhancementPrompt = $@"Your friend just asked: {originalRequest}
 
 You helped them with: {intent}
@@ -796,7 +867,9 @@ You helped them with: {intent}
 Here's what actually happened:
 {dataJson}
 
-Now just tell them real quick what happened. Like you're texting. Super casual. One or two lines max.
+Now tell them what happened. Like you're texting. Super casual. One or two lines max.{(shouldPromptNavigation ? @"
+
+IMPORTANT: Ask if they want to open/view what you just created (like ""Wanna check it out?"" or ""Should I open it for you?"" or similar casual phrasing)" : "")}
 
 Don't be formal or robotic. Just... talk. Use contractions. Be chill. React naturally.
 

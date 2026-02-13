@@ -189,7 +189,7 @@ app.MapPost("/api/upload", async (HttpRequest request, IServiceProvider serviceP
 {
     Console.WriteLine($"📤 Upload endpoint called - Files: {request.Form?.Files?.Count ?? 0}");
     
-    if (!request.HasFormContentType || request.Form.Files.Count == 0)
+    if (!request.HasFormContentType || request.Form?.Files.Count == 0 || request.Form?.Files == null)
     {
         Console.WriteLine("❌ No files in upload request");
         return Results.BadRequest(new { error = "No files uploaded" });
@@ -413,6 +413,68 @@ app.MapGet("/api/receipts", async (ReceiptHealthContext context) =>
     return Results.Ok(receipts);
 });
 
+// Query receipts by date range (for AI Insights)
+app.MapGet("/api/receipts/query", async (ReceiptHealthContext context, DateTime? startDate, DateTime? endDate, string? vendor = null) =>
+{
+    var query = context.Receipts
+        .Include(r => r.Document)
+        .Include(r => r.LineItems)
+        .Include(r => r.CategorySummary)
+        .AsQueryable();
+    
+    if (startDate.HasValue)
+    {
+        query = query.Where(r => r.Date >= startDate.Value);
+    }
+    
+    if (endDate.HasValue)
+    {
+        query = query.Where(r => r.Date <= endDate.Value);
+    }
+    
+    if (!string.IsNullOrEmpty(vendor))
+    {
+        query = query.Where(r => r.Vendor.Contains(vendor));
+    }
+    
+    var receipts = await query
+        .OrderByDescending(r => r.Date)
+        .Select(r => new
+        {
+            r.Id,
+            r.Vendor,
+            r.Date,
+            r.Total,
+            r.Currency,
+            r.HealthScore,
+            LineItems = r.LineItems.Select(li => new
+            {
+                li.Id,
+                li.Description,
+                li.Quantity,
+                li.Price,
+                li.Category
+            }).ToList(),
+            CategorySummary = r.CategorySummary != null ? new
+            {
+                r.CategorySummary.HealthyTotal,
+                r.CategorySummary.JunkTotal,
+                r.CategorySummary.OtherTotal,
+                r.CategorySummary.UnknownTotal
+            } : null
+        })
+        .ToListAsync();
+    
+    return Results.Ok(new 
+    {
+        Count = receipts.Count,
+        TotalAmount = receipts.Sum(r => r.Total),
+        StartDate = startDate,
+        EndDate = endDate,
+        Receipts = receipts
+    });
+});
+
 // Get receipt details by ID
 app.MapGet("/api/receipts/{id}", async (int id, ReceiptHealthContext context) =>
 {
@@ -630,9 +692,32 @@ app.MapPost("/api/shopping-lists", async (HttpRequest request, IShoppingListServ
 });
 
 // Generate shopping list from healthy items
-app.MapPost("/api/shopping-lists/generate", async (int daysBack, IShoppingListService shoppingListService) =>
+app.MapPost("/api/shopping-lists/generate", async (int? daysBack, string? mode, IShoppingListService shoppingListService) =>
 {
-    var list = await shoppingListService.GenerateFromHealthyItemsAsync(daysBack);
+    var days = daysBack ?? 30;
+    var generationMode = mode ?? "healthy";
+    
+    var list = generationMode switch
+    {
+        "analyze" => await shoppingListService.GenerateFromHealthyItemsAsync(days),
+        "weekly" => await shoppingListService.GenerateWeeklyEssentialsAsync(),
+        "quick" => await shoppingListService.GenerateQuickMealListAsync(),
+        _ => await shoppingListService.GenerateFromHealthyItemsAsync(days)
+    };
+    
+    return Results.Created($"/api/shopping-lists/{list.Id}", MapShoppingListToDto(list));
+});
+
+// Generate shopping list from freeform text
+app.MapPost("/api/shopping-lists/generate-from-text", async (HttpRequest request, IShoppingListService shoppingListService) =>
+{
+    var body = await request.ReadFromJsonAsync<GenerateFromTextRequest>();
+    if (body == null || string.IsNullOrEmpty(body.Text))
+    {
+        return Results.BadRequest(new { error = "Text is required" });
+    }
+    
+    var list = await shoppingListService.GenerateFromTextAsync(body.Text);
     return Results.Created($"/api/shopping-lists/{list.Id}", MapShoppingListToDto(list));
 });
 
@@ -876,6 +961,68 @@ app.MapPost("/api/meal-plans/generate", async (HttpRequest request, IMealPlanner
     }
 });
 
+// Generate meal plan from natural language
+app.MapPost("/api/meal-plans/generate-nl", async (HttpRequest request, IMealPlannerService mealPlannerService) =>
+{
+    try
+    {
+        var body = await request.ReadFromJsonAsync<GenerateMealPlanNLRequest>();
+        if (body == null || string.IsNullOrEmpty(body.UserRequest))
+        {
+            return Results.BadRequest(new { error = "User request is required" });
+        }
+        
+        var startDate = body.StartDate ?? DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
+        
+        Console.WriteLine($"🤖 Generating meal plan from natural language: \"{body.UserRequest}\", starting {startDate:yyyy-MM-dd}");
+        
+        var mealPlan = await mealPlannerService.GenerateWeeklyMealPlanFromNaturalLanguageAsync(body.UserRequest, startDate);
+        
+        // Project to avoid circular references
+        var result = new
+        {
+            mealPlan.Id,
+            mealPlan.Name,
+            mealPlan.CreatedAt,
+            mealPlan.StartDate,
+            mealPlan.EndDate,
+            mealPlan.DietaryPreference,
+            DaysCount = mealPlan.Days.Count,
+            Days = mealPlan.Days.Select(d => new
+            {
+                d.Id,
+                d.DayOfWeek,
+                d.Date,
+                Recipe = new
+                {
+                    d.Recipe.Id,
+                    d.Recipe.Name,
+                    d.Recipe.Description,
+                    d.Recipe.CookingTimeMinutes,
+                    d.Recipe.ImageUrl
+                }
+            }).ToList()
+        };
+        
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error generating meal plan from natural language: {ex.Message}");
+        Console.WriteLine($"   Stack trace: {ex.StackTrace}");
+        if (ex.InnerException != null)
+        {
+            Console.WriteLine($"   Inner exception: {ex.InnerException.Message}");
+            Console.WriteLine($"   Inner stack trace: {ex.InnerException.StackTrace}");
+        }
+        return Results.Json(new { 
+            error = ex.Message,
+            details = ex.InnerException?.Message,
+            type = ex.GetType().Name
+        }, statusCode: 500);
+    }
+});
+
 // Generate shopping list from meal plan
 app.MapPost("/api/meal-plans/{id}/shopping-list", async (int id, HttpRequest request, IMealPlannerService mealPlannerService) =>
 {
@@ -967,6 +1114,56 @@ app.MapGet("/api/recipes", async (IMealPlannerService mealPlannerService, string
     catch (Exception ex)
     {
         Console.WriteLine($"❌ Error fetching recipes: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
+// Get specific recipe by ID
+app.MapGet("/api/recipes/{id}", async (int id, IMealPlannerService mealPlannerService) =>
+{
+    try
+    {
+        var recipe = await mealPlannerService.GetRecipeByIdAsync(id);
+        
+        if (recipe == null)
+        {
+            return Results.NotFound(new { error = $"Recipe with ID {id} not found" });
+        }
+        
+        // Project to avoid circular references
+        var result = new
+        {
+            recipe.Id,
+            recipe.Name,
+            recipe.Description,
+            recipe.CookingTimeMinutes,
+            recipe.Servings,
+            recipe.Instructions,
+            recipe.ImageUrl,
+            recipe.Calories,
+            recipe.ProteinGrams,
+            recipe.CarbsGrams,
+            recipe.FatGrams,
+            recipe.IsHealthy,
+            recipe.IsHighProtein,
+            recipe.IsLowCarb,
+            recipe.IsVegetarian,
+            recipe.IsVegan,
+            recipe.IsCheatDay,
+            Ingredients = recipe.Ingredients.Select(i => new
+            {
+                i.Id,
+                i.IngredientName,
+                i.Quantity,
+                i.Category
+            }).ToList()
+        };
+        
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error fetching recipe {id}: {ex.Message}");
         return Results.Problem(ex.Message);
     }
 });
@@ -1274,6 +1471,7 @@ public record ProcessingStatusDetails(
 // Request DTOs for new endpoints
 public record CreateShoppingListRequest(string Name);
 public record AddShoppingListItemRequest(string ItemName, int Quantity = 1);
+public record GenerateFromTextRequest(string Text);
 public record UpdateItemStatusRequest(bool IsPurchased);
 public record CreateChallengeRequest(string Name, string Description, string Type, decimal TargetValue, int DurationDays);
 public record TrackFeatureRequest(string FeatureName, string? Details = null);
@@ -1281,5 +1479,6 @@ public record NaturalLanguageQueryRequest(string Query);
 public record VoiceCommandRequest(string Transcript, string? SessionId = null, List<ReceiptHealth.Services.ConversationMessage>? ConversationHistory = null);
 public record TtsRequest(string Text, string? Voice = null);
 public record GenerateMealPlanRequest(string DietaryPreference, DateTime? StartDate = null);
+public record GenerateMealPlanNLRequest(string UserRequest, DateTime? StartDate = null);
 public record CreateShoppingListFromMealPlanRequest(string? Name = null);
 
