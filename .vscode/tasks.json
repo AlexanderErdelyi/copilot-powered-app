@@ -1,59 +1,65 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "build-receipthealth",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/ReceiptHealth/ReceiptHealth.csproj",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
-      "problemMatcher": "$msCompile"
-    },
-    {
-      "label": "build-copilotwebapp",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/CopilotWebApp/CopilotWebApp.csproj",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
-      "problemMatcher": "$msCompile"
-    },
-    {
-      "label": "start-frontend",
-      "type": "shell",
-      "command": "npm",
-      "args": ["run", "dev"],
-      "options": {
-        "cwd": "${workspaceFolder}/ReceiptHealth/client"
-      },
-      "isBackground": true,
-      "problemMatcher": {
-        "pattern": {
-          "regexp": "^([^\\s].*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
-          "file": 1,
-          "line": 2,
-          "column": 3,
-          "severity": 4,
-          "message": 5
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build-receipthealth",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/ReceiptHealth/ReceiptHealth.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
         },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": ".",
-          "endsPattern": "ready in"
+        {
+            "label": "build-copilotwebapp",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/CopilotWebApp/CopilotWebApp.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "start-frontend",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "dev"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/ReceiptHealth/client"
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^([^\\s].*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".",
+                    "endsPattern": "ready in"
+                }
+            }
+        },
+        {
+            "label": "start-receipthealth-fullstack",
+            "dependsOn": [
+                "build-receipthealth",
+                "start-frontend"
+            ],
+            "dependsOrder": "sequence"
         }
-      }
-    },
-    {
-      "label": "start-receipthealth-fullstack",
-      "dependsOn": ["build-receipthealth", "start-frontend"],
-      "dependsOrder": "sequence"
-    }
-  ]
+    ]
 }
