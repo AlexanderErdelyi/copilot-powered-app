@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -6,7 +7,9 @@ import {
   ShoppingBag, 
   Apple,
   AlertCircle,
-  Heart
+  Heart,
+  HelpCircle,
+  X
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -26,6 +29,7 @@ import {
 import axios from 'axios';
 
 function Dashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalSpent: 0,
     receiptCount: 0,
@@ -42,6 +46,10 @@ function Dashboard() {
   const [categoryItems, setCategoryItems] = useState([]);
   const [availableYears, setAvailableYears] = useState([]);
   const [selectedYear, setSelectedYear] = useState(null);
+  const [showHealthScoreInfo, setShowHealthScoreInfo] = useState(false);
+  const [showSpendingBreakdown, setShowSpendingBreakdown] = useState(false);
+  const [showHealthyItemsModal, setShowHealthyItemsModal] = useState(false);
+  const [healthyItems, setHealthyItems] = useState([]);
 
   useEffect(() => {
     initializeDashboard();
@@ -148,8 +156,36 @@ function Dashboard() {
     }
   };
 
-  const KPICard = ({ title, value, icon: Icon, trend, colorClass, prefix = '', suffix = '' }) => (
-    <div className="card">
+  const handleTotalSpentClick = () => {
+    setShowSpendingBreakdown(true);
+  };
+
+  const handleReceiptsClick = () => {
+    navigate('/receipts');
+  };
+
+  const handleHealthyItemsClick = async () => {
+    try {
+      const response = await axios.get('/api/analytics/category-items/Healthy');
+      setHealthyItems(response.data);
+      setShowHealthyItemsModal(true);
+    } catch (error) {
+      console.error('Error fetching healthy items:', error);
+    }
+  };
+
+  const handleRecentActivityClick = (activity) => {
+    // Navigate to receipts page if it's a receipt activity
+    if (activity.text.includes('Receipt from')) {
+      navigate('/receipts');
+    }
+  };
+
+  const KPICard = ({ title, value, icon: Icon, trend, colorClass, prefix = '', suffix = '', onClick }) => (
+    <div 
+      className={`card ${onClick ? 'cursor-pointer hover:shadow-xl transition-shadow' : ''}`}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
@@ -229,6 +265,7 @@ function Dashboard() {
           trend={-5.2}
           colorClass="text-primary-500"
           prefix="$"
+          onClick={handleTotalSpentClick}
         />
         <KPICard
           title="Receipts"
@@ -236,6 +273,7 @@ function Dashboard() {
           icon={ShoppingBag}
           trend={12.5}
           colorClass="text-blue-500"
+          onClick={handleReceiptsClick}
         />
         <KPICard
           title="Healthy Items"
@@ -244,6 +282,7 @@ function Dashboard() {
           trend={8.3}
           colorClass="text-green-500"
           suffix="%"
+          onClick={handleHealthyItemsClick}
         />
         <KPICard
           title="Avg per Receipt"
@@ -253,12 +292,20 @@ function Dashboard() {
           colorClass="text-orange-500"
           prefix="$"
         />
-        {/* Health Score Card */}
+        {/* Health Score Card with Tooltip */}
         <div className="card relative overflow-hidden">
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Health Score</span>
-              <Heart className="w-5 h-5 text-red-500" />
+              <div className="flex items-center space-x-2">
+                <Heart className="w-5 h-5 text-red-500" />
+                <button
+                  onClick={() => setShowHealthScoreInfo(!showHealthScoreInfo)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
               {stats.healthScore || 0}
@@ -278,6 +325,29 @@ function Dashboard() {
               />
             </div>
           </div>
+          
+          {/* Tooltip */}
+          {showHealthScoreInfo && (
+            <div className="absolute top-0 left-0 right-0 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg p-4 shadow-xl z-20">
+              <div className="flex justify-between items-start mb-2">
+                <h4 className="font-semibold text-gray-900 dark:text-white">Health Score Calculation</h4>
+                <button
+                  onClick={() => setShowHealthScoreInfo(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                Your Health Score is calculated based on the percentage of healthy items in your purchases:
+              </p>
+              <ul className="text-xs text-gray-600 dark:text-gray-400 mt-2 space-y-1">
+                <li>• 70-100: Excellent healthy choices</li>
+                <li>• 40-69: Moderate healthy choices</li>
+                <li>• 0-39: Room for improvement</li>
+              </ul>
+            </div>
+          )}
         </div>
       </div>
 
@@ -389,18 +459,27 @@ function Dashboard() {
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
             Recent Activity
           </h2>
-          <button className="text-primary-500 hover:text-primary-600 font-medium text-sm">
+          <button 
+            onClick={() => navigate('/receipts')}
+            className="text-primary-500 hover:text-primary-600 font-medium text-sm"
+          >
             View All
           </button>
         </div>
         
         <div className="space-y-3">
           {[
-            { icon: ShoppingBag, text: 'Receipt from Whole Foods', amount: '$87.50', time: '2 hours ago' },
-            { icon: Apple, text: 'Healthy meal plan generated', amount: '', time: '5 hours ago' },
-            { icon: AlertCircle, text: 'Price alert: Organic milk on sale', amount: '$3.99', time: '1 day ago' }
+            { icon: ShoppingBag, text: 'Receipt from Whole Foods', amount: '$87.50', time: '2 hours ago', clickable: true },
+            { icon: Apple, text: 'Healthy meal plan generated', amount: '', time: '5 hours ago', clickable: false },
+            { icon: AlertCircle, text: 'Price alert: Organic milk on sale', amount: '$3.99', time: '1 day ago', clickable: false }
           ].map((activity, idx) => (
-            <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+            <div 
+              key={idx} 
+              onClick={() => activity.clickable && handleRecentActivityClick(activity)}
+              className={`flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
+                activity.clickable ? 'cursor-pointer' : ''
+              }`}
+            >
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-primary-100 dark:bg-primary-900 rounded-lg">
                   <activity.icon className="w-5 h-5 text-primary-500" />
@@ -417,6 +496,106 @@ function Dashboard() {
           ))}
         </div>
       </div>
+
+      {/* Spending Breakdown Modal */}
+      {showSpendingBreakdown && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Spending Breakdown
+              </h2>
+              <button
+                onClick={() => setShowSpendingBreakdown(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <span className="font-medium text-gray-900 dark:text-white">Total Spent</span>
+                  <span className="text-2xl font-bold text-primary-500">${stats.totalSpent.toFixed(2)}</span>
+                </div>
+                
+                {categoryData.length > 0 && (
+                  <>
+                    <h3 className="font-semibold text-gray-900 dark:text-white mt-6 mb-3">By Category</h3>
+                    <div className="space-y-2">
+                      {categoryData.map((cat, idx) => (
+                        <div
+                          key={idx}
+                          className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div
+                              className="w-4 h-4 rounded-full"
+                              style={{ backgroundColor: cat.color }}
+                            />
+                            <span className="font-medium text-gray-900 dark:text-white">{cat.name}</span>
+                          </div>
+                          <span className="font-bold text-gray-900 dark:text-white">
+                            ${cat.value?.toFixed(2) || '0.00'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Healthy Items Modal */}
+      {showHealthyItemsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Healthy Items
+              </h2>
+              <button
+                onClick={() => setShowHealthyItemsModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              {healthyItems.length > 0 ? (
+                <div className="space-y-2">
+                  {healthyItems.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="flex-1">
+                        <span className="font-medium text-gray-900 dark:text-white">{item.description || item.name}</span>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {item.vendor && <span>{item.vendor} • </span>}
+                          {item.date && <span>{new Date(item.date).toLocaleDateString()}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-gray-900 dark:text-white">
+                          ${item.price?.toFixed(2) || '0.00'}
+                        </div>
+                        {item.quantity > 1 && (
+                          <div className="text-xs text-gray-500">Qty: {item.quantity}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+                  No healthy items found
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Category Items Modal */}
       {showCategoryModal && selectedCategory && (
