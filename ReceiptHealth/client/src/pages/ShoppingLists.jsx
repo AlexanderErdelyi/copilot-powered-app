@@ -2,6 +2,7 @@ import { ShoppingCart, Plus, Trash2, Check, X, Leaf } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function ShoppingLists() {
   const [lists, setLists] = useState([]);
@@ -14,6 +15,7 @@ function ShoppingLists() {
   const [newItemName, setNewItemName] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [generating, setGenerating] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   useEffect(() => {
     fetchLists();
@@ -49,6 +51,16 @@ function ShoppingLists() {
       await axios.post('/api/shopping-lists/generate?daysBack=30');
       toast.success('Healthy shopping list generated!', { id: 'generate' });
       fetchLists();
+      
+      // Track feature usage
+      try {
+        await axios.post('/api/features/track', { 
+          featureName: 'shopping_list_generator',
+          details: 'Generated healthy shopping list'
+        });
+      } catch (trackError) {
+        console.error('Feature tracking failed:', trackError);
+      }
     } catch (error) {
       console.error('Error generating list:', error);
       toast.error('Failed to generate list', { id: 'generate' });
@@ -100,35 +112,141 @@ function ShoppingLists() {
   };
 
   const deleteList = async (id) => {
-    if (!confirm('Are you sure you want to delete this list?')) return;
-
-    try {
-      await axios.delete(`/api/shopping-lists/${id}`);
-      toast.success('List deleted');
-      if (showViewModal) {
-        setShowViewModal(false);
-        setSelectedList(null);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Shopping List',
+      message: 'Are you sure you want to delete this shopping list? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await axios.delete(`/api/shopping-lists/${id}`);
+          toast.success('List deleted');
+          if (showViewModal) {
+            setShowViewModal(false);
+            setSelectedList(null);
+          }
+          fetchLists();
+        } catch (error) {
+          console.error('Error deleting list:', error);
+          toast.error('Failed to delete list');
+        }
       }
-      fetchLists();
-    } catch (error) {
-      console.error('Error deleting list:', error);
-      toast.error('Failed to delete list');
-    }
+    });
   };
 
   const deleteItem = async (itemId) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Remove Item',
+      message: 'Are you sure you want to remove this item from the list?',
+      onConfirm: async () => {
+        try {
+          await axios.delete(`/api/shopping-lists/items/${itemId}`);
+          toast.success('Item removed');
+          // Refresh the list
+          if (selectedList) {
+            viewList(selectedList.id);
+            fetchLists();
+          }
+        } catch (error) {
+          console.error('Error deleting item:', error);
+          toast.error('Failed to delete item');
+        }
+      }
+    });
+  };
+
+  const toggleItemPurchased = async (itemId, currentStatus) => {
     try {
-      await axios.delete(`/api/shopping-lists/items/${itemId}`);
-      toast.success('Item removed');
+      await axios.patch(`/api/shopping-lists/items/${itemId}`, {
+        isPurchased: !currentStatus
+      });
       // Refresh the list
       if (selectedList) {
         viewList(selectedList.id);
         fetchLists();
       }
     } catch (error) {
-      console.error('Error deleting item:', error);
-      toast.error('Failed to delete item');
+      console.error('Error toggling item:', error);
+      toast.error('Failed to update item');
     }
+  };
+
+  const getItemIcon = (itemName) => {
+    const name = itemName?.toLowerCase() || '';
+    // Dairy
+    if (name.includes('milk')) return '🥛';
+    if (name.includes('cheese')) return '🧀';
+    if (name.includes('yogurt') || name.includes('yoghurt')) return '🥛';
+    if (name.includes('butter')) return '🧈';
+    if (name.includes('cream')) return '🥛';
+    // Bread & Bakery
+    if (name.includes('bread')) return '🍞';
+    if (name.includes('bagel')) return '🥯';
+    if (name.includes('toast')) return '🍞';
+    if (name.includes('croissant')) return '🥐';
+    if (name.includes('muffin') || name.includes('cake')) return '🧁';
+    // Protein
+    if (name.includes('egg')) return '🥚';
+    if (name.includes('chicken') || name.includes('turkey')) return '🍗';
+    if (name.includes('beef') || name.includes('steak') || name.includes('meat')) return '🥩';
+    if (name.includes('fish') || name.includes('salmon') || name.includes('tuna')) return '🐟';
+    if (name.includes('shrimp') || name.includes('prawn')) return '🦐';
+    if (name.includes('bacon') || name.includes('ham')) return '🥓';
+    // Fruits
+    if (name.includes('apple')) return '🍎';
+    if (name.includes('banana')) return '🍌';
+    if (name.includes('orange')) return '🍊';
+    if (name.includes('grape')) return '🍇';
+    if (name.includes('strawberr')) return '🍓';
+    if (name.includes('watermelon')) return '🍉';
+    if (name.includes('lemon') || name.includes('lime')) return '🍋';
+    if (name.includes('peach')) return '🍑';
+    if (name.includes('pear')) return '🍐';
+    if (name.includes('cherry')) return '🍒';
+    if (name.includes('fruit')) return '🍎';
+    // Vegetables
+    if (name.includes('carrot')) return '🥕';
+    if (name.includes('tomato')) return '🍅';
+    if (name.includes('potato')) return '🥔';
+    if (name.includes('lettuce') || name.includes('salad')) return '🥬';
+    if (name.includes('broccoli')) return '🥦';
+    if (name.includes('cucumber')) return '🥒';
+    if (name.includes('pepper') || name.includes('bell')) return '🫑';
+    if (name.includes('corn')) return '🌽';
+    if (name.includes('onion')) return '🧅';
+    if (name.includes('garlic')) return '🧄';
+    if (name.includes('mushroom')) return '🍄';
+    if (name.includes('vegetable') || name.includes('veggie')) return '🥬';
+    // Grains & Pasta
+    if (name.includes('pasta') || name.includes('spaghetti') || name.includes('noodle')) return '🍝';
+    if (name.includes('rice')) return '🍚';
+    if (name.includes('cereal')) return '🥣';
+    if (name.includes('oat')) return '🌾';
+    // Beverages
+    if (name.includes('coffee')) return '☕';
+    if (name.includes('tea')) return '🍵';
+    if (name.includes('water') || name.includes('bottle')) return '💧';
+    if (name.includes('juice')) return '🧃';
+    if (name.includes('soda') || name.includes('cola')) return '🥤';
+    if (name.includes('beer')) return '🍺';
+    if (name.includes('wine')) return '🍷';
+    // Snacks
+    if (name.includes('chip') || name.includes('crisp')) return '🥔';
+    if (name.includes('popcorn')) return '🍿';
+    if (name.includes('cookie') || name.includes('biscuit')) return '🍪';
+    if (name.includes('chocolate') || name.includes('candy')) return '🍫';
+    if (name.includes('ice cream')) return '🍦';
+    if (name.includes('snack')) return '🍿';
+    // Condiments
+    if (name.includes('oil') || name.includes('olive')) return '🫒';
+    if (name.includes('sauce') || name.includes('ketchup')) return '🍅';
+    if (name.includes('mayo') || name.includes('mustard')) return '🥫';
+    if (name.includes('salt') || name.includes('pepper') || name.includes('spice')) return '🧂';
+    // Canned/Packaged
+    if (name.includes('can') || name.includes('tin')) return '🥫';
+    if (name.includes('soup')) return '🍲';
+    // Default
+    return '🛒';
   };
 
   const getCompletedCount = (items) => {
@@ -178,10 +296,17 @@ function ShoppingLists() {
             const completed = getCompletedCount(list.items);
             
             return (
-              <div key={list.id} className="card hover:shadow-2xl transition-shadow">
+              <div 
+                key={list.id} 
+                onClick={() => viewList(list.id)}
+                className="card hover:shadow-2xl hover:scale-102 transition-all duration-200 cursor-pointer group"
+                style={{ boxShadow: '0 0 0 0 rgba(99, 102, 241, 0)' }}
+                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 0 20px 2px rgba(99, 102, 241, 0.3)'}
+                onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 0 0 0 rgba(99, 102, 241, 0)'}
+              >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center space-x-3">
-                    <div className="p-3 bg-primary-100 dark:bg-primary-900 rounded-lg">
+                    <div className="p-3 bg-primary-100 dark:bg-primary-900 rounded-lg group-hover:bg-primary-200 dark:group-hover:bg-primary-800 transition-colors">
                       <ShoppingCart className="w-6 h-6 text-primary-500" />
                     </div>
                     <div>
@@ -190,8 +315,11 @@ function ShoppingLists() {
                     </div>
                   </div>
                   <button 
-                    onClick={() => deleteList(list.id)}
-                    className="text-gray-400 hover:text-red-500"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteList(list.id);
+                    }}
+                    className="text-gray-400 hover:text-red-500 transition-colors"
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>
@@ -212,12 +340,9 @@ function ShoppingLists() {
                   </div>
                 </div>
                 
-                <button 
-                  onClick={() => viewList(list.id)}
-                  className="w-full btn-secondary text-sm"
-                >
-                  View Items
-                </button>
+                <div className="text-center text-sm text-primary-500 font-medium group-hover:text-primary-600">
+                  Click to view items
+                </div>
               </div>
             );
           })}
@@ -306,44 +431,84 @@ function ShoppingLists() {
               </div>
 
               {selectedList.items && selectedList.items.length > 0 ? (
-                <div className="space-y-2">
-                  {selectedList.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        item.isPurchased
-                          ? 'bg-green-50 dark:bg-green-900/20'
-                          : 'bg-gray-50 dark:bg-gray-700'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3 flex-1">
-                        <div className={`font-medium ${
-                          item.isPurchased
-                            ? 'line-through text-gray-500 dark:text-gray-400'
-                            : 'text-gray-900 dark:text-white'
-                        }`}>
-                          {item.name}
-                        </div>
-                        {item.quantity > 1 && (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
-                            x{item.quantity}
-                          </span>
-                        )}
-                        {item.estimatedPrice && (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
-                            ${item.estimatedPrice.toFixed(2)}
-                          </span>
-                        )}
+                <>
+                  {/* To Buy Section */}
+                  {selectedList.items.filter(item => !item.isPurchased).length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-md font-semibold text-purple-600 dark:text-purple-400 mb-3">
+                        To Buy ({selectedList.items.filter(item => !item.isPurchased).length})
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {selectedList.items.filter(item => !item.isPurchased).map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => toggleItemPurchased(item.id, item.isPurchased)}
+                            className="relative group cursor-pointer bg-gradient-to-br from-purple-500 to-blue-600 text-white rounded-lg p-4 hover:-translate-y-1 hover:shadow-xl transition-all duration-200"
+                          >
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteItem(item.id);
+                              }}
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 rounded-full p-1 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <div className="text-center">
+                              <div className="text-4xl mb-2">{getItemIcon(item.name)}</div>
+                              <div className="font-bold text-sm mb-1">{item.name}</div>
+                              {item.quantity > 1 && (
+                                <div className="text-xs opacity-90">Qty: {item.quantity}</div>
+                              )}
+                              {item.estimatedPrice && (
+                                <div className="text-xs opacity-90">${item.estimatedPrice.toFixed(2)}</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <button
-                        onClick={() => deleteItem(item.id)}
-                        className="text-red-500 hover:text-red-600 p-2"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
-                  ))}
-                </div>
+                  )}
+
+                  {/* Purchased Section */}
+                  {selectedList.items.filter(item => item.isPurchased).length > 0 && (
+                    <div>
+                      <h4 className="text-md font-semibold text-gray-600 dark:text-gray-400 mb-3">
+                        Purchased ({selectedList.items.filter(item => item.isPurchased).length})
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {selectedList.items.filter(item => item.isPurchased).map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => toggleItemPurchased(item.id, item.isPurchased)}
+                            className="relative group cursor-pointer bg-gradient-to-br from-gray-400 to-gray-500 text-white rounded-lg p-4 opacity-70 hover:opacity-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-200"
+                          >
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteItem(item.id);
+                              }}
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 rounded-full p-1 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <div className="text-center">
+                              <div className="text-4xl mb-2">{getItemIcon(item.name)}</div>
+                              <div className="font-bold text-sm mb-1 line-through">{item.name}</div>
+                              {item.quantity > 1 && (
+                                <div className="text-xs opacity-90">Qty: {item.quantity}</div>
+                              )}
+                              {item.estimatedPrice && (
+                                <div className="text-xs opacity-90">${item.estimatedPrice.toFixed(2)}</div>
+                              )}
+                              <div className="text-xs mt-1">✓ Purchased</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 text-center py-8">
                   No items in this list yet. Click "Add Item" to get started!
@@ -395,6 +560,16 @@ function ShoppingLists() {
           </div>
         </div>
       )}
+      
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type="danger"
+      />
     </div>
   );
 }

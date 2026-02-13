@@ -3,6 +3,7 @@ import { Upload, Search, Filter, Trash2, Eye, Calendar, X, Camera } from 'lucide
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import UploadStatus from '../components/UploadStatus';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function Receipts() {
   const [receipts, setReceipts] = useState([]);
@@ -11,6 +12,7 @@ function Receipts() {
   const [dragActive, setDragActive] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   
 
   // Camera state
@@ -124,15 +126,20 @@ function Receipts() {
   };
 
   const deleteReceipt = async (id) => {
-    if (!confirm('Are you sure you want to delete this receipt?')) return;
-    
-    try {
-      await axios.delete(`/api/receipts/${id}`);
-      toast.success('Receipt deleted');
-      fetchReceipts();
-    } catch (error) {
-      toast.error('Failed to delete receipt');
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Receipt',
+      message: 'Are you sure you want to delete this receipt? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await axios.delete(`/api/receipts/${id}`);
+          toast.success('Receipt deleted');
+          fetchReceipts();
+        } catch (error) {
+          toast.error('Failed to delete receipt');
+        }
+      }
+    });
   };
 
   // Camera handlers
@@ -162,9 +169,10 @@ function Receipts() {
       canvasRef.current.height = videoRef.current.videoHeight;
       context.drawImage(videoRef.current, 0, 0);
       
+      // Use higher quality JPEG encoding (0.95 quality)
       canvasRef.current.toBlob(async (blob) => {
         setCapturedImage(URL.createObjectURL(blob));
-      }, 'image/jpeg', 0.8);
+      }, 'image/jpeg', 0.95);
     }
   };
 
@@ -571,6 +579,16 @@ function Receipts() {
       )}
       
       <UploadStatus ref={uploadStatusRef} />
+      
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type="danger"
+      />
     </div>
   );
 }

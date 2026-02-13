@@ -11,6 +11,16 @@ function VoiceAssistant() {
   const [processing, setProcessing] = useState(false);
   const [useTextMode, setUseTextMode] = useState(false);
   const [recognition, setRecognition] = useState(null);
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [sessionId, setSessionId] = useState(() => {
+    // Get or create session ID from sessionStorage
+    let id = sessionStorage.getItem('voiceAssistantSessionId');
+    if (!id) {
+      id = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      sessionStorage.setItem('voiceAssistantSessionId', id);
+    }
+    return id;
+  });
 
   useEffect(() => {
     // Initialize Web Speech API
@@ -64,14 +74,57 @@ function VoiceAssistant() {
 
   const processCommand = async (command) => {
     setProcessing(true);
+    
+    // Add user message to history immediately
+    const userMessage = { role: 'user', content: command };
+    setConversationHistory(prev => [...prev, userMessage]);
+    setTranscript(''); // Clear current transcript
+    setTextInput(''); // Clear text input
+    
     try {
-      const res = await axios.post('/api/voice/process-command', { command });
+      // Prepare conversation history (last 10 messages)
+      const historyToSend = conversationHistory.slice(-10);
+      
+      const res = await axios.post('/api/voice/process-command', { 
+        transcript: command, // Backend expects 'transcript' not 'command'
+        sessionId,
+        conversationHistory: historyToSend
+      });
+      
       const responseText = res.data.response || res.data.message || 'Command processed';
+      const newSessionId = res.data.sessionId || sessionId;
+      
+      // Update session ID if changed
+      if (newSessionId !== sessionId) {
+        setSessionId(newSessionId);
+        sessionStorage.setItem('voiceAssistantSessionId', newSessionId);
+      }
+      
+      // Add assistant response to history
+      const assistantMessage = { role: 'assistant', content: responseText };
+      setConversationHistory(prev => [...prev, assistantMessage]);
+      
       setResponse(responseText);
       speak(responseText);
+      
+      // Track feature usage for achievements
+      try {
+        await axios.post('/api/features/track', { 
+          featureName: 'voice_assistant',
+          details: `Command: ${command.substring(0, 50)}...`
+        });
+      } catch (trackError) {
+        // Silent fail - don't interrupt user experience
+        console.error('Feature tracking failed:', trackError);
+      }
     } catch (error) {
       console.error('Error processing command:', error);
-      const errorMsg = 'Sorry, I could not process that command';
+      const errorMsg = error.response?.data?.error || 'Sorry, I could not process that command';
+      
+      // Add error message to history
+      const errorMessage = { role: 'assistant', content: errorMsg };
+      setConversationHistory(prev => [...prev, errorMessage]);
+      
       setResponse(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -100,17 +153,19 @@ function VoiceAssistant() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="h-[calc(100vh-8rem)] flex flex-col">
+      {/* Header */}
+      <div className="mb-4">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Voice Assistant</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Control ReceiptHealth with your voice or text
+          Chat with your AI assistant using voice or text
         </p>
       </div>
 
-      <div className="card max-w-2xl mx-auto">
+      {/* Chat Container - Google Assistant Style */}
+      <div className="flex-1 card flex flex-col max-w-4xl mx-auto w-full">
         {/* Mode Toggle */}
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
           <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1">
             <button
               onClick={() => setUseTextMode(false)}
@@ -135,107 +190,140 @@ function VoiceAssistant() {
               <span>Text</span>
             </button>
           </div>
+          
+          {conversationHistory.length > 0 && (
+            <button
+              onClick={() => {
+                setConversationHistory([]);
+                const newSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                setSessionId(newSessionId);
+                sessionStorage.setItem('voiceAssistantSessionId', newSessionId);
+                setTranscript('');
+                setResponse('');
+              }}
+              className="text-xs text-red-500 hover:text-red-600 font-medium"
+            >
+              Clear Chat
+            </button>
+          )}
+        </div>
+        
+        {/* Chat Messages Area */}
+        <div className="flex-1 overflow-y-auto mb-4 space-y-4 px-2">
+          {conversationHistory.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <div className="w-24 h-24 mb-6 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
+                <Mic className="w-12 h-12 text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                Hi! I'm your ReceiptHealth Assistant
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md">
+                I can help you with receipts, shopping lists, meal planning, and more. Try asking me something!
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl">
+                {[
+                  'Show my recent receipts',
+                  'What\'s my spending this month?',
+                  'Create a meal plan',
+                  'Generate a healthy shopping list'
+                ].map((example, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => useTextMode ? setTextInput(example) : null}
+                    className="text-left p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{example}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            conversationHistory.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[75%] p-4 rounded-2xl ${
+                    msg.role === 'user'
+                      ? 'bg-primary-500 text-white rounded-br-sm'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-bl-sm'
+                  }`}
+                >
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                  <p className="text-xs opacity-70 mt-2">
+                    {msg.role === 'user' ? 'You' : 'Assistant'}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+          
+          {/* Processing indicator */}
+          {processing && (
+            <div className="flex justify-start">
+              <div className="max-w-[75%] p-4 rounded-2xl bg-gray-100 dark:bg-gray-700 rounded-bl-sm">
+                <div className="flex space-x-2">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {useTextMode ? (
-          /* Text Input Mode */
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-              Type your command
-            </h2>
-            <div className="flex space-x-3 mb-6">
+        {/* Input Area */}
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          {useTextMode ? (
+            /* Text Input */
+            <div className="flex space-x-3">
               <input
                 type="text"
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && !processing && handleTextSubmit()}
-                placeholder="e.g., Show my recent receipts..."
+                placeholder="Type your message..."
                 className="input flex-1"
                 disabled={processing}
               />
               <button
                 onClick={handleTextSubmit}
-                disabled={processing}
+                disabled={processing || !textInput.trim()}
                 className="btn-primary flex items-center space-x-2"
               >
                 <Send className="w-5 h-5" />
-                <span>Send</span>
               </button>
             </div>
-          </div>
-        ) : (
-          /* Voice Input Mode */
-          <div className="text-center mb-6">
-            <div className="mb-8">
+          ) : (
+            /* Voice Input */
+            <div className="flex flex-col items-center">
               <button
                 onClick={listening ? stopListening : startListening}
                 disabled={processing}
-                className={`w-32 h-32 rounded-full flex items-center justify-center mx-auto transition-all duration-300 ${
+                className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 ${
                   listening 
                     ? 'bg-gradient-to-br from-red-500 to-pink-500 animate-pulse shadow-2xl' 
-                    : 'bg-gradient-to-br from-primary-500 to-secondary-500 hover:shadow-2xl'
+                    : 'bg-gradient-to-br from-primary-500 to-secondary-500 hover:shadow-xl'
                 }`}
               >
                 {listening ? (
-                  <Mic className="w-16 h-16 text-white" />
+                  <Mic className="w-10 h-10 text-white" />
                 ) : (
-                  <MicOff className="w-16 h-16 text-white" />
+                  <Mic className="w-10 h-10 text-white" />
                 )}
               </button>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+                {listening ? 'Listening...' : processing ? 'Processing...' : 'Tap to speak'}
+              </p>
+              {transcript && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 italic">
+                  "{transcript}"
+                </p>
+              )}
             </div>
-
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-              {listening ? 'Listening...' : processing ? 'Processing...' : 'Tap to speak'}
-            </h2>
-          </div>
-        )}
-        
-        {/* Transcript */}
-        {transcript && (
-          <div className="mb-6">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">You said:</p>
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
-              <p className="text-gray-900 dark:text-white">{transcript}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Response */}
-        {response && (
-          <div className="mb-6">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Assistant:</p>
-            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
-              <p className="text-gray-900 dark:text-white">{response}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Example Commands */}
-        <div className="space-y-2">
-          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-            Try saying or typing:
-          </p>
-          <div className="space-y-2">
-            {[
-              'Show my recent receipts',
-              'What\'s my spending this month?',
-              'Create a meal plan',
-              'Add milk to shopping list',
-              'Generate a healthy shopping list',
-              'Show me my achievements'
-            ].map((example, idx) => (
-              <div 
-                key={idx} 
-                onClick={() => useTextMode ? setTextInput(example) : null}
-                className={`flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg ${
-                  useTextMode ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600' : ''
-                }`}
-              >
-                <Volume2 className="w-4 h-4 text-primary-500" />
-                <span className="text-sm text-gray-700 dark:text-gray-300">{example}</span>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
       </div>
     </div>
