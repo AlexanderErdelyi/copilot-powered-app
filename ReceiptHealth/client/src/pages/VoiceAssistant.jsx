@@ -11,6 +11,16 @@ function VoiceAssistant() {
   const [processing, setProcessing] = useState(false);
   const [useTextMode, setUseTextMode] = useState(false);
   const [recognition, setRecognition] = useState(null);
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [sessionId, setSessionId] = useState(() => {
+    // Get or create session ID from sessionStorage
+    let id = sessionStorage.getItem('voiceAssistantSessionId');
+    if (!id) {
+      id = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      sessionStorage.setItem('voiceAssistantSessionId', id);
+    }
+    return id;
+  });
 
   useEffect(() => {
     // Initialize Web Speech API
@@ -65,13 +75,37 @@ function VoiceAssistant() {
   const processCommand = async (command) => {
     setProcessing(true);
     try {
-      const res = await axios.post('/api/voice/process-command', { command });
+      // Prepare conversation history (last 10 messages)
+      const historyToSend = conversationHistory.slice(-10);
+      
+      const res = await axios.post('/api/voice/process-command', { 
+        command,
+        sessionId,
+        conversationHistory: historyToSend
+      });
+      
       const responseText = res.data.response || res.data.message || 'Command processed';
+      const newSessionId = res.data.sessionId || sessionId;
+      
+      // Update session ID if changed
+      if (newSessionId !== sessionId) {
+        setSessionId(newSessionId);
+        sessionStorage.setItem('voiceAssistantSessionId', newSessionId);
+      }
+      
+      // Update conversation history
+      const newHistory = [
+        ...conversationHistory,
+        { role: 'user', content: command },
+        { role: 'assistant', content: responseText }
+      ];
+      setConversationHistory(newHistory);
+      
       setResponse(responseText);
       speak(responseText);
     } catch (error) {
       console.error('Error processing command:', error);
-      const errorMsg = 'Sorry, I could not process that command';
+      const errorMsg = error.response?.data?.error || 'Sorry, I could not process that command';
       setResponse(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -190,8 +224,44 @@ function VoiceAssistant() {
           </div>
         )}
         
+        {/* Conversation History */}
+        {conversationHistory.length > 0 && (
+          <div className="mb-6 max-h-96 overflow-y-auto">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Conversation History:</p>
+              <button
+                onClick={() => {
+                  setConversationHistory([]);
+                  const newSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                  setSessionId(newSessionId);
+                  sessionStorage.setItem('voiceAssistantSessionId', newSessionId);
+                  setTranscript('');
+                  setResponse('');
+                }}
+                className="text-xs text-red-500 hover:text-red-600"
+              >
+                Clear History
+              </button>
+            </div>
+            <div className="space-y-3">
+              {conversationHistory.map((msg, idx) => (
+                <div key={idx} className={`p-3 rounded-lg border-l-4 ${
+                  msg.role === 'user' 
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500' 
+                    : 'bg-green-50 dark:bg-green-900/20 border-green-500'
+                }`}>
+                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                    {msg.role === 'user' ? 'You' : 'Assistant'}:
+                  </p>
+                  <p className="text-sm text-gray-900 dark:text-white">{msg.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
         {/* Transcript */}
-        {transcript && (
+        {transcript && !conversationHistory.some(m => m.content === transcript) && (
           <div className="mb-6">
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">You said:</p>
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
@@ -201,7 +271,7 @@ function VoiceAssistant() {
         )}
 
         {/* Response */}
-        {response && (
+        {response && !conversationHistory.some(m => m.content === response) && (
           <div className="mb-6">
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Assistant:</p>
             <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
