@@ -131,6 +131,41 @@ function ShoppingLists() {
     }
   };
 
+  const toggleItemPurchased = async (itemId, currentStatus) => {
+    try {
+      await axios.patch(`/api/shopping-lists/items/${itemId}`, {
+        isPurchased: !currentStatus
+      });
+      // Refresh the list
+      if (selectedList) {
+        viewList(selectedList.id);
+        fetchLists();
+      }
+    } catch (error) {
+      console.error('Error toggling item:', error);
+      toast.error('Failed to update item');
+    }
+  };
+
+  const getItemIcon = (itemName) => {
+    const name = itemName?.toLowerCase() || '';
+    // Return emoji based on item type
+    if (name.includes('milk') || name.includes('cheese') || name.includes('yogurt')) return '🥛';
+    if (name.includes('bread') || name.includes('bagel') || name.includes('toast')) return '🍞';
+    if (name.includes('egg')) return '🥚';
+    if (name.includes('chicken') || name.includes('turkey') || name.includes('meat')) return '🍗';
+    if (name.includes('fish') || name.includes('salmon') || name.includes('tuna')) return '🐟';
+    if (name.includes('apple') || name.includes('banana') || name.includes('orange') || name.includes('fruit')) return '🍎';
+    if (name.includes('carrot') || name.includes('lettuce') || name.includes('vegetable') || name.includes('broccoli')) return '🥬';
+    if (name.includes('tomato')) return '🍅';
+    if (name.includes('potato')) return '🥔';
+    if (name.includes('pasta') || name.includes('rice')) return '🍝';
+    if (name.includes('coffee') || name.includes('tea')) return '☕';
+    if (name.includes('water') || name.includes('juice')) return '🥤';
+    if (name.includes('snack') || name.includes('chips')) return '🍿';
+    return '🛒'; // Default shopping icon
+  };
+
   const getCompletedCount = (items) => {
     return items?.filter(item => item.isPurchased || item.completed).length || 0;
   };
@@ -306,44 +341,84 @@ function ShoppingLists() {
               </div>
 
               {selectedList.items && selectedList.items.length > 0 ? (
-                <div className="space-y-2">
-                  {selectedList.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        item.isPurchased
-                          ? 'bg-green-50 dark:bg-green-900/20'
-                          : 'bg-gray-50 dark:bg-gray-700'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3 flex-1">
-                        <div className={`font-medium ${
-                          item.isPurchased
-                            ? 'line-through text-gray-500 dark:text-gray-400'
-                            : 'text-gray-900 dark:text-white'
-                        }`}>
-                          {item.name}
-                        </div>
-                        {item.quantity > 1 && (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
-                            x{item.quantity}
-                          </span>
-                        )}
-                        {item.estimatedPrice && (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
-                            ${item.estimatedPrice.toFixed(2)}
-                          </span>
-                        )}
+                <>
+                  {/* To Buy Section */}
+                  {selectedList.items.filter(item => !item.isPurchased).length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-md font-semibold text-purple-600 dark:text-purple-400 mb-3">
+                        To Buy ({selectedList.items.filter(item => !item.isPurchased).length})
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {selectedList.items.filter(item => !item.isPurchased).map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => toggleItemPurchased(item.id, item.isPurchased)}
+                            className="relative group cursor-pointer bg-gradient-to-br from-purple-500 to-blue-600 text-white rounded-lg p-4 hover:-translate-y-1 hover:shadow-xl transition-all duration-200"
+                          >
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteItem(item.id);
+                              }}
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 rounded-full p-1 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <div className="text-center">
+                              <div className="text-4xl mb-2">{getItemIcon(item.name)}</div>
+                              <div className="font-bold text-sm mb-1">{item.name}</div>
+                              {item.quantity > 1 && (
+                                <div className="text-xs opacity-90">Qty: {item.quantity}</div>
+                              )}
+                              {item.estimatedPrice && (
+                                <div className="text-xs opacity-90">${item.estimatedPrice.toFixed(2)}</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <button
-                        onClick={() => deleteItem(item.id)}
-                        className="text-red-500 hover:text-red-600 p-2"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
-                  ))}
-                </div>
+                  )}
+
+                  {/* Purchased Section */}
+                  {selectedList.items.filter(item => item.isPurchased).length > 0 && (
+                    <div>
+                      <h4 className="text-md font-semibold text-gray-600 dark:text-gray-400 mb-3">
+                        Purchased ({selectedList.items.filter(item => item.isPurchased).length})
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {selectedList.items.filter(item => item.isPurchased).map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => toggleItemPurchased(item.id, item.isPurchased)}
+                            className="relative group cursor-pointer bg-gradient-to-br from-gray-400 to-gray-500 text-white rounded-lg p-4 opacity-70 hover:opacity-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-200"
+                          >
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteItem(item.id);
+                              }}
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 rounded-full p-1 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <div className="text-center">
+                              <div className="text-4xl mb-2">{getItemIcon(item.name)}</div>
+                              <div className="font-bold text-sm mb-1 line-through">{item.name}</div>
+                              {item.quantity > 1 && (
+                                <div className="text-xs opacity-90">Qty: {item.quantity}</div>
+                              )}
+                              {item.estimatedPrice && (
+                                <div className="text-xs opacity-90">${item.estimatedPrice.toFixed(2)}</div>
+                              )}
+                              <div className="text-xs mt-1">✓ Purchased</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 text-center py-8">
                   No items in this list yet. Click "Add Item" to get started!
