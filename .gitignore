@@ -47,7 +47,13 @@ yarn-error.log*
 **/build/
 
 # IDEs
-.vscode/
+# Keep shared VS Code settings, ignore personal ones
+.vscode/*.code-workspace
+.vscode/**/settings.json
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
 *.swp
 *.swo
 *~
