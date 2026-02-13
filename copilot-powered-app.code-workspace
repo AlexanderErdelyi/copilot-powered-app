@@ -1,7 +1,31 @@
 {
 	"folders": [
 		{
+			"name": "ReceiptHealth",
+			"path": "ReceiptHealth"
+		},
+		{
+			"name": "Workspace Root",
 			"path": "."
 		}
-	]
+	],
+	"settings": {
+		// ReceiptHealth-specific settings
+		"files.exclude": {
+			"**/node_modules": true,
+			"**/bin": true,
+			"**/obj": true,
+			"**/.vite": true,
+			"**/*.db": true,
+			"**/*.db-shm": true,
+			"**/*.db-wal": true,
+			"**/storage": true
+		},
+		"search.exclude": {
+			"**/node_modules": true,
+			"**/bin": true,
+			"**/obj": true,
+			"**/.vite": true
+		}
+	}
 }
