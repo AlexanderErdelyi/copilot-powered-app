@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Upload, Search, Filter, Trash2, Eye, Calendar, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Upload, Search, Filter, Trash2, Eye, Calendar, X, Camera } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import UploadStatus from '../components/UploadStatus';
 
 function Receipts() {
   const [receipts, setReceipts] = useState([]);
@@ -10,6 +11,17 @@ function Receipts() {
   const [dragActive, setDragActive] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  
+
+  // Camera state
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [stream, setStream] = useState(null);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  
+  // Upload status tracking
+  const uploadStatusRef = useRef(null);
 
   useEffect(() => {
     fetchReceipts();
@@ -66,7 +78,9 @@ function Receipts() {
 
   const handleFiles = async (files) => {
     const formData = new FormData();
-    Array.from(files).forEach(file => {
+    const fileArray = Array.from(files);
+    
+    fileArray.forEach(file => {
       formData.append('files', file);
     });
 
@@ -75,7 +89,29 @@ function Receipts() {
       const response = await axios.post('/api/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      toast.success('Receipt uploaded successfully!', { id: 'upload' });
+      toast.dismiss('upload');
+      
+      // Check for duplicates vs new uploads
+      const uploads = response.data?.uploads || [];
+      const duplicates = uploads.filter(u => u.status === 'duplicate');
+      const newUploads = uploads.filter(u => u.status !== 'duplicate');
+      
+      if (duplicates.length > 0 && newUploads.length === 0) {
+        toast('This receipt was already uploaded', { id: 'upload', icon: '⚠️' });
+      } else if (duplicates.length > 0) {
+        toast.success(`${newUploads.length} new receipt(s) uploaded, ${duplicates.length} duplicate(s) skipped`, { id: 'upload' });
+      } else {
+        toast.success('Receipt uploaded successfully!', { id: 'upload' });
+      }
+      
+      // Track upload status for each file
+      if (response.data && response.data.uploads) {
+        response.data.uploads.forEach((upload) => {
+          if (uploadStatusRef.current && upload.id && upload.status !== 'duplicate') {
+            uploadStatusRef.current.addUpload(upload.id, upload.fileName);
+          }
+        });
+      }
       
       // Wait a bit for processing, then refresh
       setTimeout(() => {
@@ -97,6 +133,86 @@ function Receipts() {
     } catch (error) {
       toast.error('Failed to delete receipt');
     }
+  };
+
+  // Camera handlers
+  const openCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      setStream(mediaStream);
+      setShowCameraModal(true);
+      
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Camera access error:', error);
+      toast.error('Failed to access camera');
+    }
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext('2d');
+      canvasRef.current.width = videoRef.current.videoWidth;
+      canvasRef.current.height = videoRef.current.videoHeight;
+      context.drawImage(videoRef.current, 0, 0);
+      
+      canvasRef.current.toBlob(async (blob) => {
+        setCapturedImage(URL.createObjectURL(blob));
+      }, 'image/jpeg', 0.8);
+    }
+  };
+
+  const retakePhoto = () => {
+    setCapturedImage(null);
+  };
+
+  const uploadCapturedPhoto = async () => {
+    if (!capturedImage) return;
+    
+    try {
+      const response = await fetch(capturedImage);
+      const blob = await response.blob();
+      const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
+      
+      const formData = new FormData();
+      formData.append('files', file);
+      
+      toast.loading('Uploading receipt...', { id: 'upload' });
+      const uploadResponse = await axios.post('/api/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success('Receipt uploaded successfully!', { id: 'upload' });
+      
+      // Track upload status
+      if (uploadResponse.data && uploadResponse.data.uploads) {
+        uploadResponse.data.uploads.forEach((upload) => {
+          if (uploadStatusRef.current && upload.id && upload.status !== 'duplicate') {
+            uploadStatusRef.current.addUpload(upload.id, upload.fileName);
+          }
+        });
+      }
+      
+      closeCamera();
+      setTimeout(() => fetchReceipts(), 2000);
+    } catch (error) {
+      console.error('Error uploading:', error);
+      toast.error('Failed to upload receipt', { id: 'upload' });
+    }
+  };
+
+  const closeCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setCapturedImage(null);
+    setShowCameraModal(false);
   };
 
   const filteredReceipts = receipts.filter(receipt => 
@@ -147,9 +263,15 @@ function Receipts() {
             multiple
             onChange={handleFileInput}
           />
-          <label htmlFor="fileInput" className="btn-primary cursor-pointer inline-block">
-            Choose Files
-          </label>
+          <div className="flex gap-3 justify-center">
+            <label htmlFor="fileInput" className="btn-primary cursor-pointer inline-block">
+              Choose Files
+            </label>
+            <button onClick={openCamera} className="btn-secondary flex items-center space-x-2">
+              <Camera className="w-4 h-4" />
+              <span>Take Photo</span>
+            </button>
+          </div>
           <p className="text-sm text-gray-500 mt-4">
             Supports: JPG, PNG, PDF (Max 10MB)
           </p>
@@ -389,6 +511,66 @@ function Receipts() {
           </div>
         </div>
       )}
+
+      {/* Camera Modal */}
+      {showCameraModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {capturedImage ? 'Preview' : 'Take Photo'}
+              </h2>
+              <button onClick={closeCamera} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {!capturedImage ? (
+                <div className="relative bg-black rounded-lg overflow-hidden">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    className="w-full h-auto max-h-[60vh]"
+                  />
+                  <canvas ref={canvasRef} className="hidden" />
+                </div>
+              ) : (
+                <div className="relative bg-black rounded-lg overflow-hidden">
+                  <img
+                    src={capturedImage}
+                    alt="Captured receipt"
+                    className="w-full h-auto max-h-[60vh] object-contain"
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                {!capturedImage ? (
+                  <button onClick={capturePhoto} className="btn-primary flex-1">
+                    Capture
+                  </button>
+                ) : (
+                  <>
+                    <button onClick={retakePhoto} className="btn-secondary flex-1">
+                      Retake
+                    </button>
+                    <button onClick={uploadCapturedPhoto} className="btn-primary flex-1">
+                      Upload
+                    </button>
+                  </>
+                )}
+                <button onClick={closeCamera} className="btn-secondary">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <UploadStatus ref={uploadStatusRef} />
     </div>
   );
 }

@@ -14,6 +14,8 @@ import {
   PieChart, 
   Pie, 
   Cell, 
+  BarChart,
+  Bar,
   ResponsiveContainer,
   XAxis,
   YAxis,
@@ -34,28 +36,63 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [categoryData, setCategoryData] = useState([]);
   const [trendData, setTrendData] = useState([]);
+  const [monthlySpendData, setMonthlySpendData] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categoryItems, setCategoryItems] = useState([]);
+  const [availableYears, setAvailableYears] = useState([]);
+  const [selectedYear, setSelectedYear] = useState(null);
 
   useEffect(() => {
-    fetchDashboardData();
+    initializeDashboard();
   }, []);
+
+  useEffect(() => {
+    if (selectedYear !== null) {
+      fetchMonthlySpendData();
+    }
+  }, [selectedYear]);
+
+  const initializeDashboard = async () => {
+    // Fetch available years first
+    try {
+      const response = await axios.get('/api/analytics/available-years');
+      const years = response.data;
+      setAvailableYears(years);
+      
+      // Set current year or most recent year as default
+      if (years.length > 0) {
+        const currentYear = new Date().getFullYear();
+        const defaultYear = years.includes(currentYear) ? currentYear : years[0];
+        setSelectedYear(defaultYear);
+      } else {
+        // No years available, use current year
+        setSelectedYear(new Date().getFullYear());
+      }
+    } catch (error) {
+      console.error('Error fetching available years:', error);
+      // Default to current year if API fails
+      setSelectedYear(new Date().getFullYear());
+    }
+
+    // Fetch main dashboard data (not year-filtered)
+    fetchDashboardData();
+  };
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch stats from API
+      // Fetch stats from API (no year filter - shows all data)
       const statsRes = await axios.get('/api/dashboard/stats');
       const statsData = statsRes.data;
       // Calculate health score (0-100 based on healthy percentage)
       statsData.healthScore = statsData.healthyPercentage || 0;
       setStats(statsData);
 
-      // Fetch category breakdown
+      // Fetch category breakdown (no year filter)
       const categoryRes = await axios.get('/api/dashboard/category-breakdown');
       setCategoryData(categoryRes.data);
 
-      // Fetch spending trends
+      // Fetch spending trends (last 6 months)
       const trendRes = await axios.get('/api/dashboard/spending-trends');
       setTrendData(trendRes.data);
     } catch (error) {
@@ -73,6 +110,29 @@ function Dashboard() {
       setTrendData([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMonthlySpendData = async () => {
+    if (!selectedYear) return;
+    
+    try {
+      // Fetch monthly spending trends for selected year
+      const monthlyRes = await axios.get(`/api/analytics/monthly-spend?year=${selectedYear}`);
+      if (monthlyRes.data && monthlyRes.data.data) {
+        // Transform data for bar chart
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const formattedData = monthlyRes.data.data.map(item => ({
+          month: monthNames[item.Month - 1],
+          totalSpend: item.TotalSpend,
+          receiptCount: item.ReceiptCount,
+          avgHealthScore: item.AverageHealthScore
+        }));
+        setMonthlySpendData(formattedData);
+      }
+    } catch (error) {
+      console.error('Error fetching monthly spend data:', error);
+      setMonthlySpendData([]);
     }
   };
 
@@ -133,11 +193,31 @@ function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Welcome back! Here's an overview of your spending habits.
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Welcome back! Here's an overview of your spending habits.
+          </p>
+        </div>
+        
+        {/* Year Filter */}
+        {availableYears.length > 0 && (
+          <div className="flex items-center space-x-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Year:
+            </label>
+            <select 
+              value={selectedYear || ''}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="input w-32"
+            >
+              {availableYears.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* KPI Cards */}
@@ -269,6 +349,39 @@ function Dashboard() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Monthly Spending Trends */}
+      {monthlySpendData.length > 0 && (
+        <div className="card">
+          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+            Monthly Spending Trends ({selectedYear})
+          </h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={monthlySpendData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="month" stroke="#9ca3af" />
+              <YAxis stroke="#9ca3af" />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: '#1f2937', 
+                  border: 'none', 
+                  borderRadius: '8px',
+                  color: '#fff'
+                }}
+                formatter={(value, name) => {
+                  if (name === 'totalSpend') return [`$${value.toFixed(2)}`, 'Total Spent'];
+                  if (name === 'receiptCount') return [value, 'Receipts'];
+                  if (name === 'avgHealthScore') return [value.toFixed(1), 'Avg Health Score'];
+                  return [value, name];
+                }}
+              />
+              <Legend />
+              <Bar dataKey="totalSpend" fill="#667eea" name="Total Spent" />
+              <Bar dataKey="receiptCount" fill="#764ba2" name="Receipt Count" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Recent activity */}
       <div className="card">

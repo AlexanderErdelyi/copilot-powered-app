@@ -11,7 +11,7 @@ builder.Logging.AddConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 // Configure HTTP URL
-builder.WebHost.UseUrls("http://localhost:5000");
+builder.WebHost.UseUrls("http://localhost:5100");
 
 Console.WriteLine("🚀 Starting ReceiptHealth server...");
 

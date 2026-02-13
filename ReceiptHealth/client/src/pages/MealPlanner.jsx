@@ -84,17 +84,6 @@ function MealPlanner() {
             </>
           )}
         </button>
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Generating...</span>
-            </>
-          ) : (
-            <>
-              <Plus className="w-5 h-5" />
-              <span>Generate Plan</span>
-            </>
-          )}
-        </button>
       </div>
 
       {loading ? (

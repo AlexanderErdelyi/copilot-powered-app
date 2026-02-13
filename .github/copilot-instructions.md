@@ -1,4 +1,21 @@
-# Copilot Instructions for CopilotWebApp
+# Copilot Instructions for copilot-powered-app
+
+## 📁 Projects in This Repository
+
+This repository contains multiple projects:
+
+1. **CopilotWebApp** - Simple chat interface with AI tools (instructions below)
+2. **ReceiptHealth** - Full-stack React + .NET receipt management app
+   - **📖 Use this prompt:** [`.github/prompts/receipthealth.prompt.md`](.github/prompts/receipthealth.prompt.md)
+   - Complete workflow for rebuild, test, and deployment
+   - Includes troubleshooting and auto-fix procedures
+3. **CopilotDemo** - Original console app demonstration
+
+**IMPORTANT**: When working with ReceiptHealth, always load and follow the dedicated prompt file above!
+
+---
+
+# CopilotWebApp Instructions
 
 ## 🚨 CRITICAL: Server Management Commands
 

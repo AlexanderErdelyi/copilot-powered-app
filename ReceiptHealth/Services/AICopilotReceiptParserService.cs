@@ -21,6 +21,7 @@ public class AICopilotReceiptParserService : IReceiptParserService
     public async Task<(Receipt receipt, List<LineItem> lineItems)> ParseReceiptAsync(string text)
     {
         _logger.LogInformation("AI-powered receipt parsing ({Length} chars)", text.Length);
+        _logger.LogInformation("📄 Receipt text to parse: {Text}", text);
 
         try
         {
