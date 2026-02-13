@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Search, Filter, Trash2, Eye, Calendar, X, Camera } from 'lucide-react';
+import { Upload, Search, Filter, Trash2, Calendar, X, Camera } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import UploadStatus from '../components/UploadStatus';
@@ -255,12 +255,12 @@ function Receipts() {
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
-        <div className="text-center py-8 sm:py-12">
-          <Upload className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 ${dragActive ? 'text-primary-500' : 'text-gray-400'}`} />
-          <h3 className="text-lg sm:text-xl font-semibold mb-2 text-gray-900 dark:text-white">
+        <div className="text-center py-3 sm:py-4">
+          <Upload className={`w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 ${dragActive ? 'text-primary-500' : 'text-gray-400'}`} />
+          <h3 className="text-sm sm:text-base font-semibold mb-1 text-gray-900 dark:text-white">
             {dragActive ? 'Drop your receipt here' : 'Upload Receipt'}
           </h3>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4">
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2 sm:mb-3">
             Drag and drop your receipt image or PDF, or click to browse
           </p>
           <input
@@ -280,8 +280,8 @@ function Receipts() {
               <span>Take Photo</span>
             </button>
           </div>
-          <p className="text-sm text-gray-500 mt-4">
-            Supports: JPG, PNG, PDF (Max 10MB)
+          <p className="text-xs text-gray-500 mt-2">
+            JPG, PNG, PDF (Max 10MB)
           </p>
         </div>
       </div>
@@ -341,7 +341,11 @@ function Receipts() {
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredReceipts.map((receipt) => (
-                  <tr key={receipt.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  <tr 
+                    key={receipt.id} 
+                    onClick={() => viewReceipt(receipt.id)}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                  >
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                       <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate max-w-[120px] sm:max-w-none">
                         {receipt.vendor}
@@ -368,22 +372,16 @@ function Receipts() {
                       </span>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-1 sm:space-x-2">
-                        <button 
-                          onClick={() => viewReceipt(receipt.id)}
-                          className="text-primary-500 hover:text-primary-600 transition-colors p-1.5 sm:p-2"
-                          title="View Receipt Details"
-                        >
-                          <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </button>
-                        <button 
-                          onClick={() => deleteReceipt(receipt.id)}
-                          className="text-red-500 hover:text-red-600 transition-colors p-1.5 sm:p-2"
-                          title="Delete Receipt"
-                        >
-                          <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </button>
-                      </div>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteReceipt(receipt.id);
+                        }}
+                        className="text-red-500 hover:text-red-600 transition-colors p-1.5 sm:p-2"
+                        title="Delete Receipt"
+                      >
+                        <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </button>
                     </td>
                   </tr>
                 ))}

@@ -14,9 +14,11 @@ public interface IMealPlannerService
     Task<MealPlan> GetMealPlanAsync(int id);
     Task<List<MealPlan>> GetAllMealPlansAsync();
     Task<MealPlan> GenerateWeeklyMealPlanAsync(string dietaryPreference, DateTime startDate);
+    Task<MealPlan> GenerateWeeklyMealPlanFromNaturalLanguageAsync(string userRequest, DateTime startDate);
     Task<ShoppingList> GenerateShoppingListFromMealPlanAsync(int mealPlanId, string shoppingListName);
     Task<bool> DeleteMealPlanAsync(int id);
     Task<List<Recipe>> GetRecipesAsync(string? dietaryPreference = null);
+    Task<Recipe?> GetRecipeByIdAsync(int id);
 }
 
 public class MealPlannerService : IMealPlannerService
@@ -142,6 +144,258 @@ public class MealPlannerService : IMealPlannerService
             }
             
             throw new Exception($"Failed to generate meal plan: {ex.Message}", ex);
+        }
+    }
+
+    public async Task<MealPlan> GenerateWeeklyMealPlanFromNaturalLanguageAsync(string userRequest, DateTime startDate)
+    {
+        _logger.LogInformation("🤖 Parsing natural language request: {Request}", userRequest);
+
+        // Use AI to parse the user's request and extract dietary preferences, restrictions, etc.
+        var parsedRequest = await ParseMealPlanRequestWithAIAsync(userRequest);
+        
+        _logger.LogInformation("✅ Parsed request - Preference: {Preference}, Additional context: {Context}", 
+            parsedRequest.DietaryPreference, parsedRequest.AdditionalContext);
+
+        // Create meal plan first with parsed information
+        var mealPlan = await CreateMealPlanAsync(
+            $"{parsedRequest.DietaryPreference} Meal Plan - Week of {startDate:MMM dd}",
+            startDate,
+            parsedRequest.DietaryPreference);
+
+        try
+        {
+            // Generate 7 dinner recipes using AI with the enhanced context
+            _logger.LogInformation("📝 Requesting 7 recipes from AI with custom context...");
+            var recipes = await GenerateRecipesWithContextAsync(parsedRequest, 7);
+            _logger.LogInformation("✅ Received {Count} recipes from AI", recipes.Count);
+
+            // Create meal plan days
+            for (int i = 0; i < 7; i++)
+            {
+                var date = startDate.Date.AddDays(i);
+                var recipe = recipes[i];
+
+                var mealPlanDay = new MealPlanDay
+                {
+                    MealPlanId = mealPlan.Id,
+                    DayOfWeek = date.DayOfWeek,
+                    Date = date,
+                    RecipeId = recipe.Id
+                };
+
+                _context.MealPlanDays.Add(mealPlanDay);
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("✅ Generated natural language meal plan with {RecipeCount} recipes", recipes.Count);
+
+            // Reload with all related data
+            return await GetMealPlanAsync(mealPlan.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error generating meal plan from natural language: {Message}", ex.Message);
+            
+            // Delete the partially created meal plan
+            try
+            {
+                var entry = _context.Entry(mealPlan);
+                if (entry.State != Microsoft.EntityFrameworkCore.EntityState.Detached)
+                {
+                    _context.MealPlans.Remove(mealPlan);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("🗑️ Cleaned up partial meal plan");
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                _logger.LogError(cleanupEx, "❌ Error cleaning up meal plan");
+            }
+            
+            throw new Exception($"Failed to generate meal plan: {ex.Message}", ex);
+        }
+    }
+
+    private async Task<ParsedMealPlanRequest> ParseMealPlanRequestWithAIAsync(string userRequest)
+    {
+        var prompt = $@"Parse the following user request for a meal plan and extract key information.
+
+User Request: ""{userRequest}""
+
+Analyze the request and extract:
+1. Dietary preference (Healthy, High Protein, Low Carb, Vegetarian, Vegan, Cheat Day, Quick & Easy, Family Friendly)
+2. Specific ingredients they want (e.g., ""with chicken"", ""lots of vegetables"")
+3. Dietary restrictions (e.g., ""no dairy"", ""gluten-free"")
+4. Cooking preferences (e.g., ""easy recipes"", ""under 30 minutes"")
+5. Cuisine preferences (e.g., ""Italian"", ""Asian"")
+
+Return ONLY a valid JSON object (no markdown, no extra text):
+{{
+  ""dietaryPreference"": ""High Protein"",
+  ""specificIngredients"": [""chicken"", ""salmon""],
+  ""restrictions"": [""no dairy""],
+  ""cookingPreferences"": [""quick meals""],
+  ""cuisinePreferences"": [""Italian""],
+  ""additionalContext"": ""User wants high protein meals with chicken and salmon, no dairy, prefers quick Italian-style cooking""
+}}";
+
+        try
+        {
+            var session = await _copilotClient.CreateSessionAsync();
+            var response = await session.SendAndWaitAsync(new MessageOptions { Prompt = prompt });
+            var content = response?.Data?.Content?.Trim();
+
+            if (string.IsNullOrEmpty(content))
+            {
+                _logger.LogWarning("AI returned empty response, using defaults");
+                return new ParsedMealPlanRequest
+                {
+                    DietaryPreference = "Healthy",
+                    AdditionalContext = userRequest
+                };
+            }
+
+            // Clean markdown if present
+            content = content.Replace("```json", "").Replace("```", "").Trim();
+
+            var parsed = JsonSerializer.Deserialize<ParsedMealPlanRequest>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            return parsed ?? new ParsedMealPlanRequest
+            {
+                DietaryPreference = "Healthy",
+                AdditionalContext = userRequest
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error parsing meal plan request with AI, using defaults");
+            return new ParsedMealPlanRequest
+            {
+                DietaryPreference = "Healthy",
+                AdditionalContext = userRequest
+            };
+        }
+    }
+
+    private async Task<List<Recipe>> GenerateRecipesWithContextAsync(ParsedMealPlanRequest parsedRequest, int count)
+    {
+        var contextualPrompt = $@"Generate {count} delicious dinner recipes that can be made in under 60 minutes.
+
+Dietary Preference: {parsedRequest.DietaryPreference}
+
+{(parsedRequest.SpecificIngredients?.Any() == true ? $"MUST include these ingredients: {string.Join(", ", parsedRequest.SpecificIngredients)}" : "")}
+{(parsedRequest.Restrictions?.Any() == true ? $"MUST avoid: {string.Join(", ", parsedRequest.Restrictions)}" : "")}
+{(parsedRequest.CookingPreferences?.Any() == true ? $"Cooking style: {string.Join(", ", parsedRequest.CookingPreferences)}" : "")}
+{(parsedRequest.CuisinePreferences?.Any() == true ? $"Cuisine preferences: {string.Join(", ", parsedRequest.CuisinePreferences)}" : "")}
+
+Additional context: {parsedRequest.AdditionalContext}
+
+Requirements:
+- Each recipe should take less than 60 minutes to prepare and cook
+- Include variety (different proteins, cooking methods)
+- Follow the dietary preference and user preferences specified above
+- Include complete ingredient lists with quantities
+- Provide clear, step-by-step instructions
+- Include nutritional information (calories, protein, carbs, fat)
+
+Return ONLY a valid JSON array with this exact structure (no markdown, no extra text):
+[
+  {{
+    ""name"": ""Recipe Name"",
+    ""description"": ""Brief description"",
+    ""cookingTime"": 45,
+    ""servings"": 4,
+    ""instructions"": ""Step 1: ... Step 2: ..."",
+    ""imageUrl"": ""🍽️"",
+    ""calories"": 500,
+    ""protein"": 30,
+    ""carbs"": 40,
+    ""fat"": 15,
+    ""ingredients"": [
+      {{
+        ""name"": ""Chicken breast"",
+        ""quantity"": ""500g"",
+        ""category"": ""Meat""
+      }}
+    ]
+  }}
+]";
+
+        try
+        {
+            _logger.LogInformation("📤 Sending contextual prompt to AI");
+            var session = await _copilotClient.CreateSessionAsync();
+            var timeout = TimeSpan.FromMinutes(3);
+            var response = await session.SendAndWaitAsync(new MessageOptions { Prompt = contextualPrompt }, timeout);
+
+            var content = response?.Data?.Content?.Trim();
+            if (string.IsNullOrEmpty(content))
+            {
+                throw new Exception("AI returned empty response");
+            }
+
+            var recipesData = ParseRecipesFromAI(content);
+            _logger.LogInformation("✅ Parsed {Count} recipes from AI response", recipesData.Count);
+
+            // Save recipes to database (same logic as GenerateRecipesWithAIAsync)
+            var recipes = new List<Recipe>();
+            for (int i = 0; i < recipesData.Count; i++)
+            {
+                var recipeData = recipesData[i];
+                var dietaryPreference = parsedRequest.DietaryPreference;
+                
+                var recipe = new Recipe
+                {
+                    Name = recipeData.Name,
+                    Description = recipeData.Description,
+                    CookingTimeMinutes = recipeData.CookingTime,
+                    Servings = recipeData.Servings,
+                    Instructions = recipeData.Instructions,
+                    ImageUrl = recipeData.ImageUrl ?? "🍽️",
+                    CreatedAt = DateTime.UtcNow,
+                    IsHealthy = dietaryPreference.Contains("Healthy", StringComparison.OrdinalIgnoreCase),
+                    IsHighProtein = dietaryPreference.Contains("Protein", StringComparison.OrdinalIgnoreCase),
+                    IsLowCarb = dietaryPreference.Contains("Low Carb", StringComparison.OrdinalIgnoreCase) ||
+                               dietaryPreference.Contains("Keto", StringComparison.OrdinalIgnoreCase),
+                    IsVegetarian = dietaryPreference.Contains("Vegetarian", StringComparison.OrdinalIgnoreCase),
+                    IsVegan = dietaryPreference.Contains("Vegan", StringComparison.OrdinalIgnoreCase),
+                    IsCheatDay = dietaryPreference.Contains("Cheat", StringComparison.OrdinalIgnoreCase),
+                    Calories = recipeData.Calories,
+                    ProteinGrams = recipeData.Protein,
+                    CarbsGrams = recipeData.Carbs,
+                    FatGrams = recipeData.Fat
+                };
+
+                _context.Recipes.Add(recipe);
+                await _context.SaveChangesAsync();
+
+                foreach (var ingredient in recipeData.Ingredients)
+                {
+                    var recipeIngredient = new RecipeIngredient
+                    {
+                        RecipeId = recipe.Id,
+                        IngredientName = ingredient.Name,
+                        Quantity = ingredient.Quantity,
+                        Category = ingredient.Category
+                    };
+                    _context.RecipeIngredients.Add(recipeIngredient);
+                }
+
+                await _context.SaveChangesAsync();
+                recipes.Add(recipe);
+            }
+
+            return recipes;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error generating recipes with context");
+            throw;
         }
     }
 
@@ -387,6 +641,13 @@ Return ONLY a valid JSON array with this exact structure (no markdown, no extra 
 
         return await query.OrderByDescending(r => r.CreatedAt).ToListAsync();
     }
+
+    public async Task<Recipe?> GetRecipeByIdAsync(int id)
+    {
+        return await _context.Recipes
+            .Include(r => r.Ingredients)
+            .FirstOrDefaultAsync(r => r.Id == id);
+    }
 }
 
 // Helper classes for JSON parsing
@@ -410,6 +671,16 @@ internal class IngredientData
     public string Name { get; set; } = string.Empty;
     public string Quantity { get; set; } = string.Empty;
     public string? Category { get; set; }
+}
+
+internal class ParsedMealPlanRequest
+{
+    public string DietaryPreference { get; set; } = "Healthy";
+    public List<string> SpecificIngredients { get; set; } = new();
+    public List<string> Restrictions { get; set; } = new();
+    public List<string> CookingPreferences { get; set; } = new();
+    public List<string> CuisinePreferences { get; set; } = new();
+    public string AdditionalContext { get; set; } = string.Empty;
 }
 
 // Extension method
