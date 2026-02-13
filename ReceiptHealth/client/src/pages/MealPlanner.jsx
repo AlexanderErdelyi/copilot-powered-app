@@ -50,6 +50,16 @@ function MealPlanner() {
       toast.success('Meal plan generated!', { id: 'generate' });
       setShowOptionsModal(false);
       fetchMealPlans();
+      
+      // Track feature usage
+      try {
+        await axios.post('/api/features/track', { 
+          featureName: 'meal_planner',
+          details: `Generated ${mealOptions.dietaryPreference} plan for ${mealOptions.servings} servings`
+        });
+      } catch (trackError) {
+        console.error('Feature tracking failed:', trackError);
+      }
     } catch (error) {
       console.error('Error generating meal plan:', error);
       toast.error('Failed to generate meal plan', { id: 'generate' });

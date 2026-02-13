@@ -162,9 +162,10 @@ function Receipts() {
       canvasRef.current.height = videoRef.current.videoHeight;
       context.drawImage(videoRef.current, 0, 0);
       
+      // Use higher quality JPEG encoding (0.95 quality)
       canvasRef.current.toBlob(async (blob) => {
         setCapturedImage(URL.createObjectURL(blob));
-      }, 'image/jpeg', 0.8);
+      }, 'image/jpeg', 0.95);
     }
   };
 

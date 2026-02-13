@@ -103,6 +103,17 @@ function VoiceAssistant() {
       
       setResponse(responseText);
       speak(responseText);
+      
+      // Track feature usage for achievements
+      try {
+        await axios.post('/api/features/track', { 
+          featureName: 'voice_assistant',
+          details: `Command: ${command.substring(0, 50)}...`
+        });
+      } catch (trackError) {
+        // Silent fail - don't interrupt user experience
+        console.error('Feature tracking failed:', trackError);
+      }
     } catch (error) {
       console.error('Error processing command:', error);
       const errorMsg = error.response?.data?.error || 'Sorry, I could not process that command';

@@ -49,6 +49,16 @@ function ShoppingLists() {
       await axios.post('/api/shopping-lists/generate?daysBack=30');
       toast.success('Healthy shopping list generated!', { id: 'generate' });
       fetchLists();
+      
+      // Track feature usage
+      try {
+        await axios.post('/api/features/track', { 
+          featureName: 'shopping_list_generator',
+          details: 'Generated healthy shopping list'
+        });
+      } catch (trackError) {
+        console.error('Feature tracking failed:', trackError);
+      }
     } catch (error) {
       console.error('Error generating list:', error);
       toast.error('Failed to generate list', { id: 'generate' });
