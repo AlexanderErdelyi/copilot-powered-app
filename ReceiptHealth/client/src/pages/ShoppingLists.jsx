@@ -1002,25 +1002,7 @@ function ShoppingLists() {
                       </div>
                     </div>
                   )}
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                            <div className="text-center">
-                              <div className="text-3xl sm:text-4xl mb-1 sm:mb-2">{getItemIcon(item.name || item.itemName)}</div>
-                              <div className="font-bold text-xs sm:text-sm mb-1 line-through truncate">{item.name || item.itemName || 'Item'}</div>
-                              {(item.quantity > 1 || item.quantity === 1) && (
-                                <div className="text-xs opacity-90">×{item.quantity}</div>
-                              )}
-                              {item.estimatedPrice && (
-                                <div className="text-xs opacity-90">${item.estimatedPrice.toFixed(2)}</div>
-                              )}
-                              <div className="text-xs mt-1">✓ Purchased</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+
                 </>
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 text-center py-8">

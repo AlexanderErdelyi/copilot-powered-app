@@ -1536,7 +1536,7 @@ app.MapGet("/api/leaderboard", async (ReceiptHealthContext context, IGamificatio
     try
     {
         // Get current user stats
-        var achievements = await gamificationService.GetAllAchievementsAsync();
+        var achievements = await gamificationService.GetAchievementsAsync();
         var completedChallenges = await context.Challenges
             .Where(c => c.IsCompleted)
             .CountAsync();
@@ -1552,7 +1552,7 @@ app.MapGet("/api/leaderboard", async (ReceiptHealthContext context, IGamificatio
             TotalAchievements = achievements.Count(a => a.IsUnlocked),
             CompletedChallenges = completedChallenges,
             AvgHealthScore = avgHealthScore,
-            TotalReceipts = totalReceits,
+            TotalReceipts = totalReceipts,
             CurrentStreak = 0, // Can be calculated later
             Points = achievements.Count(a => a.IsUnlocked) * 100 + completedChallenges * 50,
             LastActivityDate = DateTime.UtcNow
