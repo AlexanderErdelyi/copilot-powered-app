@@ -8,6 +8,7 @@ import MealPlanner from './pages/MealPlanner';
 import Insights from './pages/Insights';
 import Achievements from './pages/Achievements';
 import VoiceAssistant from './pages/VoiceAssistant';
+import Categories from './pages/Categories';
 import WakeWordListener from './components/WakeWordListener';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
           <Route path="/insights" element={<Insights />} />
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/voice-assistant" element={<VoiceAssistant />} />
+          <Route path="/categories" element={<Categories />} />
         </Routes>
       </Layout>
       <Toaster 

@@ -25,6 +25,7 @@ public class ReceiptHealthContext : DbContext
     public DbSet<MealPlanDay> MealPlanDays { get; set; }
     public DbSet<Recipe> Recipes { get; set; }
     public DbSet<RecipeIngredient> RecipeIngredients { get; set; }
+    public DbSet<Category> Categories { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -194,6 +195,16 @@ public class ReceiptHealthContext : DbContext
                   .HasForeignKey(e => e.RecipeId)
                   .OnDelete(DeleteBehavior.Cascade);
             entity.Property(e => e.IngredientName).IsRequired().HasMaxLength(200);
+        });
+
+        // Category configuration
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.HasIndex(e => e.Name).IsUnique();
+            entity.HasIndex(e => e.IsSystemCategory);
+            entity.HasIndex(e => e.SortOrder);
         });
     }
 }

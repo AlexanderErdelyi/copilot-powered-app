@@ -1,4 +1,4 @@
-import { Trophy, Star, Award, Target, Sparkles, RefreshCw, X, Check } from 'lucide-react';
+import { Trophy, Star, Award, Target, Sparkles, RefreshCw, X, Check, Medal } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -7,6 +7,7 @@ function Achievements() {
   const [achievements, setAchievements] = useState([]);
   const [nextAchievements, setNextAchievements] = useState([]);
   const [activeChallenges, setActiveChallenges] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -18,6 +19,7 @@ function Achievements() {
   const [stats, setStats] = useState({ totalUnlocked: 0, activeChallenges: 0, completedChallenges: 0 });
   const [clickedAchievements, setClickedAchievements] = useState(new Set());
   const [selectedGoal, setSelectedGoal] = useState(null);
+  const [viewMode, setViewMode] = useState('achievements'); // 'achievements' or 'leaderboard'
 
   useEffect(() => {
     fetchAllData();
@@ -28,7 +30,8 @@ function Achievements() {
       await Promise.all([
         fetchAchievements(),
         fetchNextAchievements(),
-        fetchActiveChallenges()
+        fetchActiveChallenges(),
+        fetchLeaderboard()
       ]);
     } finally {
       setLoading(false);
@@ -86,6 +89,16 @@ function Achievements() {
     } catch (error) {
       console.error('Error fetching challenges:', error);
       setActiveChallenges([]);
+    }
+  };
+
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await axios.get('/api/leaderboard');
+      setLeaderboard(response.data || []);
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      setLeaderboard([]);
     }
   };
 
@@ -303,33 +316,140 @@ function Achievements() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Achievements</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+            {viewMode === 'achievements' ? 'Achievements' : 'Leaderboard'}
+          </h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
-            Track your progress and unlock badges
+            {viewMode === 'achievements' 
+              ? 'Track your progress and unlock badges' 
+              : 'See how you rank against other users'}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+          {viewMode === 'achievements' && (
+            <>
+              <button
+                onClick={checkForNewAchievements}
+                disabled={checking}
+                className="btn-secondary flex items-center justify-center space-x-2 text-sm sm:text-base"
+              >
+                <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${checking ? 'animate-spin' : ''}`} />
+                <span>Check for New</span>
+              </button>
+              <button
+                onClick={generateAIChallenges}
+                disabled={generating}
+                className="btn-primary flex items-center justify-center space-x-2 text-sm sm:text-base"
+              >
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>{generating ? 'Generating...' : 'Generate AI Challenges'}</span>
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* View Mode Toggle */}
+      <div className="flex justify-center">
+        <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1 bg-white dark:bg-gray-800">
           <button
-            onClick={checkForNewAchievements}
-            disabled={checking}
-            className="btn-secondary flex items-center justify-center space-x-2 text-sm sm:text-base"
+            onClick={() => setViewMode('achievements')}
+            className={`px-4 sm:px-6 py-2 rounded-lg text-sm sm:text-base font-medium transition-all duration-200 ${
+              viewMode === 'achievements'
+                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-lg'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
           >
-            <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${checking ? 'animate-spin' : ''}`} />
-            <span>Check for New</span>
+            <div className="flex items-center space-x-2">
+              <Trophy className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span>Achievements</span>
+            </div>
           </button>
           <button
-            onClick={generateAIChallenges}
-            disabled={generating}
-            className="btn-primary flex items-center justify-center space-x-2 text-sm sm:text-base"
+            onClick={() => setViewMode('leaderboard')}
+            className={`px-4 sm:px-6 py-2 rounded-lg text-sm sm:text-base font-medium transition-all duration-200 ${
+              viewMode === 'leaderboard'
+                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-lg'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
           >
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span>{generating ? 'Generating...' : 'Generate AI Challenges'}</span>
+            <div className="flex items-center space-x-2">
+              <Medal className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span>Leaderboard</span>
+            </div>
           </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      {/* Content based on view mode */}
+      {viewMode === 'leaderboard' ? (
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
+            Top Players
+          </h2>
+          <div className="space-y-3">
+            {leaderboard.map((entry, index) => (
+              <div
+                key={entry.id}
+                className={`card transition-all duration-300 ${
+                  entry.isCurrentUser
+                    ? 'border-2 border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                    : ''
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    {/* Rank Badge */}
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${
+                        entry.rank === 1
+                          ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-white'
+                          : entry.rank === 2
+                          ? 'bg-gradient-to-br from-gray-300 to-gray-500 text-white'
+                          : entry.rank === 3
+                          ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-white'
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}
+                    </div>
+                    {/* User Info */}
+                    <div>
+                      <h3 className="font-bold text-gray-900 dark:text-white">
+                        {entry.userName}
+                        {entry.isCurrentUser && (
+                          <span className="ml-2 text-xs text-purple-600 dark:text-purple-400">(You)</span>
+                        )}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {entry.points} points • {entry.totalReceipts} receipts
+                      </p>
+                    </div>
+                  </div>
+                  {/* Stats */}
+                  <div className="hidden sm:flex items-center space-x-6 text-sm">
+                    <div className="text-center">
+                      <div className="font-bold text-gray-900 dark:text-white">{entry.totalAchievements}</div>
+                      <div className="text-xs text-gray-500">Achievements</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-bold text-gray-900 dark:text-white">{entry.avgHealthScore.toFixed(0)}</div>
+                      <div className="text-xs text-gray-500">Avg Score</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-bold text-gray-900 dark:text-white">{entry.currentStreak}</div>
+                      <div className="text-xs text-gray-500">Streak</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <div className="card bg-gradient-to-br from-purple-500 to-blue-600 text-white">
           <div className="text-center">
             <div className="text-3xl sm:text-4xl font-bold mb-2">{stats.totalUnlocked}</div>
@@ -540,6 +660,8 @@ function Achievements() {
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* Challenge Generation Modal */}
       {showChallengeModal && (

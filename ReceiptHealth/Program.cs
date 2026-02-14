@@ -68,6 +68,7 @@ builder.Services.AddScoped<IInsightsService, InsightsService>();
 builder.Services.AddScoped<INutritionService, NutritionService>();
 builder.Services.AddScoped<IMealPlannerService, MealPlannerService>();
 builder.Services.AddScoped<VoiceAssistantService>();
+builder.Services.AddScoped<ICategoryManagementService, CategoryManagementService>();
 
 // Text-to-Speech service (Piper)
 builder.Services.AddSingleton<IPiperTtsService, PiperTtsService>();
@@ -96,6 +97,11 @@ using (var scope = app.Services.CreateScope())
     context.Database.EnsureCreated();
     Console.WriteLine($"✅ Database initialized at: {dbPath}");
     app.Logger.LogInformation("Database initialized at: {DbPath}", dbPath);
+    
+    // Initialize system categories
+    var categoryService = scope.ServiceProvider.GetRequiredService<ICategoryManagementService>();
+    await categoryService.EnsureSystemCategoriesExistAsync();
+    Console.WriteLine("✅ System categories initialized");
 }
 
 Console.WriteLine("📡 Setting up API endpoints...");
@@ -1524,6 +1530,72 @@ app.MapGet("/api/achievements/celebration", async (IGamificationService gamifica
     return Results.Ok(new { celebrate = shouldCelebrate });
 });
 
+// Leaderboard endpoint (mock data for now - single user system)
+app.MapGet("/api/leaderboard", async (ReceiptHealthContext context, IGamificationService gamificationService) =>
+{
+    try
+    {
+        // Get current user stats
+        var achievements = await gamificationService.GetAchievementsAsync();
+        var completedChallenges = await context.Challenges
+            .Where(c => c.IsCompleted)
+            .CountAsync();
+        var totalReceipts = await context.Receipts.CountAsync();
+        var avgHealthScore = await context.Receipts
+            .Where(r => r.HealthScore > 0)
+            .AverageAsync(r => (decimal?)r.HealthScore) ?? 50m;
+
+        var currentUser = new LeaderboardEntry
+        {
+            Id = 1,
+            UserName = "You",
+            TotalAchievements = achievements.Count(a => a.IsUnlocked),
+            CompletedChallenges = completedChallenges,
+            AvgHealthScore = avgHealthScore,
+            TotalReceipts = totalReceipts,
+            CurrentStreak = 0, // Can be calculated later
+            Points = achievements.Count(a => a.IsUnlocked) * 100 + completedChallenges * 50,
+            LastActivityDate = DateTime.UtcNow
+        };
+
+        // Mock other users for demonstration
+        var mockUsers = new List<LeaderboardEntry>
+        {
+            new() { Id = 2, UserName = "HealthyEater123", TotalAchievements = 15, CompletedChallenges = 8, AvgHealthScore = 85m, TotalReceipts = 45, CurrentStreak = 7, Points = 15 * 100 + 8 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-2) },
+            new() { Id = 3, UserName = "BudgetMaster", TotalAchievements = 12, CompletedChallenges = 10, AvgHealthScore = 72m, TotalReceipts = 38, CurrentStreak = 5, Points = 12 * 100 + 10 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-5) },
+            new() { Id = 4, UserName = "FitnessGuru", TotalAchievements = 18, CompletedChallenges = 6, AvgHealthScore = 92m, TotalReceipts = 52, CurrentStreak = 12, Points = 18 * 100 + 6 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-1) },
+            new() { Id = 5, UserName = "GroceryPro", TotalAchievements = 10, CompletedChallenges = 7, AvgHealthScore = 68m, TotalReceipts = 30, CurrentStreak = 3, Points = 10 * 100 + 7 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-8) }
+        };
+
+        // Combine and sort by points
+        var leaderboard = new List<LeaderboardEntry> { currentUser };
+        leaderboard.AddRange(mockUsers);
+        leaderboard = leaderboard.OrderByDescending(u => u.Points).ToList();
+
+        // Add rank
+        var rankedLeaderboard = leaderboard.Select((entry, index) => new
+        {
+            entry.Id,
+            entry.UserName,
+            Rank = index + 1,
+            entry.TotalAchievements,
+            entry.CompletedChallenges,
+            entry.AvgHealthScore,
+            entry.TotalReceipts,
+            entry.CurrentStreak,
+            entry.Points,
+            entry.LastActivityDate,
+            IsCurrentUser = entry.Id == 1
+        }).ToList();
+
+        return Results.Ok(rankedLeaderboard);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
 // === AI Insights Endpoints ===
 
 // Natural language query
@@ -1704,6 +1776,165 @@ app.MapDelete("/api/receipts/{id}", async (int id, ReceiptHealthContext context,
     }
 });
 
+// ============= Category Management API Endpoints =============
+app.MapGet("/api/categories", async (ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var categories = await categoryService.GetActiveCategoriesAsync();
+        return Results.Ok(categories);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapGet("/api/categories/all", async (ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var categories = await categoryService.GetAllCategoriesAsync();
+        return Results.Ok(categories);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapGet("/api/categories/{id}", async (int id, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var category = await categoryService.GetCategoryByIdAsync(id);
+        if (category == null)
+        {
+            return Results.NotFound(new { message = $"Category with ID {id} not found" });
+        }
+        return Results.Ok(category);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPost("/api/categories", async (CreateCategoryRequest request, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var category = new Category
+        {
+            Name = request.Name,
+            Description = request.Description,
+            Color = request.Color,
+            Icon = request.Icon,
+            SortOrder = request.SortOrder
+        };
+
+        var created = await categoryService.CreateCategoryAsync(category);
+        return Results.Created($"/api/categories/{created.Id}", created);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPut("/api/categories/{id}", async (int id, UpdateCategoryRequest request, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var category = new Category
+        {
+            Id = id,
+            Name = request.Name,
+            Description = request.Description,
+            Color = request.Color,
+            Icon = request.Icon,
+            IsActive = request.IsActive,
+            SortOrder = request.SortOrder
+        };
+
+        var updated = await categoryService.UpdateCategoryAsync(category);
+        return Results.Ok(updated);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapDelete("/api/categories/{id}", async (int id, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var result = await categoryService.DeleteCategoryAsync(id);
+        if (!result)
+        {
+            return Results.NotFound(new { message = $"Category with ID {id} not found" });
+        }
+        return Results.NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPost("/api/categories/suggest", async (SuggestCategoriesRequest request, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var suggestions = await categoryService.SuggestCategoriesAsync(request.ItemDescription);
+        return Results.Ok(new { suggestions });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPut("/api/shopping-lists/{listId}/items/{itemId}/category", async (
+    int listId, 
+    int itemId, 
+    UpdateItemCategoryRequest request, 
+    ReceiptHealthContext context) =>
+{
+    try
+    {
+        var item = await context.ShoppingListItems
+            .FirstOrDefaultAsync(i => i.Id == itemId && i.ShoppingListId == listId);
+
+        if (item == null)
+        {
+            return Results.NotFound(new { message = "Item not found" });
+        }
+
+        item.Category = request.Category;
+        await context.SaveChangesAsync();
+
+        return Results.Ok(item);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
 Console.WriteLine("✅ All endpoints configured");
 Console.WriteLine("🌐 ReceiptHealth API is running on http://localhost:5002");
 Console.WriteLine("📊 Dashboard: http://localhost:5002");
@@ -1768,4 +1999,8 @@ public record GenerateSingleMealRequest(string DayOfWeek, string MealType, strin
 public record CreateShoppingListFromMealPlanRequest(string? Name = null);
 public record AddRecipeToMealSlotRequest(int RecipeId, DayOfWeek DayOfWeek, MealType MealType);
 public record AddRecipeToShoppingListRequest(int RecipeId, int? ShoppingListId = null);
+public record CreateCategoryRequest(string Name, string? Description = null, string? Color = null, string? Icon = null, int SortOrder = 0);
+public record UpdateCategoryRequest(string Name, string? Description = null, string? Color = null, string? Icon = null, bool IsActive = true, int SortOrder = 0);
+public record SuggestCategoriesRequest(string ItemDescription);
+public record UpdateItemCategoryRequest(string Category);
 
