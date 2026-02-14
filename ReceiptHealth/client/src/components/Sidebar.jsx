@@ -7,6 +7,7 @@ import {
   TrendingUp, 
   Trophy, 
   Sparkles,
+  Tag,
   Moon,
   Sun,
   Menu,
@@ -21,6 +22,7 @@ const menuItems = [
   { path: '/meal-planner', icon: UtensilsCrossed, label: 'Meal Planner' },
   { path: '/insights', icon: TrendingUp, label: 'Insights' },
   { path: '/achievements', icon: Trophy, label: 'Achievements' },
+  { path: '/categories', icon: Tag, label: 'Categories' },
   { path: '/voice-assistant', icon: Sparkles, label: 'AI Assistant' },
 ];
 

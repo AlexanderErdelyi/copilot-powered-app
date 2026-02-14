@@ -1530,6 +1530,72 @@ app.MapGet("/api/achievements/celebration", async (IGamificationService gamifica
     return Results.Ok(new { celebrate = shouldCelebrate });
 });
 
+// Leaderboard endpoint (mock data for now - single user system)
+app.MapGet("/api/leaderboard", async (ReceiptHealthContext context, IGamificationService gamificationService) =>
+{
+    try
+    {
+        // Get current user stats
+        var achievements = await gamificationService.GetAllAchievementsAsync();
+        var completedChallenges = await context.Challenges
+            .Where(c => c.IsCompleted)
+            .CountAsync();
+        var totalReceipts = await context.Receipts.CountAsync();
+        var avgHealthScore = await context.Receipts
+            .Where(r => r.HealthScore > 0)
+            .AverageAsync(r => (decimal?)r.HealthScore) ?? 50m;
+
+        var currentUser = new LeaderboardEntry
+        {
+            Id = 1,
+            UserName = "You",
+            TotalAchievements = achievements.Count(a => a.IsUnlocked),
+            CompletedChallenges = completedChallenges,
+            AvgHealthScore = avgHealthScore,
+            TotalReceipts = totalReceits,
+            CurrentStreak = 0, // Can be calculated later
+            Points = achievements.Count(a => a.IsUnlocked) * 100 + completedChallenges * 50,
+            LastActivityDate = DateTime.UtcNow
+        };
+
+        // Mock other users for demonstration
+        var mockUsers = new List<LeaderboardEntry>
+        {
+            new() { Id = 2, UserName = "HealthyEater123", TotalAchievements = 15, CompletedChallenges = 8, AvgHealthScore = 85m, TotalReceipts = 45, CurrentStreak = 7, Points = 1900, LastActivityDate = DateTime.UtcNow.AddHours(-2) },
+            new() { Id = 3, UserName = "BudgetMaster", TotalAchievements = 12, CompletedChallenges = 10, AvgHealthScore = 72m, TotalReceipts = 38, CurrentStreak = 5, Points = 1700, LastActivityDate = DateTime.UtcNow.AddHours(-5) },
+            new() { Id = 4, UserName = "FitnessGuru", TotalAchievements = 18, CompletedChallenges = 6, AvgHealthScore = 92m, TotalReceipts = 52, CurrentStreak = 12, Points = 2100, LastActivityDate = DateTime.UtcNow.AddHours(-1) },
+            new() { Id = 5, UserName = "GroceryPro", TotalAchievements = 10, CompletedChallenges = 7, AvgHealthScore = 68m, TotalReceipts = 30, CurrentStreak = 3, Points = 1350, LastActivityDate = DateTime.UtcNow.AddHours(-8) }
+        };
+
+        // Combine and sort by points
+        var leaderboard = new List<LeaderboardEntry> { currentUser };
+        leaderboard.AddRange(mockUsers);
+        leaderboard = leaderboard.OrderByDescending(u => u.Points).ToList();
+
+        // Add rank
+        var rankedLeaderboard = leaderboard.Select((entry, index) => new
+        {
+            entry.Id,
+            entry.UserName,
+            Rank = index + 1,
+            entry.TotalAchievements,
+            entry.CompletedChallenges,
+            entry.AvgHealthScore,
+            entry.TotalReceipts,
+            entry.CurrentStreak,
+            entry.Points,
+            entry.LastActivityDate,
+            IsCurrentUser = entry.Id == 1
+        }).ToList();
+
+        return Results.Ok(rankedLeaderboard);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
 // === AI Insights Endpoints ===
 
 // Natural language query
