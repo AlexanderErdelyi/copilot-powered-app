@@ -376,10 +376,12 @@ function GlobalVoiceAssistant() {
 
       isPlayingRef.current = true;
 
-      // Try Piper TTS first
+      // Use Edge TTS (same as VoiceAssistant page)
+      const voiceId = localStorage.getItem('preferredEdgeVoice') || 'en-US-AriaNeural';
+      
       axios.post('/api/voice/text-to-speech', { 
-        text,
-        voice: localStorage.getItem('selectedVoice') || 'en_US-lessac-medium'
+        text: text,
+        voice: voiceId
       }, {
         responseType: 'blob'
       })
@@ -405,9 +407,32 @@ function GlobalVoiceAssistant() {
         });
       })
       .catch(error => {
-        console.error('TTS error:', error);
-        isPlayingRef.current = false;
-        resolve();
+        console.warn('⚠️ Piper TTS unavailable, using browser speech synthesis:', error.message);
+        
+        // Fallback to browser's built-in speech synthesis
+        if ('speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+          
+          utterance.onend = () => {
+            isPlayingRef.current = false;
+            resolve();
+          };
+          
+          utterance.onerror = () => {
+            isPlayingRef.current = false;
+            resolve();
+          };
+          
+          window.speechSynthesis.speak(utterance);
+        } else {
+          // No speech synthesis available at all
+          console.error('No speech synthesis available');
+          isPlayingRef.current = false;
+          resolve();
+        }
       });
     });
   };
