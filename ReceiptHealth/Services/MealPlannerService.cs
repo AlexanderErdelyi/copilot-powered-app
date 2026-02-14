@@ -672,10 +672,8 @@ Return ONLY a valid JSON array with this exact structure (no markdown, no extra 
 
         // Calculate the date for the given day of week
         var date = mealPlan.StartDate;
-        while (date.DayOfWeek != dayOfWeek)
-        {
-            date = date.AddDays(1);
-        }
+        int daysToAdd = ((int)dayOfWeek - (int)date.DayOfWeek + 7) % 7;
+        date = date.AddDays(daysToAdd);
 
         // Check if a meal already exists for this slot
         var existingMeal = await _context.MealPlanDays

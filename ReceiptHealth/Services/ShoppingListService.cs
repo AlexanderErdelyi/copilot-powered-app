@@ -788,7 +788,7 @@ CRITICAL RULES:
             }
             else
             {
-                shoppingList = await CreateShoppingListAsync($"Shopping List - {DateTime.Now:MMM dd}");
+                shoppingList = await CreateShoppingListAsync($"Shopping List - {DateTime.UtcNow:MMM dd}");
             }
         }
 

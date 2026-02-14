@@ -45,18 +45,20 @@ function MealPlanner() {
   const parseInstructions = (instructions) => {
     if (!instructions) return [];
     
+    const MIN_STEP_LENGTH = 10; // Minimum characters for a valid step
+    
     // Split by common delimiters: newlines, numbered steps, or periods followed by capital letters
     let steps = instructions
       .split(/\n+|\d+\.\s+|(?<=\.)\s+(?=[A-Z])/)
       .map(s => s.trim())
-      .filter(s => s.length > 10); // Filter out very short fragments
+      .filter(s => s.length > MIN_STEP_LENGTH); // Filter out very short fragments
     
     // If no clear steps were found, split by periods as last resort
     if (steps.length <= 1) {
       steps = instructions
         .split(/\.\s+/)
         .map(s => s.trim())
-        .filter(s => s.length > 10);
+        .filter(s => s.length > MIN_STEP_LENGTH);
     }
     
     return steps;
