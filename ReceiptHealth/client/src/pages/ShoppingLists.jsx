@@ -920,8 +920,17 @@ function ShoppingLists() {
                             
                             {/* Item Content */}
                             <div 
+                              role="button"
+                              tabIndex={0}
                               onClick={() => toggleItemPurchased(item.id, item.isPurchased)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  toggleItemPurchased(item.id, item.isPurchased);
+                                }
+                              }}
                               className="cursor-pointer"
+                              aria-label={`Mark ${item.name || item.itemName} as purchased`}
                             >
                               <div className="text-center">
                                 <div className="text-3xl sm:text-4xl mb-1 sm:mb-2">{getItemIcon(item.name || item.itemName)}</div>
@@ -977,8 +986,17 @@ function ShoppingLists() {
                             
                             {/* Item Content */}
                             <div 
+                              role="button"
+                              tabIndex={0}
                               onClick={() => toggleItemPurchased(item.id, item.isPurchased)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  toggleItemPurchased(item.id, item.isPurchased);
+                                }
+                              }}
                               className="cursor-pointer"
+                              aria-label={`Unmark ${item.name || item.itemName} as purchased`}
                             >
                               <div className="text-center">
                                 <div className="text-3xl sm:text-4xl mb-1 sm:mb-2 opacity-80 line-through">{getItemIcon(item.name || item.itemName)}</div>

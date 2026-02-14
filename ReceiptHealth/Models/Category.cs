@@ -9,6 +9,6 @@ public class Category
     public string? Icon { get; set; } // Emoji or icon identifier
     public bool IsSystemCategory { get; set; } = false; // Built-in categories (Healthy, Junk, Other)
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
     public int SortOrder { get; set; } = 0; // For custom ordering
 }

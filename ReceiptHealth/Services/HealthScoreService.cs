@@ -63,8 +63,8 @@ public class HealthScoreService : IHealthScoreService
         score = Math.Max(0m, Math.Min(100m, score));
 
         _logger.LogInformation(
-            "Computed health score: {Score:F2} (Healthy={HealthyPercent:F1}%, Junk={JunkPercent:F1}%, Other={OtherPercent:F1}%)",
-            score, healthyPercent, junkPercent, otherPercent);
+            "Computed health score: {Score:F2} (Healthy={HealthyPercent:F1}%, Other={OtherPercent:F1}%, Junk={JunkPercent:F1}%)",
+            score, healthyPercent, otherPercent, junkPercent);
 
         return Math.Round(score, 2);
     }

@@ -1561,10 +1561,10 @@ app.MapGet("/api/leaderboard", async (ReceiptHealthContext context, IGamificatio
         // Mock other users for demonstration
         var mockUsers = new List<LeaderboardEntry>
         {
-            new() { Id = 2, UserName = "HealthyEater123", TotalAchievements = 15, CompletedChallenges = 8, AvgHealthScore = 85m, TotalReceipts = 45, CurrentStreak = 7, Points = 1900, LastActivityDate = DateTime.UtcNow.AddHours(-2) },
-            new() { Id = 3, UserName = "BudgetMaster", TotalAchievements = 12, CompletedChallenges = 10, AvgHealthScore = 72m, TotalReceipts = 38, CurrentStreak = 5, Points = 1700, LastActivityDate = DateTime.UtcNow.AddHours(-5) },
-            new() { Id = 4, UserName = "FitnessGuru", TotalAchievements = 18, CompletedChallenges = 6, AvgHealthScore = 92m, TotalReceipts = 52, CurrentStreak = 12, Points = 2100, LastActivityDate = DateTime.UtcNow.AddHours(-1) },
-            new() { Id = 5, UserName = "GroceryPro", TotalAchievements = 10, CompletedChallenges = 7, AvgHealthScore = 68m, TotalReceipts = 30, CurrentStreak = 3, Points = 1350, LastActivityDate = DateTime.UtcNow.AddHours(-8) }
+            new() { Id = 2, UserName = "HealthyEater123", TotalAchievements = 15, CompletedChallenges = 8, AvgHealthScore = 85m, TotalReceipts = 45, CurrentStreak = 7, Points = 15 * 100 + 8 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-2) },
+            new() { Id = 3, UserName = "BudgetMaster", TotalAchievements = 12, CompletedChallenges = 10, AvgHealthScore = 72m, TotalReceipts = 38, CurrentStreak = 5, Points = 12 * 100 + 10 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-5) },
+            new() { Id = 4, UserName = "FitnessGuru", TotalAchievements = 18, CompletedChallenges = 6, AvgHealthScore = 92m, TotalReceipts = 52, CurrentStreak = 12, Points = 18 * 100 + 6 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-1) },
+            new() { Id = 5, UserName = "GroceryPro", TotalAchievements = 10, CompletedChallenges = 7, AvgHealthScore = 68m, TotalReceipts = 30, CurrentStreak = 3, Points = 10 * 100 + 7 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-8) }
         };
 
         // Combine and sort by points
