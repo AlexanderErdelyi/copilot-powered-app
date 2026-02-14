@@ -313,6 +313,8 @@ function MealPlanner() {
   };
 
   const viewRecipe = (recipe) => {
+    console.log('Opening recipe:', recipe);
+    console.log('Ingredients:', recipe.ingredients);
     setSelectedRecipe(recipe);
     setShowRecipeModal(true);
   };
@@ -371,15 +373,37 @@ function MealPlanner() {
       let response;
       
       if (useNaturalLanguage && naturalLanguageInput.trim()) {
-        // Use natural language generation with day count and meal type settings
-        response = await axios.post('/api/meal-plans/generate-nl', {
-          userRequest: naturalLanguageInput,
-          servings: mealOptions.servings,
-          days: mealOptions.days,
-          includeBreakfast: mealOptions.includeBreakfast,
-          includeLunch: mealOptions.includeLunch,
-          includeDinner: mealOptions.includeDinner
-        });
+        // Check if this is a single meal request (contains day + meal type)
+        const input = naturalLanguageInput.toLowerCase();
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const mealTypes = ['breakfast', 'lunch', 'dinner'];
+        
+        const detectedDay = days.find(day => input.includes(day));
+        const detectedMeal = mealTypes.find(meal => input.includes(meal));
+        
+        if (detectedDay && detectedMeal) {
+          // Single meal request - use generate-single-meal endpoint
+          console.log(`Detected single meal request: ${detectedDay} ${detectedMeal}`);
+          const capitalizedDay = detectedDay.charAt(0).toUpperCase() + detectedDay.slice(1);
+          const capitalizedMeal = detectedMeal.charAt(0).toUpperCase() + detectedMeal.slice(1);
+          
+          response = await axios.post('/api/meal-plans/generate-single-meal', {
+            dayOfWeek: capitalizedDay,
+            mealType: capitalizedMeal,
+            naturalLanguagePrompt: naturalLanguageInput,
+            servings: mealOptions.servings
+          });
+        } else {
+          // Full meal plan request - use generate-nl endpoint
+          response = await axios.post('/api/meal-plans/generate-nl', {
+            userRequest: naturalLanguageInput,
+            servings: mealOptions.servings,
+            days: mealOptions.days,
+            includeBreakfast: mealOptions.includeBreakfast,
+            includeLunch: mealOptions.includeLunch,
+            includeDinner: mealOptions.includeDinner
+          });
+        }
       } else {
         // Use predefined dietary preference
         response = await axios.post('/api/meal-plans/generate', mealOptions);
@@ -601,10 +625,17 @@ function MealPlanner() {
                         ? 'bg-primary-50 dark:bg-primary-900/20 border-2 border-primary-200 dark:border-primary-800' 
                         : 'bg-gray-50 dark:bg-gray-700'
                     }`}
-                    onClick={() => {
+                    onClick={async () => {
                       if (hasMeal) {
-                        setSelectedRecipe(hasMeal);
-                        setShowRecipeModal(true);
+                        // Fetch full recipe details just like Meal Plans view
+                        try {
+                          const response = await axios.get(`/api/recipes/${hasMeal.id}`);
+                          setSelectedRecipe(response.data);
+                          setShowRecipeModal(true);
+                        } catch (error) {
+                          console.error('Error fetching recipe:', error);
+                          toast.error('Failed to load recipe details');
+                        }
                       } else {
                         setSelectedMealSlot({ day, mealType: meal });
                         setShowSingleMealModal(true);
@@ -744,6 +775,8 @@ function MealPlanner() {
                     Describe what you'd like for {selectedMealSlot.mealType}:
                   </p>
                   <textarea
+                    id="single-meal-nl-input"
+                    name="single-meal-nl-input"
                     value={singleMealNLInput}
                     onChange={(e) => setSingleMealNLInput(e.target.value)}
                     placeholder={`E.g., "Something quick with chicken and vegetables" or "A hearty ${selectedMealSlot.mealType.toLowerCase()} with pasta"`}
@@ -836,6 +869,8 @@ function MealPlanner() {
                     Describe what kind of meals you want in natural language:
                   </p>
                   <textarea
+                    id="meal-plan-nl-input"
+                    name="meal-plan-nl-input"
                     value={naturalLanguageInput}
                     onChange={(e) => setNaturalLanguageInput(e.target.value)}
                     placeholder="e.g., 'High protein meals with chicken, no dairy, prefer quick Italian recipes' or 'Healthy vegetarian meals with lots of vegetables'"
@@ -970,7 +1005,7 @@ function MealPlanner() {
                   className="flex-1 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   <span className="mr-2 text-xl">✨</span>
-                  {generating ? 'Generating...' : `Generate ${mealOptions.days}-Day Meal Plan`}
+                  {generating ? 'Generating...' : (useNaturalLanguage ? 'Generate Meal Plan' : `Generate ${mealOptions.days}-Day Meal Plan`)}
                 </button>
                 ) : (
                 <div className="flex-1 text-center text-gray-500 dark:text-gray-400 py-3">
@@ -1055,6 +1090,8 @@ function MealPlanner() {
                       <li key={idx} className="flex items-start space-x-2">
                         <input
                           type="checkbox"
+                          id={`ingredient-${idx}`}
+                          name={`ingredient-${idx}`}
                           checked={checkedIngredients[idx] || false}
                           onChange={() => toggleIngredient(idx)}
                           className="mt-1 w-4 h-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500 cursor-pointer flex-shrink-0"
@@ -1079,6 +1116,8 @@ function MealPlanner() {
                       <li key={idx} className="flex items-start space-x-2">
                         <input
                           type="checkbox"
+                          id={`instruction-step-${idx}`}
+                          name={`instruction-step-${idx}`}
                           checked={checkedSteps[idx] || false}
                           onChange={() => toggleStep(idx)}
                           className="mt-1 w-4 h-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500 cursor-pointer flex-shrink-0"
