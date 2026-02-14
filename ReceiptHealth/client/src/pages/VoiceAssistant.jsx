@@ -1,9 +1,11 @@
-import { Mic, MicOff, Volume2, Send, Settings, Volume1 } from 'lucide-react';
+import { Mic, MicOff, Volume2, Send, Settings, Volume1, Radio } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
 function VoiceAssistant() {
+  const location = useLocation();
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [textInput, setTextInput] = useState('');
@@ -22,6 +24,7 @@ function VoiceAssistant() {
   const [isStreaming, setIsStreaming] = useState(false);
   const audioRef = useRef(null);
   const streamingIntervalRef = useRef(null);
+  const autoStartHandledRef = useRef(false);
   const [sessionId, setSessionId] = useState(() => {
     // Get or create session ID from sessionStorage
     let id = sessionStorage.getItem('voiceAssistantSessionId');
@@ -59,16 +62,135 @@ function VoiceAssistant() {
       recognitionInstance.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
         setListening(false);
-        toast.error('Speech recognition error');
+        
+        // Don't show error toast for aborted errors in continuous mode
+        if (event.error !== 'aborted' && event.error !== 'no-speech') {
+          toast.error('Speech recognition error');
+        }
+        
+        // Try to restart in continuous mode if not aborted
+        if (continuousMode && event.error !== 'aborted') {
+          console.log('📢 Attempting to restart after error in continuous mode');
+          setTimeout(() => {
+            if (!listening && !processing && continuousMode) {
+              startListening();
+            }
+          }, 1000);
+        }
       };
 
       recognitionInstance.onend = () => {
+        console.log('🎤 Recognition ended, listening state:', listening);
         setListening(false);
-        // Don't auto-restart here - will be handled by speak() onended callback
+        // Restart logic is handled in speak() onended callback for continuous mode
       };
 
       setRecognition(recognitionInstance);
     }
+  }, []);
+
+  // Handle wake word events and autoStart (separate effect that depends on recognition being ready)
+  useEffect(() => {
+    if (!recognition) return; // Wait for recognition to be initialized
+    
+    // Handle wake word event
+    const handleWakeWord = () => {
+      console.log('✨ Wake word event received, starting listening...');
+      if (!listening && !processing) {
+        setContinuousMode(true);
+        setTimeout(() => {
+          startListening();
+        }, 500);
+      }
+    };
+    
+    window.addEventListener('wakeWordDetected', handleWakeWord);
+    
+    // Check if navigated with enableContinuousMode or autoStart from wake word (only handle once per navigation)
+    if ((location.state?.enableContinuousMode || location.state?.autoStart) && !listening && !processing && !autoStartHandledRef.current) {
+      console.log('📍 Navigated with continuous mode enabled from wake word');
+      autoStartHandledRef.current = true;
+      setContinuousMode(true);
+      setTimeout(() => {
+        console.log('🎤 AutoStart: Starting listening...');
+        startListening();
+      }, 800);
+    }
+    
+    return () => {
+      window.removeEventListener('wakeWordDetected', handleWakeWord);
+      // Reset autoStart flag when leaving the page
+      if (location.pathname !== '/voice-assistant') {
+        autoStartHandledRef.current = false;
+      }
+    };
+  }, [location, recognition, listening, processing]);
+
+  // Listen for changes to listeningMode (when user cycles to AI Assistant mode)
+  useEffect(() => {
+    if (!recognition) return;
+
+    const handleModeChange = () => {
+      const mode = localStorage.getItem('listeningMode');
+      if (mode === 'aiAssistant' && !listening && !processing && !continuousMode) {
+        console.log('🎤 Listening mode changed to AI Assistant, enabling continuous mode');
+        setContinuousMode(true);
+        setTimeout(() => {
+          startListening();
+        }, 500);
+      }
+    };
+
+    // Check every second for mode changes
+    const interval = setInterval(handleModeChange, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [recognition, listening, processing, continuousMode]);
+
+  // Sync with global chat history
+  useEffect(() => {
+    // Load global chat history on mount
+    const loadGlobalHistory = () => {
+      try {
+        const globalHistory = localStorage.getItem('globalChatHistory');
+        if (globalHistory) {
+          const parsed = JSON.parse(globalHistory);
+          // Merge with existing conversation history (avoid duplicates)
+          setConversationHistory(prev => {
+            const merged = [...prev];
+            parsed.forEach(msg => {
+              // Check if message already exists by timestamp
+              if (!merged.some(m => m.timestamp === msg.timestamp)) {
+                merged.push(msg);
+              }
+            });
+            // Sort by timestamp
+            return merged.sort((a, b) => 
+              new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
+            );
+          });
+          console.log('📖 Loaded global chat history:', parsed.length, 'messages');
+        }
+      } catch (error) {
+        console.error('Error loading global chat:', error);
+      }
+    };
+
+    loadGlobalHistory();
+
+    // Listen for updates from GlobalVoiceAssistant
+    const handleHistoryUpdate = () => {
+      console.log('📖 Global chat history updated, syncing...');
+      loadGlobalHistory();
+    };
+
+    window.addEventListener('chatHistoryUpdated', handleHistoryUpdate);
+
+    return () => {
+      window.removeEventListener('chatHistoryUpdated', handleHistoryUpdate);
+    };
   }, []);
 
   const loadVoices = async () => {
@@ -78,6 +200,23 @@ function VoiceAssistant() {
     } catch (error) {
       console.error('Error loading voices:', error);
       toast.error('Failed to load voices');
+    }
+  };
+
+  // Helper to save message to global history
+  const saveToGlobalHistory = (message) => {
+    try {
+      const history = JSON.parse(localStorage.getItem('globalChatHistory') || '[]');
+      history.push({
+        ...message,
+        timestamp: new Date().toISOString()
+      });
+      // Keep last 50 messages
+      const trimmed = history.slice(-50);
+      localStorage.setItem('globalChatHistory', JSON.stringify(trimmed));
+      window.dispatchEvent(new CustomEvent('chatHistoryUpdated'));
+    } catch (error) {
+      console.error('Error saving to global history:', error);
     }
   };
 
@@ -125,11 +264,27 @@ function VoiceAssistant() {
   const startListening = () => {
     if (recognition) {
       try {
+        console.log('🎤 Starting listening...');
         recognition.start();
         setListening(true);
         setResponse('');
       } catch (error) {
         console.error('Error starting recognition:', error);
+        // If already started, stop and restart
+        if (error.message && error.message.includes('already started')) {
+          console.log('Recognition already started, stopping first...');
+          recognition.stop();
+          setTimeout(() => {
+            try {
+              recognition.start();
+              setListening(true);
+              setResponse('');
+            } catch (retryError) {
+              console.error('Retry failed:', retryError);
+              toast.error('Could not start voice recognition');
+            }
+          }, 100);
+        }
       }
     } else {
       toast.error('Speech recognition not supported in your browser');
@@ -147,8 +302,9 @@ function VoiceAssistant() {
     setProcessing(true);
     
     // Add user message to history immediately
-    const userMessage = { role: 'user', content: command };
+    const userMessage = { role: 'user', content: command, timestamp: new Date().toISOString() };
     setConversationHistory(prev => [...prev, userMessage]);
+    saveToGlobalHistory(userMessage); // Save to global history
     setTranscript(''); // Clear current transcript
     setTextInput(''); // Clear text input
     
@@ -171,11 +327,11 @@ function VoiceAssistant() {
         sessionStorage.setItem('voiceAssistantSessionId', newSessionId);
       }
       
-      // Start streaming the assistant response
+      // Start BOTH text streaming AND voice synthesis in parallel for faster response
       startStreamingMessage(responseText);
+      speak(responseText); // Start speaking immediately, don't wait for streaming to finish
       
       setResponse(responseText);
-      // speak will be called after streaming completes
       
       // Track feature usage for achievements
       try {
@@ -191,8 +347,9 @@ function VoiceAssistant() {
       console.error('Error processing command:', error);
       const errorMsg = error.response?.data?.error || 'Sorry, I could not process that command';
       
-      // Start streaming the error message
+      // Start BOTH streaming and voice in parallel for error messages too
       startStreamingMessage(errorMsg);
+      speak(errorMsg); // Start speaking immediately
       
       setResponse(errorMsg);
       toast.error(errorMsg);
@@ -226,12 +383,12 @@ function VoiceAssistant() {
         setIsStreaming(false);
         
         // Add complete message to history
-        const assistantMessage = { role: 'assistant', content: fullText };
+        const assistantMessage = { role: 'assistant', content: fullText, timestamp: new Date().toISOString() };
         setConversationHistory(prev => [...prev, assistantMessage]);
+        saveToGlobalHistory(assistantMessage); // Save to global history
         setStreamingMessage(null);
         
-        // Now speak the response
-        speak(fullText);
+        // Voice is already speaking (started in processCommand), no need to call speak() here
       }
     }, 50); // Adjust speed: lower = faster, higher = slower
   };
@@ -247,7 +404,19 @@ function VoiceAssistant() {
   };
 
   const speak = async (text) => {
-    if (!autoSpeak) return;
+    if (!autoSpeak) {
+      // If auto-speak is disabled but continuous mode is enabled, restart listening
+      if (continuousMode) {
+        console.log('📢 No audio, restarting listening immediately');
+        setTimeout(() => {
+          if (!processing && !listening && continuousMode) {
+            console.log('📢 Restarting listening (no audio)');
+            startListening();
+          }
+        }, 300); // Shorter delay when no audio
+      }
+      return;
+    }
     
     try {
       const response = await axios.post('/api/voice/text-to-speech', {
@@ -264,15 +433,24 @@ function VoiceAssistant() {
         audioRef.current.src = audioUrl;
         audioRef.current.onended = () => {
           URL.revokeObjectURL(audioUrl);
+          console.log('🔊 Audio finished playing');
           
           // Auto-restart listening if continuous mode is enabled
-          if (continuousMode && !processing) {
+          if (continuousMode) {
+            console.log('📢 Audio ended, checking restart conditions...');
             setTimeout(() => {
-              startListening();
+              console.log(`State check: processing=${processing}, listening=${listening}, continuousMode=${continuousMode}`);
+              if (!processing && !listening && continuousMode) {
+                console.log('📢 Restarting listening (after audio)');
+                startListening();
+              } else {
+                console.log('❌ Cannot restart: conditions not met');
+              }
             }, 500); // Small delay before restarting
           }
         };
         await audioRef.current.play();
+        console.log('🔊 Audio started playing');
       }
     } catch (error) {
       console.error('Error speaking:', error);
@@ -283,14 +461,26 @@ function VoiceAssistant() {
         utterance.pitch = 1.08;
         utterance.volume = 0.95;
         utterance.onend = () => {
+          console.log('🔊 Fallback audio finished');
           // Auto-restart listening if continuous mode is enabled
-          if (continuousMode && !processing) {
+          if (continuousMode) {
             setTimeout(() => {
-              startListening();
+              if (!processing && !listening && continuousMode) {
+                console.log('📢 Restarting listening (after fallback audio)');
+                startListening();
+              }
             }, 500);
           }
         };
         speechSynthesis.speak(utterance);
+      } else if (continuousMode) {
+        // No audio available but continuous mode is on, restart immediately
+        setTimeout(() => {
+          if (!processing && !listening && continuousMode) {
+            console.log('📢 Restarting listening (no audio available)');
+            startListening();
+          }
+        }, 300);
       }
     }
   };
@@ -324,11 +514,15 @@ function VoiceAssistant() {
             <button
               onClick={() => {
                 setConversationHistory([]);
+                // Clear global chat history too
+                localStorage.setItem('globalChatHistory', '[]');
+                window.dispatchEvent(new CustomEvent('chatHistoryUpdated'));
                 const newSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 setSessionId(newSessionId);
                 sessionStorage.setItem('voiceAssistantSessionId', newSessionId);
                 setTranscript('');
                 setResponse('');
+                toast.success('Chat history cleared');
               }}
               className="text-xs text-red-500 hover:text-red-600 font-medium"
             >
@@ -506,22 +700,55 @@ function VoiceAssistant() {
               onChange={(e) => setTextInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && !processing && handleTextSubmit()}
               placeholder={listening ? 'Listening...' : 'Type or speak your message...'}
-              className="input w-full pr-24 text-sm sm:text-base"
+              className="input w-full pr-32 text-sm sm:text-base"
               disabled={processing || listening}
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {/* Regular Mic Button */}
               <button
                 onClick={listening ? stopListening : startListening}
-                disabled={processing}
+                disabled={processing || continuousMode}
                 className={`p-2 rounded-lg transition-all duration-300 ${
-                  listening 
+                  listening && !continuousMode
                     ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 disabled:opacity-30'
                 }`}
-                title={listening ? 'Stop listening' : 'Start voice input'}
+                title={listening ? 'Stop listening' : 'Push to talk'}
               >
                 <Mic className="w-5 h-5" />
               </button>
+              
+              {/* Open Mic (Continuous Mode) Button */}
+              <button
+                onClick={() => {
+                  if (continuousMode) {
+                    // Turn off continuous mode and stop listening
+                    setContinuousMode(false);
+                    if (listening) {
+                      stopListening();
+                    }
+                  } else {
+                    // Turn on continuous mode and start listening
+                    setContinuousMode(true);
+                    if (!listening && !processing) {
+                      startListening();
+                    }
+                  }
+                }}
+                disabled={processing}
+                className={`p-2 rounded-lg transition-all duration-300 ${
+                  continuousMode
+                    ? listening 
+                      ? 'bg-green-500 hover:bg-green-600 text-white animate-pulse'
+                      : 'bg-green-500 hover:bg-green-600 text-white'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
+                }`}
+                title={continuousMode ? 'Stop continuous mode' : 'Open mic (continuous conversation)'}
+              >
+                <Radio className={`w-5 h-5 ${listening && continuousMode ? 'animate-pulse' : ''}`} />
+              </button>
+              
+              {/* Send Button */}
               <button
                 onClick={handleTextSubmit}
                 disabled={processing || (!textInput.trim() && !listening)}
@@ -534,7 +761,15 @@ function VoiceAssistant() {
           </div>
           {listening && (
             <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
-              🎤 Listening... {continuousMode && '(Continuous mode active) '}Click mic to stop
+              {continuousMode ? (
+                <span className="text-green-600 dark:text-green-400 font-medium">
+                  📡 Open mic active - Listening continuously... Click Radio button to stop
+                </span>
+              ) : (
+                <span>🎤 Listening... Click mic to stop</span>
+              )}
+              <br />
+              <span className="text-xs opacity-60">Say "Hey Sanitas Mind" from anywhere to activate me</span>
             </p>
           )}
           {transcript && !listening && (

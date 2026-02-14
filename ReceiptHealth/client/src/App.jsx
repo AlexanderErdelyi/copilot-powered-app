@@ -8,10 +8,12 @@ import MealPlanner from './pages/MealPlanner';
 import Insights from './pages/Insights';
 import Achievements from './pages/Achievements';
 import VoiceAssistant from './pages/VoiceAssistant';
+import WakeWordListener from './components/WakeWordListener';
 
 function App() {
   return (
     <Router>
+      <WakeWordListener />
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
