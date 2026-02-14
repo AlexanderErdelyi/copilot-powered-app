@@ -1,14 +1,54 @@
-import { useState } from 'react';
-import { Menu, Bell, Search, User, X, Settings, LogOut } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Menu, Bell, Search, User, X, Settings, LogOut, Mic, MicOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import Sidebar from './Sidebar';
+import GlobalVoiceAssistant from './GlobalVoiceAssistant';
+import WakeWordListener from './WakeWordListener';
 
 function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [listeningMode, setListeningMode] = useState(() => {
+    // Always start disabled on page load/refresh
+    return 'disabled';
+  });
   const navigate = useNavigate();
+
+  // Reset to disabled on mount (page load/refresh)
+  useEffect(() => {
+    localStorage.setItem('listeningMode', 'disabled');
+    console.log('🔄 Page loaded - All listening disabled');
+  }, []); // Empty dependency array = runs once on mount
+
+  // Persist listening mode state
+  useEffect(() => {
+    localStorage.setItem('listeningMode', listeningMode);
+    const modeLabels = {
+      disabled: 'DISABLED',
+      wakeWord: 'WAKE WORD (Yellow)',
+      aiAssistant: 'AI ASSISTANT (Green)'
+    };
+    console.log('🔊 Listening mode:', modeLabels[listeningMode]);
+  }, [listeningMode]);
+
+  const cycleListeningMode = () => {
+    setListeningMode(prev => {
+      if (prev === 'disabled') {
+        toast.success('Wake word listening enabled', { icon: '🟡' });
+        return 'wakeWord';
+      }
+      if (prev === 'wakeWord') {
+        toast.success('Global AI Assistant activated!', { icon: '🟢', duration: 3000 });
+        return 'aiAssistant';
+      }
+      // aiAssistant → disabled
+      toast('All listening disabled', { icon: '⚪' });
+      return 'disabled';
+    });
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -70,6 +110,38 @@ function Layout({ children }) {
 
             {/* Right side */}
             <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4">
+              {/* Listening Mode Toggle (3 states) */}
+              <div className="relative">
+                <button 
+                  onClick={cycleListeningMode}
+                  className={`relative p-1.5 sm:p-2 rounded-lg transition-all ${
+                    listeningMode === 'aiAssistant'
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+                      : listeningMode === 'wakeWord'
+                      ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-900/50'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                  title={
+                    listeningMode === 'aiAssistant'
+                      ? 'AI Assistant Active (Green) - Hands-free mode across all pages - Click to disable'
+                      : listeningMode === 'wakeWord'
+                      ? 'Wake Word Listening (Yellow) - Say "Hey Sanitas Mind" to activate - Click to enable AI Assistant'
+                      : 'All Listening Disabled (Gray) - Click to enable wake word mode'
+                  }
+                >
+                  {listeningMode === 'disabled' ? (
+                    <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />
+                  ) : (
+                    <>
+                      <Mic className="w-5 h-5 sm:w-6 sm:h-6" />
+                      <span className={`absolute top-0 right-0 w-2 h-2 rounded-full animate-pulse ${
+                        listeningMode === 'aiAssistant' ? 'bg-green-500' : 'bg-yellow-500'
+                      }`}></span>
+                    </>
+                  )}
+                </button>
+              </div>
+              
               {/* Notifications */}
               <div className="relative">
                 <button 
@@ -164,6 +236,10 @@ function Layout({ children }) {
           </div>
         </footer>
       </div>
+      
+      {/* Global Voice Components */}
+      <WakeWordListener />
+      <GlobalVoiceAssistant />
     </div>
   );
 }

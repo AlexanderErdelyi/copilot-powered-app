@@ -1,5 +1,12 @@
 namespace ReceiptHealth.Models;
 
+public enum MealType
+{
+    Breakfast = 0,
+    Lunch = 1,
+    Dinner = 2
+}
+
 public class MealPlan
 {
     public int Id { get; set; }
@@ -20,6 +27,7 @@ public class MealPlanDay
     public int MealPlanId { get; set; }
     public DayOfWeek DayOfWeek { get; set; }
     public DateTime Date { get; set; }
+    public MealType MealType { get; set; } = MealType.Dinner;
     public int RecipeId { get; set; }
     
     // Navigation properties

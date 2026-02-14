@@ -13,12 +13,16 @@ public interface IMealPlannerService
     Task<MealPlan> CreateMealPlanAsync(string name, DateTime startDate, string? dietaryPreference = null);
     Task<MealPlan> GetMealPlanAsync(int id);
     Task<List<MealPlan>> GetAllMealPlansAsync();
-    Task<MealPlan> GenerateWeeklyMealPlanAsync(string dietaryPreference, DateTime startDate);
-    Task<MealPlan> GenerateWeeklyMealPlanFromNaturalLanguageAsync(string userRequest, DateTime startDate);
+    Task<MealPlan> GenerateWeeklyMealPlanAsync(string dietaryPreference, DateTime startDate, int? servings = null, int? days = null, bool includeBreakfast = true, bool includeLunch = true, bool includeDinner = true);
+    Task<MealPlan> GenerateWeeklyMealPlanFromNaturalLanguageAsync(string userRequest, DateTime startDate, int? servings = null, int? days = null, bool includeBreakfast = true, bool includeLunch = true, bool includeDinner = true);
     Task<ShoppingList> GenerateShoppingListFromMealPlanAsync(int mealPlanId, string shoppingListName);
     Task<bool> DeleteMealPlanAsync(int id);
     Task<List<Recipe>> GetRecipesAsync(string? dietaryPreference = null);
     Task<Recipe?> GetRecipeByIdAsync(int id);
+    Task<MealPlanDay> AddRecipeToMealSlotAsync(int mealPlanId, int recipeId, DayOfWeek dayOfWeek, MealType mealType);
+    Task<bool> RemoveRecipeFromMealSlotAsync(int mealPlanDayId);
+    Task<Recipe> GenerateSingleRecipeAsync(string dietaryPreference, string mealType, int servings);
+    Task<Recipe> GenerateSingleRecipeFromNaturalLanguageAsync(string userRequest, string mealType, int servings);
 }
 
 public class MealPlannerService : IMealPlannerService
@@ -82,43 +86,76 @@ public class MealPlannerService : IMealPlannerService
             .ToListAsync();
     }
 
-    public async Task<MealPlan> GenerateWeeklyMealPlanAsync(string dietaryPreference, DateTime startDate)
+    public async Task<MealPlan> GenerateWeeklyMealPlanAsync(string dietaryPreference, DateTime startDate, int? servings = null, int? days = null, bool includeBreakfast = true, bool includeLunch = true, bool includeDinner = true)
     {
-        _logger.LogInformation("🤖 Generating AI-powered weekly meal plan with preference: {Preference}", dietaryPreference);
+        _logger.LogInformation("🤖 Generating AI-powered meal plan with preference: {Preference}", dietaryPreference);
+        
+        // Determine how many days to generate (default 7)
+        int numDays = days ?? 7;
+        
+        // Determine which meal types to include
+        var mealTypes = new List<string>();
+        if (includeBreakfast) mealTypes.Add("Breakfast");
+        if (includeLunch) mealTypes.Add("Lunch");
+        if (includeDinner) mealTypes.Add("Dinner");
+        
+        // If no meal types selected, default to all
+        if (mealTypes.Count == 0)
+        {
+            mealTypes.AddRange(new[] { "Breakfast", "Lunch", "Dinner" });
+        }
+        
+        _logger.LogInformation("📅 Generating {Days} days with meal types: {MealTypes}", numDays, string.Join(", ", mealTypes));
 
         // Create meal plan first
         var mealPlan = await CreateMealPlanAsync(
-            $"{dietaryPreference} Meal Plan - Week of {startDate:MMM dd}",
+            $"{dietaryPreference} Meal Plan - {numDays} Days",
             startDate,
             dietaryPreference);
 
         try
         {
-            // Generate 7 dinner recipes using AI
-            _logger.LogInformation("📝 Requesting 7 recipes from AI...");
-            var recipes = await GenerateRecipesWithAIAsync(dietaryPreference, 7);
+            // Calculate total number of recipes needed (days * number of meal types)
+            int totalRecipes = numDays * mealTypes.Count;
+            
+            _logger.LogInformation("📝 Requesting {Count} recipes from AI...", totalRecipes);
+            var recipes = await GenerateRecipesWithAIAsync(dietaryPreference, totalRecipes);
             _logger.LogInformation("✅ Received {Count} recipes from AI", recipes.Count);
 
-            // Create meal plan days
-            for (int i = 0; i < 7; i++)
+            // Create meal plan days - iterate through each day and each meal type
+            int recipeIndex = 0;
+            for (int i = 0; i < numDays; i++)
             {
                 var date = startDate.Date.AddDays(i);
-                var recipe = recipes[i];
-
-                var mealPlanDay = new MealPlanDay
+                
+                foreach (var mealTypeStr in mealTypes)
                 {
-                    MealPlanId = mealPlan.Id,
-                    DayOfWeek = date.DayOfWeek,
-                    Date = date,
-                    RecipeId = recipe.Id
-                };
+                    if (recipeIndex >= recipes.Count) break;
+                    
+                    var recipe = recipes[recipeIndex++];
+                    
+                    // Parse meal type enum
+                    if (!Enum.TryParse<MealType>(mealTypeStr, out var mealType))
+                    {
+                        mealType = MealType.Dinner; // Default to Dinner if parsing fails
+                    }
 
-                _context.MealPlanDays.Add(mealPlanDay);
+                    var mealPlanDay = new MealPlanDay
+                    {
+                        MealPlanId = mealPlan.Id,
+                        DayOfWeek = date.DayOfWeek,
+                        Date = date,
+                        MealType = mealType,
+                        RecipeId = recipe.Id
+                    };
+
+                    _context.MealPlanDays.Add(mealPlanDay);
+                }
             }
 
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("✅ Generated meal plan with {RecipeCount} recipes", recipes.Count);
+            _logger.LogInformation("✅ Generated meal plan with {RecipeCount} recipes for {Days} days", recipes.Count, numDays);
 
             // Reload with all related data
             return await GetMealPlanAsync(mealPlan.Id);
@@ -147,9 +184,26 @@ public class MealPlannerService : IMealPlannerService
         }
     }
 
-    public async Task<MealPlan> GenerateWeeklyMealPlanFromNaturalLanguageAsync(string userRequest, DateTime startDate)
+    public async Task<MealPlan> GenerateWeeklyMealPlanFromNaturalLanguageAsync(string userRequest, DateTime startDate, int? servings = null, int? days = null, bool includeBreakfast = true, bool includeLunch = true, bool includeDinner = true)
     {
         _logger.LogInformation("🤖 Parsing natural language request: {Request}", userRequest);
+        
+        // Determine how many days to generate (default 7)
+        int numDays = days ?? 7;
+        
+        // Determine which meal types to include
+        var mealTypes = new List<string>();
+        if (includeBreakfast) mealTypes.Add("Breakfast");
+        if (includeLunch) mealTypes.Add("Lunch");
+        if (includeDinner) mealTypes.Add("Dinner");
+        
+        // If no meal types selected, default to all
+        if (mealTypes.Count == 0)
+        {
+            mealTypes.AddRange(new[] { "Breakfast", "Lunch", "Dinner" });
+        }
+        
+        _logger.LogInformation("📅 Generating {Days} days with meal types: {MealTypes}", numDays, string.Join(", ", mealTypes));
 
         // Use AI to parse the user's request and extract dietary preferences, restrictions, etc.
         var parsedRequest = await ParseMealPlanRequestWithAIAsync(userRequest);
@@ -159,37 +213,53 @@ public class MealPlannerService : IMealPlannerService
 
         // Create meal plan first with parsed information
         var mealPlan = await CreateMealPlanAsync(
-            $"{parsedRequest.DietaryPreference} Meal Plan - Week of {startDate:MMM dd}",
+            $"{parsedRequest.DietaryPreference} Meal Plan - {numDays} Days",
             startDate,
             parsedRequest.DietaryPreference);
 
         try
         {
-            // Generate 7 dinner recipes using AI with the enhanced context
-            _logger.LogInformation("📝 Requesting 7 recipes from AI with custom context...");
-            var recipes = await GenerateRecipesWithContextAsync(parsedRequest, 7);
+            // Calculate total number of recipes needed (days * number of meal types)
+            int totalRecipes = numDays * mealTypes.Count;
+            
+            _logger.LogInformation("📝 Requesting {Count} recipes from AI with custom context...", totalRecipes);
+            var recipes = await GenerateRecipesWithContextAsync(parsedRequest, totalRecipes);
             _logger.LogInformation("✅ Received {Count} recipes from AI", recipes.Count);
 
-            // Create meal plan days
-            for (int i = 0; i < 7; i++)
+            // Create meal plan days - iterate through each day and each meal type
+            int recipeIndex = 0;
+            for (int i = 0; i < numDays; i++)
             {
                 var date = startDate.Date.AddDays(i);
-                var recipe = recipes[i];
-
-                var mealPlanDay = new MealPlanDay
+                
+                foreach (var mealTypeStr in mealTypes)
                 {
-                    MealPlanId = mealPlan.Id,
-                    DayOfWeek = date.DayOfWeek,
-                    Date = date,
-                    RecipeId = recipe.Id
-                };
+                    if (recipeIndex >= recipes.Count) break;
+                    
+                    var recipe = recipes[recipeIndex++];
+                    
+                    // Parse meal type enum
+                    if (!Enum.TryParse<MealType>(mealTypeStr, out var mealType))
+                    {
+                        mealType = MealType.Dinner; // Default to Dinner if parsing fails
+                    }
 
-                _context.MealPlanDays.Add(mealPlanDay);
+                    var mealPlanDay = new MealPlanDay
+                    {
+                        MealPlanId = mealPlan.Id,
+                        DayOfWeek = date.DayOfWeek,
+                        Date = date,
+                        MealType = mealType,
+                        RecipeId = recipe.Id
+                    };
+
+                    _context.MealPlanDays.Add(mealPlanDay);
+                }
             }
 
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("✅ Generated natural language meal plan with {RecipeCount} recipes", recipes.Count);
+            _logger.LogInformation("✅ Generated natural language meal plan with {RecipeCount} recipes for {Days} days", recipes.Count, numDays);
 
             // Reload with all related data
             return await GetMealPlanAsync(mealPlan.Id);
@@ -347,7 +417,7 @@ Return ONLY a valid JSON array with this exact structure (no markdown, no extra 
             for (int i = 0; i < recipesData.Count; i++)
             {
                 var recipeData = recipesData[i];
-                var dietaryPreference = parsedRequest.DietaryPreference;
+                var dietaryPreference = parsedRequest.DietaryPreference ?? "";
                 
                 var recipe = new Recipe
                 {
@@ -647,6 +717,142 @@ Return ONLY a valid JSON array with this exact structure (no markdown, no extra 
         return await _context.Recipes
             .Include(r => r.Ingredients)
             .FirstOrDefaultAsync(r => r.Id == id);
+    }
+
+    public async Task<MealPlanDay> AddRecipeToMealSlotAsync(int mealPlanId, int recipeId, DayOfWeek dayOfWeek, MealType mealType)
+    {
+        _logger.LogInformation("Adding recipe {RecipeId} to meal plan {MealPlanId} for {DayOfWeek} {MealType}", 
+            recipeId, mealPlanId, dayOfWeek, mealType);
+
+        // Verify meal plan exists
+        var mealPlan = await _context.MealPlans.FindAsync(mealPlanId);
+        if (mealPlan == null)
+        {
+            throw new ArgumentException($"Meal plan with ID {mealPlanId} not found");
+        }
+
+        // Verify recipe exists
+        var recipe = await _context.Recipes.FindAsync(recipeId);
+        if (recipe == null)
+        {
+            throw new ArgumentException($"Recipe with ID {recipeId} not found");
+        }
+
+        // Calculate the date for the given day of week
+        var date = mealPlan.StartDate;
+        int daysToAdd = ((int)dayOfWeek - (int)date.DayOfWeek + 7) % 7;
+        date = date.AddDays(daysToAdd);
+
+        // Check if a meal already exists for this slot
+        var existingMeal = await _context.MealPlanDays
+            .FirstOrDefaultAsync(mpd => 
+                mpd.MealPlanId == mealPlanId && 
+                mpd.DayOfWeek == dayOfWeek && 
+                mpd.MealType == mealType);
+
+        if (existingMeal != null)
+        {
+            // Update existing meal
+            existingMeal.RecipeId = recipeId;
+            existingMeal.Date = date;
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Updated existing meal slot");
+            return existingMeal;
+        }
+
+        // Create new meal plan day
+        var mealPlanDay = new MealPlanDay
+        {
+            MealPlanId = mealPlanId,
+            DayOfWeek = dayOfWeek,
+            Date = date,
+            MealType = mealType,
+            RecipeId = recipeId
+        };
+
+        _context.MealPlanDays.Add(mealPlanDay);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Created new meal slot");
+        return mealPlanDay;
+    }
+
+    public async Task<bool> RemoveRecipeFromMealSlotAsync(int mealPlanDayId)
+    {
+        var mealPlanDay = await _context.MealPlanDays.FindAsync(mealPlanDayId);
+        if (mealPlanDay == null)
+        {
+            return false;
+        }
+
+        _context.MealPlanDays.Remove(mealPlanDay);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Removed meal plan day {MealPlanDayId}", mealPlanDayId);
+        return true;
+    }
+
+    public async Task<Recipe> GenerateSingleRecipeAsync(string dietaryPreference, string mealType, int servings)
+    {
+        _logger.LogInformation("🍽️ Generating single recipe - Preference: {Preference}, MealType: {MealType}, Servings: {Servings}", 
+            dietaryPreference, mealType, servings);
+        
+        // Generate a single recipe using the existing AI logic
+        var recipes = await GenerateRecipesWithAIAsync(dietaryPreference, 1);
+        
+        if (recipes == null || recipes.Count == 0)
+        {
+            throw new Exception("Failed to generate recipe");
+        }
+        
+        var recipe = recipes[0];
+        
+        // Update servings if different from generated
+        if (recipe.Servings != servings)
+        {
+            recipe.Servings = servings;
+            _context.Recipes.Update(recipe);
+            await _context.SaveChangesAsync();
+        }
+        
+        _logger.LogInformation("✅ Generated single recipe: {RecipeName}", recipe.Name);
+        
+        // Reload with ingredients
+        return await GetRecipeByIdAsync(recipe.Id) ?? recipe;
+    }
+    
+    public async Task<Recipe> GenerateSingleRecipeFromNaturalLanguageAsync(string userRequest, string mealType, int servings)
+    {
+        _logger.LogInformation("🤖 Generating single recipe from natural language: {Request}", userRequest);
+        
+        // Parse the request to extract dietary preferences and context
+        var parsedRequest = await ParseMealPlanRequestWithAIAsync(userRequest);
+        
+        _logger.LogInformation("✅ Parsed request - Preference: {Preference}, Context: {Context}", 
+            parsedRequest.DietaryPreference, parsedRequest.AdditionalContext);
+        
+        // Generate a single recipe with the parsed context
+        var recipes = await GenerateRecipesWithContextAsync(parsedRequest, 1);
+        
+        if (recipes == null || recipes.Count == 0)
+        {
+            throw new Exception("Failed to generate recipe from natural language");
+        }
+        
+        var recipe = recipes[0];
+        
+        // Update servings if different from generated
+        if (recipe.Servings != servings)
+        {
+            recipe.Servings = servings;
+            _context.Recipes.Update(recipe);
+            await _context.SaveChangesAsync();
+        }
+        
+        _logger.LogInformation("✅ Generated single recipe from NL: {RecipeName}", recipe.Name);
+        
+        // Reload with ingredients
+        return await GetRecipeByIdAsync(recipe.Id) ?? recipe;
     }
 }
 

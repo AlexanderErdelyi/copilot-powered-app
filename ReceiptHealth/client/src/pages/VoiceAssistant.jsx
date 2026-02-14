@@ -1,9 +1,11 @@
-import { Mic, MicOff, Volume2, Send, Keyboard, Settings, Volume1 } from 'lucide-react';
+import { Mic, MicOff, Volume2, Send, Settings, Volume1, Radio } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
 function VoiceAssistant() {
+  const location = useLocation();
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [textInput, setTextInput] = useState('');
@@ -17,7 +19,12 @@ function VoiceAssistant() {
   const [selectedVoice, setSelectedVoice] = useState('en-US-AriaNeural');
   const [testingVoice, setTestingVoice] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
+  const [continuousMode, setContinuousMode] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState(null);
+  const [isStreaming, setIsStreaming] = useState(false);
   const audioRef = useRef(null);
+  const streamingIntervalRef = useRef(null);
+  const autoStartHandledRef = useRef(false);
   const [sessionId, setSessionId] = useState(() => {
     // Get or create session ID from sessionStorage
     let id = sessionStorage.getItem('voiceAssistantSessionId');
@@ -55,15 +62,135 @@ function VoiceAssistant() {
       recognitionInstance.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
         setListening(false);
-        toast.error('Speech recognition error');
+        
+        // Don't show error toast for aborted errors in continuous mode
+        if (event.error !== 'aborted' && event.error !== 'no-speech') {
+          toast.error('Speech recognition error');
+        }
+        
+        // Try to restart in continuous mode if not aborted
+        if (continuousMode && event.error !== 'aborted') {
+          console.log('📢 Attempting to restart after error in continuous mode');
+          setTimeout(() => {
+            if (!listening && !processing && continuousMode) {
+              startListening();
+            }
+          }, 1000);
+        }
       };
 
       recognitionInstance.onend = () => {
+        console.log('🎤 Recognition ended, listening state:', listening);
         setListening(false);
+        // Restart logic is handled in speak() onended callback for continuous mode
       };
 
       setRecognition(recognitionInstance);
     }
+  }, []);
+
+  // Handle wake word events and autoStart (separate effect that depends on recognition being ready)
+  useEffect(() => {
+    if (!recognition) return; // Wait for recognition to be initialized
+    
+    // Handle wake word event
+    const handleWakeWord = () => {
+      console.log('✨ Wake word event received, starting listening...');
+      if (!listening && !processing) {
+        setContinuousMode(true);
+        setTimeout(() => {
+          startListening();
+        }, 500);
+      }
+    };
+    
+    window.addEventListener('wakeWordDetected', handleWakeWord);
+    
+    // Check if navigated with enableContinuousMode or autoStart from wake word (only handle once per navigation)
+    if ((location.state?.enableContinuousMode || location.state?.autoStart) && !listening && !processing && !autoStartHandledRef.current) {
+      console.log('📍 Navigated with continuous mode enabled from wake word');
+      autoStartHandledRef.current = true;
+      setContinuousMode(true);
+      setTimeout(() => {
+        console.log('🎤 AutoStart: Starting listening...');
+        startListening();
+      }, 800);
+    }
+    
+    return () => {
+      window.removeEventListener('wakeWordDetected', handleWakeWord);
+      // Reset autoStart flag when leaving the page
+      if (location.pathname !== '/voice-assistant') {
+        autoStartHandledRef.current = false;
+      }
+    };
+  }, [location, recognition, listening, processing]);
+
+  // Listen for changes to listeningMode (when user cycles to AI Assistant mode)
+  useEffect(() => {
+    if (!recognition) return;
+
+    const handleModeChange = () => {
+      const mode = localStorage.getItem('listeningMode');
+      if (mode === 'aiAssistant' && !listening && !processing && !continuousMode) {
+        console.log('🎤 Listening mode changed to AI Assistant, enabling continuous mode');
+        setContinuousMode(true);
+        setTimeout(() => {
+          startListening();
+        }, 500);
+      }
+    };
+
+    // Check every second for mode changes
+    const interval = setInterval(handleModeChange, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [recognition, listening, processing, continuousMode]);
+
+  // Sync with global chat history
+  useEffect(() => {
+    // Load global chat history on mount
+    const loadGlobalHistory = () => {
+      try {
+        const globalHistory = localStorage.getItem('globalChatHistory');
+        if (globalHistory) {
+          const parsed = JSON.parse(globalHistory);
+          // Merge with existing conversation history (avoid duplicates)
+          setConversationHistory(prev => {
+            const merged = [...prev];
+            parsed.forEach(msg => {
+              // Check if message already exists by timestamp
+              if (!merged.some(m => m.timestamp === msg.timestamp)) {
+                merged.push(msg);
+              }
+            });
+            // Sort by timestamp
+            return merged.sort((a, b) => 
+              new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
+            );
+          });
+          console.log('📖 Loaded global chat history:', parsed.length, 'messages');
+        }
+      } catch (error) {
+        console.error('Error loading global chat:', error);
+      }
+    };
+
+    loadGlobalHistory();
+
+    // Listen for updates from GlobalVoiceAssistant
+    const handleHistoryUpdate = () => {
+      console.log('📖 Global chat history updated, syncing...');
+      loadGlobalHistory();
+    };
+
+    window.addEventListener('chatHistoryUpdated', handleHistoryUpdate);
+
+    return () => {
+      window.removeEventListener('chatHistoryUpdated', handleHistoryUpdate);
+    };
   }, []);
 
   const loadVoices = async () => {
@@ -73,6 +200,23 @@ function VoiceAssistant() {
     } catch (error) {
       console.error('Error loading voices:', error);
       toast.error('Failed to load voices');
+    }
+  };
+
+  // Helper to save message to global history
+  const saveToGlobalHistory = (message) => {
+    try {
+      const history = JSON.parse(localStorage.getItem('globalChatHistory') || '[]');
+      history.push({
+        ...message,
+        timestamp: new Date().toISOString()
+      });
+      // Keep last 50 messages
+      const trimmed = history.slice(-50);
+      localStorage.setItem('globalChatHistory', JSON.stringify(trimmed));
+      window.dispatchEvent(new CustomEvent('chatHistoryUpdated'));
+    } catch (error) {
+      console.error('Error saving to global history:', error);
     }
   };
 
@@ -120,11 +264,27 @@ function VoiceAssistant() {
   const startListening = () => {
     if (recognition) {
       try {
+        console.log('🎤 Starting listening...');
         recognition.start();
         setListening(true);
         setResponse('');
       } catch (error) {
         console.error('Error starting recognition:', error);
+        // If already started, stop and restart
+        if (error.message && error.message.includes('already started')) {
+          console.log('Recognition already started, stopping first...');
+          recognition.stop();
+          setTimeout(() => {
+            try {
+              recognition.start();
+              setListening(true);
+              setResponse('');
+            } catch (retryError) {
+              console.error('Retry failed:', retryError);
+              toast.error('Could not start voice recognition');
+            }
+          }, 100);
+        }
       }
     } else {
       toast.error('Speech recognition not supported in your browser');
@@ -142,8 +302,9 @@ function VoiceAssistant() {
     setProcessing(true);
     
     // Add user message to history immediately
-    const userMessage = { role: 'user', content: command };
+    const userMessage = { role: 'user', content: command, timestamp: new Date().toISOString() };
     setConversationHistory(prev => [...prev, userMessage]);
+    saveToGlobalHistory(userMessage); // Save to global history
     setTranscript(''); // Clear current transcript
     setTextInput(''); // Clear text input
     
@@ -166,12 +327,11 @@ function VoiceAssistant() {
         sessionStorage.setItem('voiceAssistantSessionId', newSessionId);
       }
       
-      // Add assistant response to history
-      const assistantMessage = { role: 'assistant', content: responseText };
-      setConversationHistory(prev => [...prev, assistantMessage]);
+      // Start BOTH text streaming AND voice synthesis in parallel for faster response
+      startStreamingMessage(responseText);
+      speak(responseText); // Start speaking immediately, don't wait for streaming to finish
       
       setResponse(responseText);
-      speak(responseText);
       
       // Track feature usage for achievements
       try {
@@ -187,15 +347,50 @@ function VoiceAssistant() {
       console.error('Error processing command:', error);
       const errorMsg = error.response?.data?.error || 'Sorry, I could not process that command';
       
-      // Add error message to history
-      const errorMessage = { role: 'assistant', content: errorMsg };
-      setConversationHistory(prev => [...prev, errorMessage]);
+      // Start BOTH streaming and voice in parallel for error messages too
+      startStreamingMessage(errorMsg);
+      speak(errorMsg); // Start speaking immediately
       
       setResponse(errorMsg);
       toast.error(errorMsg);
     } finally {
       setProcessing(false);
     }
+  };
+
+  const startStreamingMessage = (fullText) => {
+    // Clear any existing streaming
+    if (streamingIntervalRef.current) {
+      clearInterval(streamingIntervalRef.current);
+    }
+
+    setIsStreaming(true);
+    setStreamingMessage('');
+    
+    let currentIndex = 0;
+    const words = fullText.split(' ');
+    
+    streamingIntervalRef.current = setInterval(() => {
+      if (currentIndex < words.length) {
+        setStreamingMessage(prev => {
+          const newText = prev + (currentIndex > 0 ? ' ' : '') + words[currentIndex];
+          return newText;
+        });
+        currentIndex++;
+      } else {
+        // Streaming complete
+        clearInterval(streamingIntervalRef.current);
+        setIsStreaming(false);
+        
+        // Add complete message to history
+        const assistantMessage = { role: 'assistant', content: fullText, timestamp: new Date().toISOString() };
+        setConversationHistory(prev => [...prev, assistantMessage]);
+        saveToGlobalHistory(assistantMessage); // Save to global history
+        setStreamingMessage(null);
+        
+        // Voice is already speaking (started in processCommand), no need to call speak() here
+      }
+    }, 50); // Adjust speed: lower = faster, higher = slower
   };
 
   const handleTextSubmit = () => {
@@ -209,7 +404,19 @@ function VoiceAssistant() {
   };
 
   const speak = async (text) => {
-    if (!autoSpeak) return;
+    if (!autoSpeak) {
+      // If auto-speak is disabled but continuous mode is enabled, restart listening
+      if (continuousMode) {
+        console.log('📢 No audio, restarting listening immediately');
+        setTimeout(() => {
+          if (!processing && !listening && continuousMode) {
+            console.log('📢 Restarting listening (no audio)');
+            startListening();
+          }
+        }, 300); // Shorter delay when no audio
+      }
+      return;
+    }
     
     try {
       const response = await axios.post('/api/voice/text-to-speech', {
@@ -226,8 +433,24 @@ function VoiceAssistant() {
         audioRef.current.src = audioUrl;
         audioRef.current.onended = () => {
           URL.revokeObjectURL(audioUrl);
+          console.log('🔊 Audio finished playing');
+          
+          // Auto-restart listening if continuous mode is enabled
+          if (continuousMode) {
+            console.log('📢 Audio ended, checking restart conditions...');
+            setTimeout(() => {
+              console.log(`State check: processing=${processing}, listening=${listening}, continuousMode=${continuousMode}`);
+              if (!processing && !listening && continuousMode) {
+                console.log('📢 Restarting listening (after audio)');
+                startListening();
+              } else {
+                console.log('❌ Cannot restart: conditions not met');
+              }
+            }, 500); // Small delay before restarting
+          }
         };
         await audioRef.current.play();
+        console.log('🔊 Audio started playing');
       }
     } catch (error) {
       console.error('Error speaking:', error);
@@ -237,7 +460,27 @@ function VoiceAssistant() {
         utterance.rate = 0.92;
         utterance.pitch = 1.08;
         utterance.volume = 0.95;
+        utterance.onend = () => {
+          console.log('🔊 Fallback audio finished');
+          // Auto-restart listening if continuous mode is enabled
+          if (continuousMode) {
+            setTimeout(() => {
+              if (!processing && !listening && continuousMode) {
+                console.log('📢 Restarting listening (after fallback audio)');
+                startListening();
+              }
+            }, 500);
+          }
+        };
         speechSynthesis.speak(utterance);
+      } else if (continuousMode) {
+        // No audio available but continuous mode is on, restart immediately
+        setTimeout(() => {
+          if (!processing && !listening && continuousMode) {
+            console.log('📢 Restarting listening (no audio available)');
+            startListening();
+          }
+        }, 300);
       }
     }
   };
@@ -247,7 +490,7 @@ function VoiceAssistant() {
       <audio ref={audioRef} style={{ display: 'none' }} />
       {/* Header */}
       <div className="mb-3 sm:mb-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Voice Assistant</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">AI Assistant</h1>
         <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
           Chat with your AI assistant using voice or text
         </p>
@@ -255,34 +498,9 @@ function VoiceAssistant() {
 
       {/* Chat Container - Google Assistant Style */}
       <div className="flex-1 min-h-0 card flex flex-col max-w-4xl mx-auto w-full">
-        {/* Mode Toggle and Settings */}
+        {/* Settings Header */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 border-b border-gray-200 dark:border-gray-700 pb-3 sm:pb-4 mb-3 sm:mb-4">
           <div className="flex items-center gap-2 sm:gap-3 flex-1">
-            <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1 flex-1 sm:flex-initial">
-              <button
-                onClick={() => setUseTextMode(false)}
-                className={`px-3 sm:px-4 py-2 rounded-md transition-colors flex items-center justify-center space-x-2 flex-1 sm:flex-initial ${
-                  !useTextMode
-                    ? 'bg-primary-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Mic className="w-4 h-4" />
-                <span className="text-sm sm:text-base">Voice</span>
-              </button>
-              <button
-                onClick={() => setUseTextMode(true)}
-                className={`px-3 sm:px-4 py-2 rounded-md transition-colors flex items-center justify-center space-x-2 flex-1 sm:flex-initial ${
-                  useTextMode
-                    ? 'bg-primary-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Keyboard className="w-4 h-4" />
-                <span className="text-sm sm:text-base">Text</span>
-              </button>
-            </div>
-            
             <button
               onClick={() => setShowVoiceSettings(!showVoiceSettings)}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -296,11 +514,15 @@ function VoiceAssistant() {
             <button
               onClick={() => {
                 setConversationHistory([]);
+                // Clear global chat history too
+                localStorage.setItem('globalChatHistory', '[]');
+                window.dispatchEvent(new CustomEvent('chatHistoryUpdated'));
                 const newSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 setSessionId(newSessionId);
                 sessionStorage.setItem('voiceAssistantSessionId', newSessionId);
                 setTranscript('');
                 setResponse('');
+                toast.success('Chat history cleared');
               }}
               className="text-xs text-red-500 hover:text-red-600 font-medium"
             >
@@ -318,7 +540,7 @@ function VoiceAssistant() {
             </h3>
             
             {/* Auto-speak toggle */}
-            <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200 dark:border-gray-600">
+            <div className="space-y-3 mb-3 pb-3 border-b border-gray-200 dark:border-gray-600">
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
@@ -328,6 +550,22 @@ function VoiceAssistant() {
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">Auto-speak responses</span>
               </label>
+              
+              {/* Continuous mode toggle */}
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={continuousMode}
+                  onChange={(e) => setContinuousMode(e.target.checked)}
+                  className="rounded border-gray-300 text-purple-500 focus:ring-purple-500 mr-2"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">🎤 Continuous conversation mode</span>
+              </label>
+              {continuousMode && (
+                <p className="text-xs text-purple-600 dark:text-purple-400 ml-6">
+                  Mic will auto-restart after each response for hands-free conversation
+                </p>
+              )}
             </div>
             
             {/* Voice Selection */}
@@ -374,7 +612,7 @@ function VoiceAssistant() {
         
         {/* Chat Messages Area */}
         <div className="flex-1 overflow-y-auto mb-3 sm:mb-4 space-y-3 sm:space-y-4 px-1 sm:px-2">
-          {conversationHistory.length === 0 ? (
+          {conversationHistory.length === 0 && !streamingMessage ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
               <div className="w-20 h-20 sm:w-24 sm:h-24 mb-4 sm:mb-6 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
                 <Mic className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
@@ -394,7 +632,7 @@ function VoiceAssistant() {
                 ].map((example, idx) => (
                   <button
                     key={idx}
-                    onClick={() => useTextMode ? setTextInput(example) : null}
+                    onClick={() => setTextInput(example)}
                     className="text-left p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                   >
                     <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">{example}</span>
@@ -423,9 +661,24 @@ function VoiceAssistant() {
               </div>
             ))
           )}
+
+          {/* Streaming message */}
+          {streamingMessage && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] sm:max-w-[75%] p-3 sm:p-4 rounded-2xl bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-bl-sm">
+                <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words">
+                  {streamingMessage}
+                  {isStreaming && <span className="animate-pulse">▊</span>}
+                </p>
+                <p className="text-xs opacity-70 mt-1 sm:mt-2">
+                  Assistant
+                </p>
+              </div>
+            </div>
+          )}
           
           {/* Processing indicator */}
-          {processing && (
+          {processing && !streamingMessage && (
             <div className="flex justify-start">
               <div className="max-w-[85%] sm:max-w-[75%] p-3 sm:p-4 rounded-2xl bg-gray-100 dark:bg-gray-700 rounded-bl-sm">
                 <div className="flex space-x-2">
@@ -438,53 +691,91 @@ function VoiceAssistant() {
           )}
         </div>
 
-        {/* Input Area */}
+        {/* Input Area - Unified Text/Voice */}
         <div className="border-t border-gray-200 dark:border-gray-700 pt-3 sm:pt-4">
-          {useTextMode ? (
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <input
-                type="text"
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && !processing && handleTextSubmit()}
-                placeholder="Type your message..."
-                className="input flex-1 text-sm sm:text-base"
-                disabled={processing}
-              />
-              <button
-                onClick={handleTextSubmit}
-                disabled={processing || !textInput.trim()}
-                className="btn-primary flex items-center justify-center space-x-2 text-sm sm:text-base"
-              >
-                <Send className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center">
+          <div className="relative">
+            <input
+              type="text"
+              value={listening ? transcript : textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && !processing && handleTextSubmit()}
+              placeholder={listening ? 'Listening...' : 'Type or speak your message...'}
+              className="input w-full pr-32 text-sm sm:text-base"
+              disabled={processing || listening}
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {/* Regular Mic Button */}
               <button
                 onClick={listening ? stopListening : startListening}
-                disabled={processing}
-                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  listening 
-                    ? 'bg-gradient-to-br from-red-500 to-pink-500 animate-pulse shadow-2xl' 
-                    : 'bg-gradient-to-br from-primary-500 to-secondary-500 hover:shadow-xl'
+                disabled={processing || continuousMode}
+                className={`p-2 rounded-lg transition-all duration-300 ${
+                  listening && !continuousMode
+                    ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 disabled:opacity-30'
                 }`}
+                title={listening ? 'Stop listening' : 'Push to talk'}
               >
-                {listening ? (
-                  <Mic className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
-                ) : (
-                  <Mic className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
-                )}
+                <Mic className="w-5 h-5" />
               </button>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2 sm:mt-3">
-                {listening ? 'Listening...' : processing ? 'Processing...' : 'Tap to speak'}
-              </p>
-              {transcript && (
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2 italic">
-                  "{transcript}"
-                </p>
-              )}
+              
+              {/* Open Mic (Continuous Mode) Button */}
+              <button
+                onClick={() => {
+                  if (continuousMode) {
+                    // Turn off continuous mode and stop listening
+                    setContinuousMode(false);
+                    if (listening) {
+                      stopListening();
+                    }
+                  } else {
+                    // Turn on continuous mode and start listening
+                    setContinuousMode(true);
+                    if (!listening && !processing) {
+                      startListening();
+                    }
+                  }
+                }}
+                disabled={processing}
+                className={`p-2 rounded-lg transition-all duration-300 ${
+                  continuousMode
+                    ? listening 
+                      ? 'bg-green-500 hover:bg-green-600 text-white animate-pulse'
+                      : 'bg-green-500 hover:bg-green-600 text-white'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
+                }`}
+                title={continuousMode ? 'Stop continuous mode' : 'Open mic (continuous conversation)'}
+              >
+                <Radio className={`w-5 h-5 ${listening && continuousMode ? 'animate-pulse' : ''}`} />
+              </button>
+              
+              {/* Send Button */}
+              <button
+                onClick={handleTextSubmit}
+                disabled={processing || (!textInput.trim() && !listening)}
+                className="p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-gray-700 transition-colors text-primary-600 dark:text-primary-400 disabled:opacity-50"
+                title="Send message"
+              >
+                <Send className="w-5 h-5" />
+              </button>
             </div>
+          </div>
+          {listening && (
+            <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
+              {continuousMode ? (
+                <span className="text-green-600 dark:text-green-400 font-medium">
+                  📡 Open mic active - Listening continuously... Click Radio button to stop
+                </span>
+              ) : (
+                <span>🎤 Listening... Click mic to stop</span>
+              )}
+              <br />
+              <span className="text-xs opacity-60">Say "Hey Sanitas Mind" from anywhere to activate me</span>
+            </p>
+          )}
+          {transcript && !listening && (
+            <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2 italic">
+              Last heard: "{transcript}"
+            </p>
           )}
         </div>
       </div>

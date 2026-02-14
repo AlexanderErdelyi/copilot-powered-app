@@ -1,0 +1,1 @@
+Get-Process dotnet | Where-Object {$_.Path -like "*ReceiptHealth*"} | Stop-Process -Force

@@ -796,6 +796,32 @@ app.MapGet("/api/shopping-lists/{listId}/price-alerts", async (int listId, IShop
     return Results.Ok(alerts);
 });
 
+// Add recipe ingredients to shopping list
+app.MapPost("/api/shopping-lists/add-from-recipe", async (HttpRequest request, IShoppingListService shoppingListService) =>
+{
+    try
+    {
+        var body = await request.ReadFromJsonAsync<AddRecipeToShoppingListRequest>();
+        if (body == null)
+        {
+            return Results.BadRequest(new { error = "Invalid request body" });
+        }
+
+        var shoppingList = await shoppingListService.AddRecipeIngredientsAsync(body.RecipeId, body.ShoppingListId);
+        return Results.Ok(MapShoppingListToDto(shoppingList));
+    }
+    catch (InvalidOperationException ex)
+    {
+        Console.WriteLine($"❌ {ex.Message}");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error adding recipe to shopping list: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
 // === Meal Planner Endpoints ===
 
 // Get all meal plans
@@ -805,7 +831,7 @@ app.MapGet("/api/meal-plans", async (IMealPlannerService mealPlannerService) =>
     {
         var mealPlans = await mealPlannerService.GetAllMealPlansAsync();
         
-        // Project to avoid circular references
+        // Project to avoid circular references - return full recipe details for Weekly Planner
         var result = mealPlans.Select(mp => new
         {
             mp.Id,
@@ -821,13 +847,28 @@ app.MapGet("/api/meal-plans", async (IMealPlannerService mealPlannerService) =>
                 d.Id,
                 d.DayOfWeek,
                 d.Date,
-                Recipe = new
+                d.MealType,
+                Recipe = d.Recipe != null ? new
                 {
                     d.Recipe.Id,
                     d.Recipe.Name,
+                    d.Recipe.Description,
                     d.Recipe.CookingTimeMinutes,
-                    d.Recipe.ImageUrl
-                }
+                    d.Recipe.Servings,
+                    d.Recipe.Instructions,
+                    d.Recipe.ImageUrl,
+                    d.Recipe.Calories,
+                    d.Recipe.ProteinGrams,
+                    d.Recipe.CarbsGrams,
+                    d.Recipe.FatGrams,
+                    Ingredients = d.Recipe.Ingredients.Select(i => new
+                    {
+                        i.Id,
+                        i.IngredientName,
+                        i.Quantity,
+                        i.Category
+                    }).ToList()
+                } : null
             }).ToList()
         }).ToList();
         
@@ -912,9 +953,26 @@ app.MapPost("/api/meal-plans/generate", async (HttpRequest request, IMealPlanner
         
         var startDate = body.StartDate ?? DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek); // Start of current week
         
-        Console.WriteLine($"🤖 Generating meal plan: {body.DietaryPreference}, starting {startDate:yyyy-MM-dd}");
+        // Extract optional parameters with defaults
+        int servings = body.Servings ?? 2;
+        int days = body.Days ?? 7;
+        bool includeBreakfast = body.IncludeBreakfast ?? true;
+        bool includeLunch = body.IncludeLunch ?? true;
+        bool includeDinner = body.IncludeDinner ?? true;
         
-        var mealPlan = await mealPlannerService.GenerateWeeklyMealPlanAsync(body.DietaryPreference, startDate);
+        Console.WriteLine($"🤖 Generating meal plan: {body.DietaryPreference}");
+        Console.WriteLine($"📋 Settings: {days} days, {servings} servings, starting {startDate:yyyy-MM-dd}");
+        Console.WriteLine($"🍽️ Meal types: Breakfast={includeBreakfast}, Lunch={includeLunch}, Dinner={includeDinner}");
+        
+        var mealPlan = await mealPlannerService.GenerateWeeklyMealPlanAsync(
+            body.DietaryPreference, 
+            startDate, 
+            servings, 
+            days, 
+            includeBreakfast, 
+            includeLunch, 
+            includeDinner
+        );
         
         // Project to avoid circular references
         var result = new
@@ -962,6 +1020,161 @@ app.MapPost("/api/meal-plans/generate", async (HttpRequest request, IMealPlanner
 });
 
 // Generate meal plan from natural language
+app.MapPost("/api/meal-plans/generate-single-meal", async (HttpRequest request, IMealPlannerService mealPlannerService, ReceiptHealthContext context) =>
+{
+    try
+    {
+        var body = await request.ReadFromJsonAsync<GenerateSingleMealRequest>();
+        if (body == null)
+        {
+            return Results.BadRequest(new { error = "Request body is required" });
+        }
+        
+        Recipe recipe;
+        
+        if (!string.IsNullOrEmpty(body.NaturalLanguagePrompt))
+        {
+            Console.WriteLine($"🤖 Generating single meal with AI text for {body.DayOfWeek} {body.MealType}: '{body.NaturalLanguagePrompt}'");
+            recipe = await mealPlannerService.GenerateSingleRecipeFromNaturalLanguageAsync(
+                body.NaturalLanguagePrompt,
+                body.MealType ?? "Dinner",
+                body.Servings ?? 2
+            );
+        }
+        else
+        {
+            Console.WriteLine($"🍽️ Generating single meal for {body.DayOfWeek} {body.MealType} - {body.DietaryPreference}");
+            recipe = await mealPlannerService.GenerateSingleRecipeAsync(
+                body.DietaryPreference ?? "balanced",
+                body.MealType ?? "Dinner",
+                body.Servings ?? 2
+            );
+        }
+        
+        var now = DateTime.UtcNow;
+        var dayOfWeek = Enum.Parse<DayOfWeek>(body.DayOfWeek ?? "Monday");
+        var mealType = Enum.Parse<MealType>(body.MealType ?? "Dinner");
+        
+        // Calculate the date for this day of week (current or next occurrence)
+        var today = DateTime.Today;
+        int daysUntilTarget = ((int)dayOfWeek - (int)today.DayOfWeek + 7) % 7;
+        if (daysUntilTarget == 0 && DateTime.Now.Hour >= 18) daysUntilTarget = 7;
+        var targetDate = today.AddDays(daysUntilTarget);
+        
+        // Find or create the shared "My Weekly Meals" plan
+        var sharedPlanName = "My Weekly Meals";
+        var mealPlan = await context.MealPlans
+            .Include(mp => mp.Days)
+            .FirstOrDefaultAsync(mp => mp.Name == sharedPlanName && mp.IsActive);
+        
+        if (mealPlan == null)
+        {
+            Console.WriteLine($"📝 Creating new shared meal plan: {sharedPlanName}");
+            mealPlan = new MealPlan
+            {
+                Name = sharedPlanName,
+                CreatedAt = now,
+                StartDate = targetDate,
+                EndDate = targetDate,
+                DietaryPreference = "Custom",
+                IsActive = true
+            };
+            context.MealPlans.Add(mealPlan);
+            await context.SaveChangesAsync();
+        }
+        else
+        {
+            Console.WriteLine($"📝 Adding to existing shared meal plan #{mealPlan.Id}");
+            
+            // Check if a meal already exists for this day/time and remove it
+            var existingMeal = mealPlan.Days.FirstOrDefault(d => 
+                d.DayOfWeek == dayOfWeek && d.MealType == mealType);
+            
+            if (existingMeal != null)
+            {
+                Console.WriteLine($"🔄 Replacing existing {dayOfWeek} {mealType} meal");
+                context.MealPlanDays.Remove(existingMeal);
+            }
+            
+            // Update start/end dates to encompass all meals
+            if (targetDate < mealPlan.StartDate)
+                mealPlan.StartDate = targetDate;
+            if (targetDate > mealPlan.EndDate)
+                mealPlan.EndDate = targetDate;
+        }
+        
+        var mealPlanDay = new MealPlanDay
+        {
+            MealPlanId = mealPlan.Id,
+            DayOfWeek = dayOfWeek,
+            Date = targetDate,
+            MealType = mealType,
+            RecipeId = recipe.Id
+        };
+        
+        context.MealPlanDays.Add(mealPlanDay);
+        await context.SaveChangesAsync();
+        
+        Console.WriteLine($"✅ Added recipe #{recipe.Id} ({recipe.Name}) to meal plan #{mealPlan.Id} for {body.DayOfWeek} {body.MealType}");
+        
+        // Reload with full data
+        var refreshedPlan = await context.MealPlans
+            .Include(mp => mp.Days)
+                .ThenInclude(d => d.Recipe)
+                    .ThenInclude(r => r.Ingredients)
+            .FirstOrDefaultAsync(mp => mp.Id == mealPlan.Id);
+        
+        if (refreshedPlan == null)
+        {
+            return Results.Problem("Failed to reload meal plan after creation");
+        }
+        
+        // Return the complete meal plan structure
+        return Results.Ok(new
+        {
+            refreshedPlan.Id,
+            refreshedPlan.Name,
+            refreshedPlan.CreatedAt,
+            refreshedPlan.StartDate,
+            refreshedPlan.EndDate,
+            Days = refreshedPlan.Days.Select(d => new
+            {
+                d.Id,
+                d.DayOfWeek,
+                d.Date,
+                d.MealType,
+                Recipe = new
+                {
+                    d.Recipe.Id,
+                    d.Recipe.Name,
+                    d.Recipe.Description,
+                    Ingredients = d.Recipe.Ingredients.Select(i => new
+                    {
+                        i.Id,
+                        i.IngredientName,
+                        i.Quantity,
+                        i.Category
+                    }).ToList(),
+                    d.Recipe.Instructions,
+                    d.Recipe.CookingTimeMinutes,
+                    d.Recipe.Calories,
+                    d.Recipe.ProteinGrams,
+                    d.Recipe.CarbsGrams,
+                    d.Recipe.FatGrams,
+                    d.Recipe.ImageUrl,
+                    d.Recipe.Servings
+                }
+            }).ToList()
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error generating single meal: {ex.Message}");
+        Console.WriteLine($"   Stack trace: {ex.StackTrace}");
+        return Results.Problem(ex.Message);
+    }
+});
+
 app.MapPost("/api/meal-plans/generate-nl", async (HttpRequest request, IMealPlannerService mealPlannerService) =>
 {
     try
@@ -974,9 +1187,26 @@ app.MapPost("/api/meal-plans/generate-nl", async (HttpRequest request, IMealPlan
         
         var startDate = body.StartDate ?? DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
         
-        Console.WriteLine($"🤖 Generating meal plan from natural language: \"{body.UserRequest}\", starting {startDate:yyyy-MM-dd}");
+        // Extract optional parameters with defaults
+        int servings = body.Servings ?? 2;
+        int days = body.Days ?? 7;
+        bool includeBreakfast = body.IncludeBreakfast ?? true;
+        bool includeLunch = body.IncludeLunch ?? true;
+        bool includeDinner = body.IncludeDinner ?? true;
         
-        var mealPlan = await mealPlannerService.GenerateWeeklyMealPlanFromNaturalLanguageAsync(body.UserRequest, startDate);
+        Console.WriteLine($"🤖 Generating meal plan from natural language: \"{body.UserRequest}\"");
+        Console.WriteLine($"📋 Settings: {days} days, {servings} servings");
+        Console.WriteLine($"🍽️ Meal types: Breakfast={includeBreakfast}, Lunch={includeLunch}, Dinner={includeDinner}");
+        
+        var mealPlan = await mealPlannerService.GenerateWeeklyMealPlanFromNaturalLanguageAsync(
+            body.UserRequest, 
+            startDate, 
+            servings, 
+            days, 
+            includeBreakfast, 
+            includeLunch, 
+            includeDinner
+        );
         
         // Project to avoid circular references
         var result = new
@@ -1164,6 +1394,60 @@ app.MapGet("/api/recipes/{id}", async (int id, IMealPlannerService mealPlannerSe
     catch (Exception ex)
     {
         Console.WriteLine($"❌ Error fetching recipe {id}: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
+// Add recipe to a specific meal slot
+app.MapPost("/api/meal-plans/{mealPlanId}/add-recipe", async (int mealPlanId, HttpRequest request, IMealPlannerService mealPlannerService) =>
+{
+    try
+    {
+        var body = await request.ReadFromJsonAsync<AddRecipeToMealSlotRequest>();
+        if (body == null)
+        {
+            return Results.BadRequest(new { error = "Invalid request body" });
+        }
+
+        var mealPlanDay = await mealPlannerService.AddRecipeToMealSlotAsync(
+            mealPlanId, 
+            body.RecipeId, 
+            body.DayOfWeek, 
+            body.MealType);
+
+        return Results.Ok(new
+        {
+            mealPlanDay.Id,
+            mealPlanDay.MealPlanId,
+            mealPlanDay.DayOfWeek,
+            mealPlanDay.Date,
+            mealPlanDay.MealType,
+            mealPlanDay.RecipeId
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        Console.WriteLine($"❌ {ex.Message}");
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error adding recipe to meal slot: {ex.Message}");
+        return Results.Problem(ex.Message);
+    }
+});
+
+// Remove recipe from meal slot
+app.MapDelete("/api/meal-plan-days/{mealPlanDayId}", async (int mealPlanDayId, IMealPlannerService mealPlannerService) =>
+{
+    try
+    {
+        var success = await mealPlannerService.RemoveRecipeFromMealSlotAsync(mealPlanDayId);
+        return success ? Results.Ok(new { success = true }) : Results.NotFound(new { error = "Meal plan day not found" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error removing recipe from meal slot: {ex.Message}");
         return Results.Problem(ex.Message);
     }
 });
@@ -1478,7 +1762,10 @@ public record TrackFeatureRequest(string FeatureName, string? Details = null);
 public record NaturalLanguageQueryRequest(string Query);
 public record VoiceCommandRequest(string Transcript, string? SessionId = null, List<ReceiptHealth.Services.ConversationMessage>? ConversationHistory = null);
 public record TtsRequest(string Text, string? Voice = null);
-public record GenerateMealPlanRequest(string DietaryPreference, DateTime? StartDate = null);
-public record GenerateMealPlanNLRequest(string UserRequest, DateTime? StartDate = null);
+public record GenerateMealPlanRequest(string DietaryPreference, DateTime? StartDate = null, int? Servings = null, int? Days = null, bool? IncludeBreakfast = null, bool? IncludeLunch = null, bool? IncludeDinner = null);
+public record GenerateMealPlanNLRequest(string UserRequest, DateTime? StartDate = null, int? Servings = null, int? Days = null, bool? IncludeBreakfast = null, bool? IncludeLunch = null, bool? IncludeDinner = null);
+public record GenerateSingleMealRequest(string DayOfWeek, string MealType, string? DietaryPreference, int? Servings, string? NaturalLanguagePrompt);
 public record CreateShoppingListFromMealPlanRequest(string? Name = null);
+public record AddRecipeToMealSlotRequest(int RecipeId, DayOfWeek DayOfWeek, MealType MealType);
+public record AddRecipeToShoppingListRequest(int RecipeId, int? ShoppingListId = null);
 

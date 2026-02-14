@@ -6,7 +6,7 @@ import {
   UtensilsCrossed, 
   TrendingUp, 
   Trophy, 
-  Mic,
+  Sparkles,
   Moon,
   Sun,
   Menu,
@@ -21,7 +21,7 @@ const menuItems = [
   { path: '/meal-planner', icon: UtensilsCrossed, label: 'Meal Planner' },
   { path: '/insights', icon: TrendingUp, label: 'Insights' },
   { path: '/achievements', icon: Trophy, label: 'Achievements' },
-  { path: '/voice-assistant', icon: Mic, label: 'Voice Assistant' },
+  { path: '/voice-assistant', icon: Sparkles, label: 'AI Assistant' },
 ];
 
 function Sidebar({ isOpen, toggleSidebar }) {
