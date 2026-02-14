@@ -1,4 +1,4 @@
-import { Mic, MicOff, Volume2, Send, Keyboard, Settings, Volume1 } from 'lucide-react';
+import { Mic, MicOff, Volume2, Send, Settings, Volume1 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -17,7 +17,11 @@ function VoiceAssistant() {
   const [selectedVoice, setSelectedVoice] = useState('en-US-AriaNeural');
   const [testingVoice, setTestingVoice] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
+  const [continuousMode, setContinuousMode] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState(null);
+  const [isStreaming, setIsStreaming] = useState(false);
   const audioRef = useRef(null);
+  const streamingIntervalRef = useRef(null);
   const [sessionId, setSessionId] = useState(() => {
     // Get or create session ID from sessionStorage
     let id = sessionStorage.getItem('voiceAssistantSessionId');
@@ -60,6 +64,7 @@ function VoiceAssistant() {
 
       recognitionInstance.onend = () => {
         setListening(false);
+        // Don't auto-restart here - will be handled by speak() onended callback
       };
 
       setRecognition(recognitionInstance);
@@ -166,12 +171,11 @@ function VoiceAssistant() {
         sessionStorage.setItem('voiceAssistantSessionId', newSessionId);
       }
       
-      // Add assistant response to history
-      const assistantMessage = { role: 'assistant', content: responseText };
-      setConversationHistory(prev => [...prev, assistantMessage]);
+      // Start streaming the assistant response
+      startStreamingMessage(responseText);
       
       setResponse(responseText);
-      speak(responseText);
+      // speak will be called after streaming completes
       
       // Track feature usage for achievements
       try {
@@ -187,15 +191,49 @@ function VoiceAssistant() {
       console.error('Error processing command:', error);
       const errorMsg = error.response?.data?.error || 'Sorry, I could not process that command';
       
-      // Add error message to history
-      const errorMessage = { role: 'assistant', content: errorMsg };
-      setConversationHistory(prev => [...prev, errorMessage]);
+      // Start streaming the error message
+      startStreamingMessage(errorMsg);
       
       setResponse(errorMsg);
       toast.error(errorMsg);
     } finally {
       setProcessing(false);
     }
+  };
+
+  const startStreamingMessage = (fullText) => {
+    // Clear any existing streaming
+    if (streamingIntervalRef.current) {
+      clearInterval(streamingIntervalRef.current);
+    }
+
+    setIsStreaming(true);
+    setStreamingMessage('');
+    
+    let currentIndex = 0;
+    const words = fullText.split(' ');
+    
+    streamingIntervalRef.current = setInterval(() => {
+      if (currentIndex < words.length) {
+        setStreamingMessage(prev => {
+          const newText = prev + (currentIndex > 0 ? ' ' : '') + words[currentIndex];
+          return newText;
+        });
+        currentIndex++;
+      } else {
+        // Streaming complete
+        clearInterval(streamingIntervalRef.current);
+        setIsStreaming(false);
+        
+        // Add complete message to history
+        const assistantMessage = { role: 'assistant', content: fullText };
+        setConversationHistory(prev => [...prev, assistantMessage]);
+        setStreamingMessage(null);
+        
+        // Now speak the response
+        speak(fullText);
+      }
+    }, 50); // Adjust speed: lower = faster, higher = slower
   };
 
   const handleTextSubmit = () => {
@@ -226,6 +264,13 @@ function VoiceAssistant() {
         audioRef.current.src = audioUrl;
         audioRef.current.onended = () => {
           URL.revokeObjectURL(audioUrl);
+          
+          // Auto-restart listening if continuous mode is enabled
+          if (continuousMode && !processing) {
+            setTimeout(() => {
+              startListening();
+            }, 500); // Small delay before restarting
+          }
         };
         await audioRef.current.play();
       }
@@ -237,6 +282,14 @@ function VoiceAssistant() {
         utterance.rate = 0.92;
         utterance.pitch = 1.08;
         utterance.volume = 0.95;
+        utterance.onend = () => {
+          // Auto-restart listening if continuous mode is enabled
+          if (continuousMode && !processing) {
+            setTimeout(() => {
+              startListening();
+            }, 500);
+          }
+        };
         speechSynthesis.speak(utterance);
       }
     }
@@ -247,7 +300,7 @@ function VoiceAssistant() {
       <audio ref={audioRef} style={{ display: 'none' }} />
       {/* Header */}
       <div className="mb-3 sm:mb-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Voice Assistant</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">AI Assistant</h1>
         <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
           Chat with your AI assistant using voice or text
         </p>
@@ -255,34 +308,9 @@ function VoiceAssistant() {
 
       {/* Chat Container - Google Assistant Style */}
       <div className="flex-1 min-h-0 card flex flex-col max-w-4xl mx-auto w-full">
-        {/* Mode Toggle and Settings */}
+        {/* Settings Header */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 border-b border-gray-200 dark:border-gray-700 pb-3 sm:pb-4 mb-3 sm:mb-4">
           <div className="flex items-center gap-2 sm:gap-3 flex-1">
-            <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1 flex-1 sm:flex-initial">
-              <button
-                onClick={() => setUseTextMode(false)}
-                className={`px-3 sm:px-4 py-2 rounded-md transition-colors flex items-center justify-center space-x-2 flex-1 sm:flex-initial ${
-                  !useTextMode
-                    ? 'bg-primary-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Mic className="w-4 h-4" />
-                <span className="text-sm sm:text-base">Voice</span>
-              </button>
-              <button
-                onClick={() => setUseTextMode(true)}
-                className={`px-3 sm:px-4 py-2 rounded-md transition-colors flex items-center justify-center space-x-2 flex-1 sm:flex-initial ${
-                  useTextMode
-                    ? 'bg-primary-500 text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Keyboard className="w-4 h-4" />
-                <span className="text-sm sm:text-base">Text</span>
-              </button>
-            </div>
-            
             <button
               onClick={() => setShowVoiceSettings(!showVoiceSettings)}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -318,7 +346,7 @@ function VoiceAssistant() {
             </h3>
             
             {/* Auto-speak toggle */}
-            <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200 dark:border-gray-600">
+            <div className="space-y-3 mb-3 pb-3 border-b border-gray-200 dark:border-gray-600">
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
@@ -328,6 +356,22 @@ function VoiceAssistant() {
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">Auto-speak responses</span>
               </label>
+              
+              {/* Continuous mode toggle */}
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={continuousMode}
+                  onChange={(e) => setContinuousMode(e.target.checked)}
+                  className="rounded border-gray-300 text-purple-500 focus:ring-purple-500 mr-2"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">🎤 Continuous conversation mode</span>
+              </label>
+              {continuousMode && (
+                <p className="text-xs text-purple-600 dark:text-purple-400 ml-6">
+                  Mic will auto-restart after each response for hands-free conversation
+                </p>
+              )}
             </div>
             
             {/* Voice Selection */}
@@ -374,7 +418,7 @@ function VoiceAssistant() {
         
         {/* Chat Messages Area */}
         <div className="flex-1 overflow-y-auto mb-3 sm:mb-4 space-y-3 sm:space-y-4 px-1 sm:px-2">
-          {conversationHistory.length === 0 ? (
+          {conversationHistory.length === 0 && !streamingMessage ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
               <div className="w-20 h-20 sm:w-24 sm:h-24 mb-4 sm:mb-6 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
                 <Mic className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
@@ -394,7 +438,7 @@ function VoiceAssistant() {
                 ].map((example, idx) => (
                   <button
                     key={idx}
-                    onClick={() => useTextMode ? setTextInput(example) : null}
+                    onClick={() => setTextInput(example)}
                     className="text-left p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                   >
                     <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">{example}</span>
@@ -423,9 +467,24 @@ function VoiceAssistant() {
               </div>
             ))
           )}
+
+          {/* Streaming message */}
+          {streamingMessage && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] sm:max-w-[75%] p-3 sm:p-4 rounded-2xl bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-bl-sm">
+                <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words">
+                  {streamingMessage}
+                  {isStreaming && <span className="animate-pulse">▊</span>}
+                </p>
+                <p className="text-xs opacity-70 mt-1 sm:mt-2">
+                  Assistant
+                </p>
+              </div>
+            </div>
+          )}
           
           {/* Processing indicator */}
-          {processing && (
+          {processing && !streamingMessage && (
             <div className="flex justify-start">
               <div className="max-w-[85%] sm:max-w-[75%] p-3 sm:p-4 rounded-2xl bg-gray-100 dark:bg-gray-700 rounded-bl-sm">
                 <div className="flex space-x-2">
@@ -438,53 +497,50 @@ function VoiceAssistant() {
           )}
         </div>
 
-        {/* Input Area */}
+        {/* Input Area - Unified Text/Voice */}
         <div className="border-t border-gray-200 dark:border-gray-700 pt-3 sm:pt-4">
-          {useTextMode ? (
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <input
-                type="text"
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && !processing && handleTextSubmit()}
-                placeholder="Type your message..."
-                className="input flex-1 text-sm sm:text-base"
-                disabled={processing}
-              />
-              <button
-                onClick={handleTextSubmit}
-                disabled={processing || !textInput.trim()}
-                className="btn-primary flex items-center justify-center space-x-2 text-sm sm:text-base"
-              >
-                <Send className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center">
+          <div className="relative">
+            <input
+              type="text"
+              value={listening ? transcript : textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && !processing && handleTextSubmit()}
+              placeholder={listening ? 'Listening...' : 'Type or speak your message...'}
+              className="input w-full pr-24 text-sm sm:text-base"
+              disabled={processing || listening}
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
               <button
                 onClick={listening ? stopListening : startListening}
                 disabled={processing}
-                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all duration-300 ${
+                className={`p-2 rounded-lg transition-all duration-300 ${
                   listening 
-                    ? 'bg-gradient-to-br from-red-500 to-pink-500 animate-pulse shadow-2xl' 
-                    : 'bg-gradient-to-br from-primary-500 to-secondary-500 hover:shadow-xl'
+                    ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'
                 }`}
+                title={listening ? 'Stop listening' : 'Start voice input'}
               >
-                {listening ? (
-                  <Mic className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
-                ) : (
-                  <Mic className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
-                )}
+                <Mic className="w-5 h-5" />
               </button>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2 sm:mt-3">
-                {listening ? 'Listening...' : processing ? 'Processing...' : 'Tap to speak'}
-              </p>
-              {transcript && (
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2 italic">
-                  "{transcript}"
-                </p>
-              )}
+              <button
+                onClick={handleTextSubmit}
+                disabled={processing || (!textInput.trim() && !listening)}
+                className="p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-gray-700 transition-colors text-primary-600 dark:text-primary-400 disabled:opacity-50"
+                title="Send message"
+              >
+                <Send className="w-5 h-5" />
+              </button>
             </div>
+          </div>
+          {listening && (
+            <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
+              🎤 Listening... {continuousMode && '(Continuous mode active) '}Click mic to stop
+            </p>
+          )}
+          {transcript && !listening && (
+            <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2 italic">
+              Last heard: "{transcript}"
+            </p>
           )}
         </div>
       </div>
