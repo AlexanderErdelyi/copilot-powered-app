@@ -113,6 +113,13 @@ Date today: {DateTime.Today:yyyy-MM-dd}";
                 throw new InvalidOperationException("Failed to parse AI response");
             }
 
+            // Detect currency from the original text if AI didn't extract it
+            var detectedCurrency = parsedData.Currency;
+            if (string.IsNullOrEmpty(detectedCurrency))
+            {
+                detectedCurrency = DetectCurrency(text);
+            }
+
             // Create Receipt object
             var receipt = new Receipt
             {
@@ -121,7 +128,7 @@ Date today: {DateTime.Today:yyyy-MM-dd}";
                 Subtotal = parsedData.Subtotal,
                 Tax = parsedData.Tax,
                 Total = parsedData.Total,
-                Currency = parsedData.Currency ?? "USD",
+                Currency = detectedCurrency,
                 RawText = text,
                 ProcessedAt = DateTime.UtcNow
             };
@@ -155,6 +162,45 @@ Date today: {DateTime.Today:yyyy-MM-dd}";
     }
 
     /// <summary>
+    /// Detect currency from receipt text based on symbols and keywords
+    /// </summary>
+    private string DetectCurrency(string text)
+    {
+        var lowerText = text.ToLower();
+        
+        // Check for Euro indicators
+        if (text.Contains("€") || 
+            lowerText.Contains("eur") || 
+            lowerText.Contains("mwst") || // German tax = Euro
+            lowerText.Contains("mehrwertsteuer"))
+        {
+            return "EUR";
+        }
+        
+        // Check for British Pound
+        if (text.Contains("£") || lowerText.Contains("gbp") || lowerText.Contains("vat"))
+        {
+            return "GBP";
+        }
+        
+        // Check for US Dollar
+        if (text.Contains("$") || lowerText.Contains("usd"))
+        {
+            return "USD";
+        }
+        
+        // Check for Swiss Franc
+        if (lowerText.Contains("chf") || lowerText.Contains("sfr"))
+        {
+            return "CHF";
+        }
+        
+        // Default to EUR (most common in Europe)
+        _logger.LogInformation("No clear currency detected, defaulting to EUR");
+        return "EUR";
+    }
+
+    /// <summary>
     /// Fallback parsing method using simple regex patterns (similar to original implementation)
     /// </summary>
     private async Task<(Receipt receipt, List<LineItem> lineItems)> FallbackParseAsync(string text)
@@ -171,7 +217,8 @@ Date today: {DateTime.Today:yyyy-MM-dd}";
             Date = DateTime.Today,
             Total = 0,
             Subtotal = 0,
-            Tax = 0
+            Tax = 0,
+            Currency = DetectCurrency(text) // Use currency detection
         };
 
         var lineItems = new List<LineItem>();
@@ -183,7 +230,7 @@ Date today: {DateTime.Today:yyyy-MM-dd}";
             receipt.Vendor = lines[0].Trim();
         }
 
-        _logger.LogInformation("Fallback parsing completed: {Vendor}", receipt.Vendor);
+        _logger.LogInformation("Fallback parsing completed: {Vendor}, Currency: {Currency}", receipt.Vendor, receipt.Currency);
         
         return (receipt, lineItems);
     }

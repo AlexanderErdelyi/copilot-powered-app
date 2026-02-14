@@ -64,6 +64,10 @@ public class ReceiptHealthContext : DbContext
                   .WithMany(r => r.LineItems)
                   .HasForeignKey(e => e.ReceiptId)
                   .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.CategoryNavigation)
+                  .WithMany()
+                  .HasForeignKey(e => e.CategoryId)
+                  .OnDelete(DeleteBehavior.SetNull);
             entity.Property(e => e.Price).HasColumnType("decimal(18,2)");
             entity.Property(e => e.Category).IsRequired();
         });
@@ -113,6 +117,10 @@ public class ReceiptHealthContext : DbContext
                   .WithMany(sl => sl.Items)
                   .HasForeignKey(e => e.ShoppingListId)
                   .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.CategoryNavigation)
+                  .WithMany()
+                  .HasForeignKey(e => e.CategoryId)
+                  .OnDelete(DeleteBehavior.SetNull);
             entity.Property(e => e.LastKnownPrice).HasColumnType("decimal(18,2)");
             entity.HasIndex(e => e.NormalizedName);
         });

@@ -15,6 +15,7 @@ public interface ICategoryManagementService
     Task<bool> DeleteCategoryAsync(int id);
     Task<List<string>> SuggestCategoriesAsync(string itemDescription);
     Task EnsureSystemCategoriesExistAsync();
+    Task<List<CategorySuggestion>> GetCategorySuggestionsAsync();
 }
 
 public class CategoryManagementService : ICategoryManagementService
@@ -197,9 +198,10 @@ public class CategoryManagementService : ICategoryManagementService
     {
         var systemCategories = new[]
         {
-            new Category { Name = "Healthy", Description = "Healthy food items", Color = "#10b981", Icon = "🥗", IsSystemCategory = true, SortOrder = 1 },
-            new Category { Name = "Junk", Description = "Junk food and unhealthy items", Color = "#ef4444", Icon = "🍔", IsSystemCategory = true, SortOrder = 2 },
-            new Category { Name = "Other", Description = "Other items", Color = "#6b7280", Icon = "📦", IsSystemCategory = true, SortOrder = 3 }
+            new Category { Name = "Healthy", Description = "Healthy food items (fruits, vegetables, whole grains)", Color = "#10b981", Icon = "🥗", IsSystemCategory = true, SortOrder = 1, CreatedAt = DateTime.UtcNow },
+            new Category { Name = "Junk", Description = "Junk food and unhealthy items (candy, soda, chips)", Color = "#ef4444", Icon = "🍔", IsSystemCategory = true, SortOrder = 2, CreatedAt = DateTime.UtcNow },
+            new Category { Name = "Other", Description = "Other food items (bread, pasta, basic staples)", Color = "#6b7280", Icon = "📦", IsSystemCategory = true, SortOrder = 3, CreatedAt = DateTime.UtcNow },
+            new Category { Name = "Unknown", Description = "Uncategorized items", Color = "#9ca3af", Icon = "❓", IsSystemCategory = true, SortOrder = 99, CreatedAt = DateTime.UtcNow }
         };
 
         foreach (var category in systemCategories)
@@ -214,4 +216,42 @@ public class CategoryManagementService : ICategoryManagementService
 
         await _context.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Get suggested categories that users might want to add
+    /// </summary>
+    public async Task<List<CategorySuggestion>> GetCategorySuggestionsAsync()
+    {
+        var suggestions = new List<CategorySuggestion>
+        {
+            new CategorySuggestion { Name = "Beverages", Description = "Drinks, juices, water, coffee, tea", Icon = "☕", Color = "#8b5cf6" },
+            new CategorySuggestion { Name = "Dairy", Description = "Milk, cheese, yogurt, butter", Icon = "🥛", Color = "#f59e0b" },
+            new CategorySuggestion { Name = "Meat & Fish", Description = "Fresh meat, poultry, seafood", Icon = "🥩", Color = "#dc2626" },
+            new CategorySuggestion { Name = "Bakery", Description = "Bread, pastries, cakes", Icon = "🍞", Color = "#d97706" },
+            new CategorySuggestion { Name = "Frozen Foods", Description = "Frozen meals, ice cream, frozen vegetables", Icon = "🧊", Color = "#06b6d4" },
+            new CategorySuggestion { Name = "Snacks", Description = "Crackers, nuts, dried fruits", Icon = "🥜", Color = "#84cc16" },
+            new CategorySuggestion { Name = "Household", Description = "Cleaning supplies, paper products, toiletries", Icon = "🧹", Color = "#6366f1" },
+            new CategorySuggestion { Name = "Personal Care", Description = "Hygiene products, cosmetics, health items", Icon = "🧴", Color = "#ec4899" },
+            new CategorySuggestion { Name = "Baby Products", Description = "Diapers, formula, baby food", Icon = "👶", Color = "#f472b6" },
+            new CategorySuggestion { Name = "Pet Supplies", Description = "Pet food, treats, accessories", Icon = "🐾", Color = "#a855f7" },
+            new CategorySuggestion { Name = "Clothing", Description = "Apparel, shoes, accessories, fashion items", Icon = "👕", Color = "#3b82f6" }
+        };
+
+        // Filter out categories that already exist
+        var existingCategories = await _context.Categories
+            .Select(c => c.Name.ToLower())
+            .ToListAsync();
+
+        return suggestions
+            .Where(s => !existingCategories.Contains(s.Name.ToLower()))
+            .ToList();
+    }
+}
+
+public class CategorySuggestion
+{
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string Icon { get; set; } = string.Empty;
+    public string Color { get; set; } = string.Empty;
 }

@@ -23,8 +23,14 @@ public class ShoppingListItem
     public DateTime AddedAt { get; set; }
     public decimal? LastKnownPrice { get; set; }
     public string? LastKnownVendor { get; set; }
+    
+    // New: Foreign key to Categories table
+    public int? CategoryId { get; set; }
+    
+    // Deprecated: Keep for backward compatibility during migration
     public string Category { get; set; } = "Unknown";
     
-    // Navigation property
+    // Navigation properties
     public ShoppingList ShoppingList { get; set; } = null!;
+    public Category? CategoryNavigation { get; set; }
 }

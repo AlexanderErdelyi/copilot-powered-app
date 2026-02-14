@@ -1,0 +1,4 @@
+﻿Test Receipt
+Store: Test Store
+Date: 2024-01-01
+Total: .00

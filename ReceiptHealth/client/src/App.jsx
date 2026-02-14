@@ -19,12 +19,12 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/receipts" element={<Receipts />} />
+          <Route path="/receipts/categories" element={<Categories />} />
           <Route path="/shopping-lists" element={<ShoppingLists />} />
           <Route path="/meal-planner" element={<MealPlanner />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/voice-assistant" element={<VoiceAssistant />} />
-          <Route path="/categories" element={<Categories />} />
         </Routes>
       </Layout>
       <Toaster 

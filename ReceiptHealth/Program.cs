@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ReceiptHealth.Data;
 using ReceiptHealth.Services;
 using ReceiptHealth.Models;
+using ReceiptHealth; // For DatabaseMigration
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,7 +25,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("ReactDevPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:5175")
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
@@ -90,13 +91,28 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Ensure database is created
+// Ensure database is created and migrated
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ReceiptHealthContext>();
+    
+    // Check if database file exists
+    bool isNewDatabase = !File.Exists(dbPath);
+    
+    // Always ensure base schema is created first
     context.Database.EnsureCreated();
     Console.WriteLine($"✅ Database initialized at: {dbPath}");
     app.Logger.LogInformation("Database initialized at: {DbPath}", dbPath);
+    
+    // Run migrations only if database already existed (to add new columns/tables to existing schema)
+    if (!isNewDatabase)
+    {
+        DatabaseMigration.MigrateDatabase($"Data Source={dbPath}");
+    }
+    else
+    {
+        Console.WriteLine("ℹ️  Fresh database created - migrations not needed");
+    }
     
     // Initialize system categories
     var categoryService = scope.ServiceProvider.GetRequiredService<ICategoryManagementService>();
@@ -531,6 +547,88 @@ app.MapGet("/api/receipts/{id}", async (int id, ReceiptHealthContext context) =>
             receipt.CategorySummary.OtherCount,
             receipt.CategorySummary.UnknownCount
         } : null
+    });
+});
+
+// Update line item category
+app.MapPut("/api/lineitems/{id}/category", async (int id, ReceiptHealthContext context, UpdateLineItemCategoryRequest request) =>
+{
+    var lineItem = await context.LineItems
+        .Include(li => li.Receipt)
+            .ThenInclude(r => r.CategorySummary)
+        .FirstOrDefaultAsync(li => li.Id == id);
+
+    if (lineItem == null)
+    {
+        return Results.NotFound(new { error = "Line item not found" });
+    }
+
+    // Validate that the category exists
+    var category = await context.Categories
+        .FirstOrDefaultAsync(c => c.Id == request.CategoryId);
+
+    if (category == null)
+    {
+        return Results.BadRequest(new { error = "Invalid category" });
+    }
+
+    var oldCategory = lineItem.Category;
+    lineItem.Category = category.Name;
+    lineItem.CategoryId = category.Id;
+
+    // Recalculate category summary for the receipt
+    if (lineItem.Receipt != null)
+    {
+        var allLineItems = await context.LineItems
+            .Where(li => li.ReceiptId == lineItem.ReceiptId)
+            .ToListAsync();
+
+        var healthyTotal = allLineItems.Where(li => li.Category == "Healthy").Sum(li => li.Price);
+        var junkTotal = allLineItems.Where(li => li.Category == "Junk").Sum(li => li.Price);
+        var otherTotal = allLineItems.Where(li => li.Category == "Other").Sum(li => li.Price);
+        var unknownTotal = allLineItems.Where(li => li.Category == "Unknown" || string.IsNullOrEmpty(li.Category)).Sum(li => li.Price);
+
+        var healthyCount = allLineItems.Count(li => li.Category == "Healthy");
+        var junkCount = allLineItems.Count(li => li.Category == "Junk");
+        var otherCount = allLineItems.Count(li => li.Category == "Other");
+        var unknownCount = allLineItems.Count(li => li.Category == "Unknown" || string.IsNullOrEmpty(li.Category));
+
+        if (lineItem.Receipt.CategorySummary != null)
+        {
+            lineItem.Receipt.CategorySummary.HealthyTotal = healthyTotal;
+            lineItem.Receipt.CategorySummary.JunkTotal = junkTotal;
+            lineItem.Receipt.CategorySummary.OtherTotal = otherTotal;
+            lineItem.Receipt.CategorySummary.UnknownTotal = unknownTotal;
+            lineItem.Receipt.CategorySummary.HealthyCount = healthyCount;
+            lineItem.Receipt.CategorySummary.JunkCount = junkCount;
+            lineItem.Receipt.CategorySummary.OtherCount = otherCount;
+            lineItem.Receipt.CategorySummary.UnknownCount = unknownCount;
+        }
+
+        // Recalculate health score
+        var total = lineItem.Receipt.Total;
+        if (total > 0)
+        {
+            var healthyPercentage = (healthyTotal / total) * 100;
+            lineItem.Receipt.HealthScore = (int)healthyPercentage;
+        }
+    }
+
+    await context.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        success = true,
+        lineItem = new
+        {
+            lineItem.Id,
+            lineItem.Description,
+            lineItem.Category,
+            lineItem.CategoryId,
+            lineItem.Price,
+            lineItem.Quantity
+        },
+        message = $"Category updated from {oldCategory} to {category.Name}"
     });
 });
 
@@ -1908,6 +2006,19 @@ app.MapPost("/api/categories/suggest", async (SuggestCategoriesRequest request, 
     }
 });
 
+app.MapGet("/api/categories/suggestions", async (ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var suggestions = await categoryService.GetCategorySuggestionsAsync();
+        return Results.Ok(suggestions);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
 app.MapPut("/api/shopping-lists/{listId}/items/{itemId}/category", async (
     int listId, 
     int itemId, 
@@ -2001,6 +2112,7 @@ public record AddRecipeToMealSlotRequest(int RecipeId, DayOfWeek DayOfWeek, Meal
 public record AddRecipeToShoppingListRequest(int RecipeId, int? ShoppingListId = null);
 public record CreateCategoryRequest(string Name, string? Description = null, string? Color = null, string? Icon = null, int SortOrder = 0);
 public record UpdateCategoryRequest(string Name, string? Description = null, string? Color = null, string? Icon = null, bool IsActive = true, int SortOrder = 0);
+public record UpdateLineItemCategoryRequest(int CategoryId);
 public record SuggestCategoriesRequest(string ItemDescription);
 public record UpdateItemCategoryRequest(string Category);
 

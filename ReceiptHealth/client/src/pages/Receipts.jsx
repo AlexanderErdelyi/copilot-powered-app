@@ -4,6 +4,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import UploadStatus from '../components/UploadStatus';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { formatCurrency } from '../utils/currency';
 
 function Receipts() {
   const [receipts, setReceipts] = useState([]);
@@ -14,6 +15,10 @@ function Receipts() {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   
+  // Category editing state
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [availableCategories, setAvailableCategories] = useState([]);
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
 
   // Camera state
   const [showCameraModal, setShowCameraModal] = useState(false);
@@ -27,7 +32,21 @@ function Receipts() {
 
   useEffect(() => {
     fetchReceipts();
+    fetchCategories();
   }, []);
+
+  // Close category selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showCategorySelector && !event.target.closest('.category-selector-container')) {
+        setShowCategorySelector(false);
+        setEditingItemId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showCategorySelector]);
 
   const fetchReceipts = async () => {
     try {
@@ -38,6 +57,37 @@ function Receipts() {
       setReceipts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get('/api/categories');
+      setAvailableCategories(response.data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const updateLineItemCategory = async (lineItemId, categoryId) => {
+    try {
+      await axios.put(`/api/lineitems/${lineItemId}/category`, { categoryId });
+      toast.success('Category updated!');
+      
+      // Refresh the receipt details
+      if (selectedReceipt) {
+        const response = await axios.get(`/api/receipts/${selectedReceipt.id}`);
+        setSelectedReceipt(response.data);
+      }
+      
+      // Refresh receipts list
+      fetchReceipts();
+    } catch (error) {
+      console.error('Error updating category:', error);
+      toast.error('Failed to update category');
+    } finally {
+      setEditingItemId(null);
+      setShowCategorySelector(false);
     }
   };
 
@@ -363,7 +413,7 @@ function Receipts() {
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                       <div className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">
-                        ${receipt.total?.toFixed(2) || '0.00'}
+                        {formatCurrency(receipt.total, receipt.currency)}
                       </div>
                     </td>
                     <td className="hidden lg:table-cell px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
@@ -408,7 +458,7 @@ function Receipts() {
                 </h2>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   <span>📅 {new Date(selectedReceipt.date).toLocaleDateString()}</span>
-                  <span>💰 ${selectedReceipt.total?.toFixed(2)}</span>
+                  <span>💰 {formatCurrency(selectedReceipt.total, selectedReceipt.currency)}</span>
                   <span className={`px-2 py-1 rounded text-xs ${getHealthScoreColor(selectedReceipt.healthScore || 0)}`}>
                     Health: {selectedReceipt.healthScore || 0}%
                   </span>
@@ -427,24 +477,63 @@ function Receipts() {
               <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-white">Line Items</h3>
               <div className="space-y-2">
                 {selectedReceipt.lineItems && selectedReceipt.lineItems.length > 0 ? (
-                  selectedReceipt.lineItems.map((item, index) => (
+                  selectedReceipt.lineItems.map((item, index) => {
+                    // Find the category to get its color
+                    const category = availableCategories.find(c => c.name === item.category);
+                    const categoryColor = category?.color || '#6b7280'; // fallback to gray
+                    
+                    return (
                     <div key={index} className="flex justify-between items-center p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg gap-2">
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description}</span>
-                        <span className={`ml-2 px-2 py-1 text-xs rounded ${
-                          item.category === 'Healthy' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
-                          item.category === 'Junk' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
-                          'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300'
-                        }`}>
-                          {item.category}
-                        </span>
+                        <div className="relative inline-block category-selector-container">
+                          <button
+                            onClick={() => {
+                              setEditingItemId(item.id);
+                              setShowCategorySelector(true);
+                            }}
+                            className="ml-2 px-2 py-1 text-xs rounded cursor-pointer hover:opacity-80 transition-opacity text-white font-medium"
+                            style={{ backgroundColor: categoryColor }}
+                            title="Click to change category"
+                          >
+                            {item.category} ✏️
+                          </button>
+                          
+                          {/* Category Selector Dropdown */}
+                          {showCategorySelector && editingItemId === item.id && (
+                            <div className="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg min-w-[150px]">
+                              <div className="py-1">
+                                {availableCategories.map((category) => (
+                                  <button
+                                    key={category.id}
+                                    onClick={() => updateLineItemCategory(item.id, category.id)}
+                                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                  >
+                                    <span>{category.icon}</span>
+                                    <span className="text-gray-900 dark:text-white">{category.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setEditingItemId(null);
+                                  setShowCategorySelector(false);
+                                }}
+                                className="w-full px-4 py-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 border-t border-gray-200 dark:border-gray-600"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right flex-shrink-0">
                         <div className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">Qty: {item.quantity}</div>
-                        <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">${item.price?.toFixed(2)}</div>
+                        <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">{formatCurrency(item.price, selectedReceipt.currency)}</div>
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <p className="text-gray-500 dark:text-gray-400 text-center py-4">No line items available</p>
                 )}
@@ -458,7 +547,7 @@ function Receipts() {
                     <div className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                       <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Healthy</div>
                       <div className="text-lg sm:text-xl font-bold text-green-700 dark:text-green-300">
-                        ${selectedReceipt.categorySummary.healthyTotal?.toFixed(2) || '0.00'}
+                        {formatCurrency(selectedReceipt.categorySummary.healthyTotal, selectedReceipt.currency)}
                       </div>
                       <div className="text-xs text-green-600 dark:text-green-400">
                         {selectedReceipt.categorySummary.healthyCount || 0} items
@@ -467,7 +556,7 @@ function Receipts() {
                     <div className="p-3 sm:p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
                       <div className="text-xs sm:text-sm text-red-600 dark:text-red-400">Junk</div>
                       <div className="text-lg sm:text-xl font-bold text-red-700 dark:text-red-300">
-                        ${selectedReceipt.categorySummary.junkTotal?.toFixed(2) || '0.00'}
+                        {formatCurrency(selectedReceipt.categorySummary.junkTotal, selectedReceipt.currency)}
                       </div>
                       <div className="text-xs text-red-600 dark:text-red-400">
                         {selectedReceipt.categorySummary.junkCount || 0} items
@@ -476,7 +565,7 @@ function Receipts() {
                     <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                       <div className="text-xs sm:text-sm text-blue-600 dark:text-blue-400">Other</div>
                       <div className="text-lg sm:text-xl font-bold text-blue-700 dark:text-blue-300">
-                        ${selectedReceipt.categorySummary.otherTotal?.toFixed(2) || '0.00'}
+                        {formatCurrency(selectedReceipt.categorySummary.otherTotal, selectedReceipt.currency)}
                       </div>
                       <div className="text-xs text-blue-600 dark:text-blue-400">
                         {selectedReceipt.categorySummary.otherCount || 0} items
@@ -485,7 +574,7 @@ function Receipts() {
                     <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Unknown</div>
                       <div className="text-lg sm:text-xl font-bold text-gray-700 dark:text-gray-300">
-                        ${selectedReceipt.categorySummary.unknownTotal?.toFixed(2) || '0.00'}
+                        {formatCurrency(selectedReceipt.categorySummary.unknownTotal, selectedReceipt.currency)}
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">
                         {selectedReceipt.categorySummary.unknownCount || 0} items
@@ -499,18 +588,18 @@ function Receipts() {
               <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex justify-between text-lg font-semibold text-gray-900 dark:text-white">
                   <span>Total</span>
-                  <span>${selectedReceipt.total?.toFixed(2)}</span>
+                  <span>{formatCurrency(selectedReceipt.total, selectedReceipt.currency)}</span>
                 </div>
                 {selectedReceipt.subtotal && (
                   <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mt-2">
                     <span>Subtotal</span>
-                    <span>${selectedReceipt.subtotal?.toFixed(2)}</span>
+                    <span>{formatCurrency(selectedReceipt.subtotal, selectedReceipt.currency)}</span>
                   </div>
                 )}
                 {selectedReceipt.tax && (
                   <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mt-1">
                     <span>Tax</span>
-                    <span>${selectedReceipt.tax?.toFixed(2)}</span>
+                    <span>{formatCurrency(selectedReceipt.tax, selectedReceipt.currency)}</span>
                   </div>
                 )}
               </div>
