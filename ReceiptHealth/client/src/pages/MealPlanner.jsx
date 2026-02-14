@@ -1,4 +1,4 @@
-import { Calendar, Plus, ChefHat, Loader2, X } from 'lucide-react';
+import { Calendar, Plus, ChefHat, Loader2, X, ShoppingCart } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -13,6 +13,9 @@ function MealPlanner() {
   const [expandedPlans, setExpandedPlans] = useState({});
   const [useNaturalLanguage, setUseNaturalLanguage] = useState(false);
   const [naturalLanguageInput, setNaturalLanguageInput] = useState('');
+  const [checkedIngredients, setCheckedIngredients] = useState({});
+  const [checkedSteps, setCheckedSteps] = useState({});
+  const [addingToShoppingList, setAddingToShoppingList] = useState(false);
   const [mealOptions, setMealOptions] = useState({
     dietaryPreference: 'balanced',
     servings: 2,
@@ -36,6 +39,87 @@ function MealPlanner() {
   const getDietaryIcon = (preference) => {
     const pref = dietaryPreferences.find(p => p.value === preference?.toLowerCase());
     return pref?.icon || '🍽️';
+  };
+
+  // Parse instructions into numbered steps
+  const parseInstructions = (instructions) => {
+    if (!instructions) return [];
+    
+    // Split by common delimiters: newlines, numbered steps, or periods followed by capital letters
+    let steps = instructions
+      .split(/\n+|\d+\.\s+|(?<=\.)\s+(?=[A-Z])/)
+      .map(s => s.trim())
+      .filter(s => s.length > 10); // Filter out very short fragments
+    
+    // If no clear steps were found, split by periods as last resort
+    if (steps.length <= 1) {
+      steps = instructions
+        .split(/\.\s+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 10);
+    }
+    
+    return steps;
+  };
+
+  // Load cooking progress from localStorage
+  useEffect(() => {
+    if (selectedRecipe) {
+      const savedProgress = localStorage.getItem(`recipe_${selectedRecipe.id}_progress`);
+      if (savedProgress) {
+        try {
+          const { ingredients, steps } = JSON.parse(savedProgress);
+          setCheckedIngredients(ingredients || {});
+          setCheckedSteps(steps || {});
+        } catch (e) {
+          console.error('Failed to parse saved progress:', e);
+        }
+      } else {
+        setCheckedIngredients({});
+        setCheckedSteps({});
+      }
+    }
+  }, [selectedRecipe]);
+
+  // Save cooking progress to localStorage
+  const saveCookingProgress = (recipeId, ingredients, steps) => {
+    localStorage.setItem(`recipe_${recipeId}_progress`, JSON.stringify({
+      ingredients,
+      steps,
+      lastUpdated: new Date().toISOString()
+    }));
+  };
+
+  // Toggle ingredient checkbox
+  const toggleIngredient = (idx) => {
+    const newChecked = { ...checkedIngredients, [idx]: !checkedIngredients[idx] };
+    setCheckedIngredients(newChecked);
+    saveCookingProgress(selectedRecipe.id, newChecked, checkedSteps);
+  };
+
+  // Toggle step checkbox
+  const toggleStep = (idx) => {
+    const newChecked = { ...checkedSteps, [idx]: !checkedSteps[idx] };
+    setCheckedSteps(newChecked);
+    saveCookingProgress(selectedRecipe.id, checkedIngredients, newChecked);
+  };
+
+  // Add recipe to shopping list
+  const addToShoppingList = async () => {
+    if (!selectedRecipe) return;
+    
+    setAddingToShoppingList(true);
+    try {
+      await axios.post('/api/shopping-lists/add-from-recipe', {
+        recipeId: selectedRecipe.id
+      });
+      toast.success(`Added ${selectedRecipe.name} ingredients to shopping list!`);
+    } catch (error) {
+      console.error('Error adding to shopping list:', error);
+      toast.error('Failed to add ingredients to shopping list');
+    } finally {
+      setAddingToShoppingList(false);
+    }
   };
 
   const getRecipeIcon = (recipeName, recipeDescription) => {
@@ -482,14 +566,29 @@ function MealPlanner() {
               {/* Ingredients */}
               {selectedRecipe.ingredients && selectedRecipe.ingredients.length > 0 && (
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">
-                    🛒 Ingredients
-                  </h3>
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                      🛒 Ingredients
+                    </h3>
+                    <button
+                      onClick={addToShoppingList}
+                      disabled={addingToShoppingList}
+                      className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs sm:text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <span>{addingToShoppingList ? 'Adding...' : 'Add to List'}</span>
+                    </button>
+                  </div>
                   <ul className="space-y-1 sm:space-y-2">
                     {selectedRecipe.ingredients.map((ingredient, idx) => (
                       <li key={idx} className="flex items-start space-x-2">
-                        <span className="text-primary-500 mt-1 flex-shrink-0">✓</span>
-                        <span className="text-sm sm:text-base text-gray-700 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={checkedIngredients[idx] || false}
+                          onChange={() => toggleIngredient(idx)}
+                          className="mt-1 w-4 h-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500 cursor-pointer flex-shrink-0"
+                        />
+                        <span className={`text-sm sm:text-base ${checkedIngredients[idx] ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
                           {typeof ingredient === 'string' ? ingredient : `${ingredient.quantity || ''} ${ingredient.ingredientName}`}
                         </span>
                       </li>
@@ -504,9 +603,26 @@ function MealPlanner() {
                   <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">
                     👨‍🍳 Instructions
                   </h3>
-                  <div className="text-sm sm:text-base text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                    {selectedRecipe.instructions}
-                  </div>
+                  <ol className="space-y-2 sm:space-y-3">
+                    {parseInstructions(selectedRecipe.instructions).map((step, idx) => (
+                      <li key={idx} className="flex items-start space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={checkedSteps[idx] || false}
+                          onChange={() => toggleStep(idx)}
+                          className="mt-1 w-4 h-4 text-primary-500 border-gray-300 rounded focus:ring-primary-500 cursor-pointer flex-shrink-0"
+                        />
+                        <div className="flex-1">
+                          <span className="text-xs sm:text-sm font-semibold text-primary-500 mr-2">
+                            Step {idx + 1}:
+                          </span>
+                          <span className={`text-sm sm:text-base ${checkedSteps[idx] ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                            {step}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
                 </div>
               )}
 
