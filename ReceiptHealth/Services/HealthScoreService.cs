@@ -24,45 +24,48 @@ public class HealthScoreService : IHealthScoreService
             return 50m;
         }
 
-        decimal totalWeight = 0m;
-        decimal weightedSum = 0m;
+        decimal totalAmount = lineItems.Sum(item => item.Price * item.Quantity);
+        decimal healthyAmount = 0m;
+        decimal junkAmount = 0m;
+        decimal otherAmount = 0m;
 
         foreach (var item in lineItems)
         {
             var amount = item.Price * item.Quantity;
             
-            // Weight based on category
-            decimal weight = item.Category switch
+            switch (item.Category)
             {
-                "Healthy" => 1m,  // +1 per currency unit
-                "Junk" => -1m,    // -1 per currency unit
-                "Other" => 0m,    // neutral
-                "Unknown" => 0m,  // neutral
-                _ => 0m
-            };
-
-            weightedSum += weight * amount;
-            totalWeight += Math.Abs(weight) * amount;
+                case "Healthy":
+                    healthyAmount += amount;
+                    break;
+                case "Junk":
+                    junkAmount += amount;
+                    break;
+                default:
+                    otherAmount += amount;
+                    break;
+            }
         }
 
-        // If no weighted items (all Other/Unknown), return 50
-        if (totalWeight == 0m)
-        {
-            _logger.LogDebug("No weighted items, returning default score of 50");
-            return 50m;
-        }
+        // Calculate percentages
+        decimal healthyPercent = totalAmount > 0 ? (healthyAmount / totalAmount) * 100m : 0m;
+        decimal junkPercent = totalAmount > 0 ? (junkAmount / totalAmount) * 100m : 0m;
+        decimal otherPercent = totalAmount > 0 ? (otherAmount / totalAmount) * 100m : 0m;
 
-        // Normalize to 0-100 scale
-        // weightedSum ranges from -totalWeight to +totalWeight
-        // Map to 0-100: ((weightedSum + totalWeight) / (2 * totalWeight)) * 100
-        var normalizedScore = ((weightedSum + totalWeight) / (2 * totalWeight)) * 100m;
+        // New algorithm: 
+        // - Healthy items contribute positively (worth full value)
+        // - Junk items contribute negatively
+        // - Other items are treated as slightly positive (60% of neutral = 60 points)
+        // Formula: (Healthy% * 100) + (Other% * 60) + (Junk% * 0)
+        decimal score = (healthyPercent * 1.0m) + (otherPercent * 0.6m) + (junkPercent * 0m);
         
         // Clamp to 0-100
-        normalizedScore = Math.Max(0m, Math.Min(100m, normalizedScore));
+        score = Math.Max(0m, Math.Min(100m, score));
 
-        _logger.LogInformation("Computed health score: {Score:F2} (WeightedSum={WeightedSum:F2}, TotalWeight={TotalWeight:F2})",
-            normalizedScore, weightedSum, totalWeight);
+        _logger.LogInformation(
+            "Computed health score: {Score:F2} (Healthy={HealthyPercent:F1}%, Junk={JunkPercent:F1}%, Other={OtherPercent:F1}%)",
+            score, healthyPercent, junkPercent, otherPercent);
 
-        return Math.Round(normalizedScore, 2);
+        return Math.Round(score, 2);
     }
 }

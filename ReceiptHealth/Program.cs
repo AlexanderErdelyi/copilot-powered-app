@@ -68,6 +68,7 @@ builder.Services.AddScoped<IInsightsService, InsightsService>();
 builder.Services.AddScoped<INutritionService, NutritionService>();
 builder.Services.AddScoped<IMealPlannerService, MealPlannerService>();
 builder.Services.AddScoped<VoiceAssistantService>();
+builder.Services.AddScoped<ICategoryManagementService, CategoryManagementService>();
 
 // Text-to-Speech service (Piper)
 builder.Services.AddSingleton<IPiperTtsService, PiperTtsService>();
@@ -96,6 +97,11 @@ using (var scope = app.Services.CreateScope())
     context.Database.EnsureCreated();
     Console.WriteLine($"✅ Database initialized at: {dbPath}");
     app.Logger.LogInformation("Database initialized at: {DbPath}", dbPath);
+    
+    // Initialize system categories
+    var categoryService = scope.ServiceProvider.GetRequiredService<ICategoryManagementService>();
+    await categoryService.EnsureSystemCategoriesExistAsync();
+    Console.WriteLine("✅ System categories initialized");
 }
 
 Console.WriteLine("📡 Setting up API endpoints...");
@@ -1704,6 +1710,165 @@ app.MapDelete("/api/receipts/{id}", async (int id, ReceiptHealthContext context,
     }
 });
 
+// ============= Category Management API Endpoints =============
+app.MapGet("/api/categories", async (ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var categories = await categoryService.GetActiveCategoriesAsync();
+        return Results.Ok(categories);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapGet("/api/categories/all", async (ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var categories = await categoryService.GetAllCategoriesAsync();
+        return Results.Ok(categories);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapGet("/api/categories/{id}", async (int id, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var category = await categoryService.GetCategoryByIdAsync(id);
+        if (category == null)
+        {
+            return Results.NotFound(new { message = $"Category with ID {id} not found" });
+        }
+        return Results.Ok(category);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPost("/api/categories", async (CreateCategoryRequest request, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var category = new Category
+        {
+            Name = request.Name,
+            Description = request.Description,
+            Color = request.Color,
+            Icon = request.Icon,
+            SortOrder = request.SortOrder
+        };
+
+        var created = await categoryService.CreateCategoryAsync(category);
+        return Results.Created($"/api/categories/{created.Id}", created);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPut("/api/categories/{id}", async (int id, UpdateCategoryRequest request, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var category = new Category
+        {
+            Id = id,
+            Name = request.Name,
+            Description = request.Description,
+            Color = request.Color,
+            Icon = request.Icon,
+            IsActive = request.IsActive,
+            SortOrder = request.SortOrder
+        };
+
+        var updated = await categoryService.UpdateCategoryAsync(category);
+        return Results.Ok(updated);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapDelete("/api/categories/{id}", async (int id, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var result = await categoryService.DeleteCategoryAsync(id);
+        if (!result)
+        {
+            return Results.NotFound(new { message = $"Category with ID {id} not found" });
+        }
+        return Results.NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPost("/api/categories/suggest", async (SuggestCategoriesRequest request, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var suggestions = await categoryService.SuggestCategoriesAsync(request.ItemDescription);
+        return Results.Ok(new { suggestions });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPut("/api/shopping-lists/{listId}/items/{itemId}/category", async (
+    int listId, 
+    int itemId, 
+    UpdateItemCategoryRequest request, 
+    ReceiptHealthContext context) =>
+{
+    try
+    {
+        var item = await context.ShoppingListItems
+            .FirstOrDefaultAsync(i => i.Id == itemId && i.ShoppingListId == listId);
+
+        if (item == null)
+        {
+            return Results.NotFound(new { message = "Item not found" });
+        }
+
+        item.Category = request.Category;
+        await context.SaveChangesAsync();
+
+        return Results.Ok(item);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
 Console.WriteLine("✅ All endpoints configured");
 Console.WriteLine("🌐 ReceiptHealth API is running on http://localhost:5002");
 Console.WriteLine("📊 Dashboard: http://localhost:5002");
@@ -1768,4 +1933,8 @@ public record GenerateSingleMealRequest(string DayOfWeek, string MealType, strin
 public record CreateShoppingListFromMealPlanRequest(string? Name = null);
 public record AddRecipeToMealSlotRequest(int RecipeId, DayOfWeek DayOfWeek, MealType MealType);
 public record AddRecipeToShoppingListRequest(int RecipeId, int? ShoppingListId = null);
+public record CreateCategoryRequest(string Name, string? Description = null, string? Color = null, string? Icon = null, int SortOrder = 0);
+public record UpdateCategoryRequest(string Name, string? Description = null, string? Color = null, string? Icon = null, bool IsActive = true, int SortOrder = 0);
+public record SuggestCategoriesRequest(string ItemDescription);
+public record UpdateItemCategoryRequest(string Category);
 
