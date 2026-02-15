@@ -137,6 +137,53 @@ We love code contributions! Here's how to get started:
 
 6. **Run the application**
    
+   **Option A: VS Code (Recommended)** ⚡
+   
+   The easiest way to start developing:
+   1. Open the project in VS Code
+   2. **Choose your mode:**
+      - **Press `Ctrl+F5`** → Run without debugging (Faster! ⚡ Best for React/Vite hot reload)
+      - **Press `F5`** → Run with debugging (Use when you need C# breakpoints)
+   3. Browser opens automatically to `http://localhost:5173`
+   
+   > **💡 Tip:** Use `Ctrl+F5` for normal development - Vite's hot module replacement (HMR) works best without the debugger attached. Only use `F5` when you need to debug backend C# code.
+   
+   > **Troubleshooting: Port already in use?**
+   > 
+   > If you see "Port 5173 is already in use", you have leftover processes from a previous session.
+   > 
+   > **Quick fix:**
+   > ```powershell
+   > cd ReceiptHealth
+   > .\kill-dev-servers.ps1
+   > ```
+   > 
+   > **Manual fix:**
+   > - Press `Ctrl+C` in any terminal running Vite
+   > - Or: `Get-Process node | Stop-Process -Force` (PowerShell)
+   > - Or: Task Manager → Find `node.exe` → End Task
+   > 
+   > Then press F5 again.
+   
+   **Available configurations:**
+   - **"Sanitas Mind Full Stack (React + API)"** - Default, with debugging
+   - **"Sanitas Mind (No Debug - Fast HMR)"** - Optimized for frontend development
+   - "ReceiptHealth Backend Only" - Just the API
+   - "CopilotWebApp Backend" - Other project
+   
+   This uses the `.vscode/launch.json` configuration:
+   - **Configuration name:** "Sanitas Mind Full Stack (React + API)"
+   - **Backend:** Builds and runs on `http://localhost:5100`
+   - **Frontend:** Starts Vite dev server on `http://localhost:5173`
+   - **Debugging:** Enables breakpoints in both C# and JavaScript/React
+   - **Auto-open:** Browser launches automatically when ready
+   
+   **Other launch configurations available:**
+   - "ReceiptHealth Backend Only" - Just the API (for API-only work)
+   - "CopilotWebApp Backend" - The other project in the solution
+   
+   **Option B: Command Line Scripts**
+   
    **Windows:**
    ```bash
    cd ReceiptHealth
@@ -148,10 +195,65 @@ We love code contributions! Here's how to get started:
    cd ReceiptHealth
    ./start-dev.sh
    ```
+   
+   **Option C: Manual (Two Terminals)**
+   
+   Terminal 1 - Backend:
+   ```bash
+   cd ReceiptHealth
+   dotnet run
+   ```
+   
+   Terminal 2 - Frontend:
+   ```bash
+   cd ReceiptHealth/client
+   npm run dev
+   ```
 
 7. **Verify everything works**
    
    Open `http://localhost:5173` in your browser.
+   
+   You should see:
+   - ✅ Sanitas Mind logo and branding
+   - ✅ Sidebar navigation (collapsible)
+   - ✅ Dark mode by default
+   - ✅ Dashboard with sample data or empty state
+
+### Understanding the Development Setup
+
+**Two servers run during development:**
+
+| Server | Technology | Port | Purpose |
+|--------|-----------|------|---------|
+| **Backend API** | .NET 8 | 5100 | Handles data, receipts, AI processing |
+| **Frontend Dev Server** | Vite (Node.js) | 5173 | Serves React app with hot reload |
+
+**What is Vite?**
+- ⚡ Modern dev server for React (replaces older tools like Webpack)
+- 🔄 **Hot Module Replacement (HMR)** - See code changes instantly without refresh
+- 🔌 Proxies API calls to backend (`/api` → `http://localhost:5100`)
+- 📦 Bundles your React app for production (`npm run build`)
+
+**Why two servers?**
+- Frontend and backend run independently during development
+- Frontend can reload instantly when you change React code
+- Backend can be debugged separately with C# breakpoints
+- In production, the built React app is served by the backend
+
+**Common commands:**
+```powershell
+# Stop all dev servers
+.\kill-dev-servers.ps1
+
+# Start fresh (automatic with F5)
+# 1. Backend: dotnet run
+# 2. Frontend: npm run dev
+
+# Build for production
+npm run build          # Minified React app → client/dist
+dotnet publish -c Release  # Optimized .NET binary
+```
 
 ## 🔄 Development Workflow
 
@@ -185,6 +287,35 @@ git checkout -b fix/bug-description
 - `docs/description` - Documentation updates
 - `refactor/description` - Code refactoring
 - `test/description` - Adding or updating tests
+
+### Debugging Your Code
+
+#### VS Code Debugging Setup
+
+The project includes pre-configured debugging support in `.vscode/launch.json`.
+
+**To start debugging:**
+1. Set breakpoints in your code (click left of line numbers)
+2. Press **F5** or click Run → Start Debugging
+3. Choose "Sanitas Mind Full Stack (React + API)" (default)
+4. Code execution will pause at your breakpoints
+
+**Backend (C#) Debugging:**
+- Set breakpoints in `.cs` files (Services, Program.cs, etc.)
+- Inspect variables, call stack, watch expressions
+- Step through code with F10 (step over) and F11 (step into)
+
+**Frontend (React) Debugging:**
+- Use browser DevTools (F12)
+- React Developer Tools extension recommended
+- Set breakpoints in Sources tab or use `debugger;` statement
+- Check Console for errors and warnings
+
+**Tips:**
+- Use conditional breakpoints (right-click breakpoint → Edit Breakpoint)
+- Watch expressions for tracking variable changes
+- Use Debug Console to evaluate expressions at runtime
+- Check Output panel for backend logs
 
 ### Making Changes
 

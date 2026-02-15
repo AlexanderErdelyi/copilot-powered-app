@@ -2514,15 +2514,15 @@ app.MapPut("/api/shopping-lists/{listId}/items/{itemId}/category", async (
 });
 
 Console.WriteLine("✅ All endpoints configured");
-Console.WriteLine("🌐 ReceiptHealth API is running on http://localhost:5002");
-Console.WriteLine("📊 Dashboard: http://localhost:5002");
-Console.WriteLine("📄 Receipts: http://localhost:5002/receipts.html");
-Console.WriteLine("🧪 Test endpoint: http://localhost:5002/api/test");
+Console.WriteLine("🌐 Sanitas Mind API is running on http://localhost:5100");
+Console.WriteLine("📊 Dashboard: http://localhost:5173 (React app)");
+Console.WriteLine("🔧 API endpoint: http://localhost:5100/api");
+Console.WriteLine("🧪 Test endpoint: http://localhost:5100/api/test");
 Console.WriteLine(string.Empty);
 Console.WriteLine("Waiting for requests...");
 Console.WriteLine(string.Empty);
 
-app.Logger.LogInformation("ReceiptHealth API is running on http://localhost:5002");
+app.Logger.LogInformation("Sanitas Mind API is running on http://localhost:5100");
 
 app.Run();
 

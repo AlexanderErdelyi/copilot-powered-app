@@ -114,7 +114,29 @@ copilot-powered-app/
 
 ### Running the Application
 
-#### Development Mode (Recommended)
+#### Quick Start with VS Code (Easiest!) ⚡
+
+If you're using VS Code:
+
+1. Open the project in VS Code
+2. **Choose your start mode:**
+   - **`Ctrl+F5`** - Run without debugging ⚡ **Recommended for development!**
+   - **`F5`** - Run with debugging (only when you need C# breakpoints)
+3. Wait for both backend and frontend to start
+4. Your browser will automatically open to `http://localhost:5173`
+
+> **💡 Pro Tip:** Use `Ctrl+F5` for normal development - Vite's hot module replacement is much faster without the debugger!
+
+This will:
+- ✅ Build the .NET backend
+- ✅ Start the React dev server (Vite)
+- ✅ Launch the API on port 5100
+- ✅ Open the React app on port 5173
+- ✅ Enable fast hot reload for instant code changes
+
+> **Note:** The launch configuration is named "Sanitas Mind Full Stack (React + API)" and is set as the default.
+
+#### Development Mode (Scripts)
 
 **Windows:**
 ```bash
@@ -129,7 +151,7 @@ cd ReceiptHealth
 ```
 
 This will start:
-- Backend API on `http://localhost:5162`
+- Backend API on `http://localhost:5100`
 - React dev server on `http://localhost:5173`
 
 #### Manual Start

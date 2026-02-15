@@ -159,7 +159,7 @@ Failed to extract text from image: API error
 
 Text files work without AI (directly read from file):
 ```bash
-curl -X POST http://localhost:5002/api/upload \
+curl -X POST http://localhost:5100/api/upload \
   -F "file=@sample-receipt.txt"
 ```
 
@@ -167,7 +167,7 @@ curl -X POST http://localhost:5002/api/upload \
 
 Image files require AI-powered OCR:
 ```bash
-curl -X POST http://localhost:5002/api/upload \
+curl -X POST http://localhost:5100/api/upload \
   -F "file=@receipt-image.jpg"
 ```
 
@@ -175,7 +175,7 @@ curl -X POST http://localhost:5002/api/upload \
 
 PDF files require AI-powered extraction:
 ```bash
-curl -X POST http://localhost:5002/api/upload \
+curl -X POST http://localhost:5100/api/upload \
   -F "file=@receipt.pdf"
 ```
 
