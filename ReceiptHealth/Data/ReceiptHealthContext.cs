@@ -26,6 +26,7 @@ public class ReceiptHealthContext : DbContext
     public DbSet<Recipe> Recipes { get; set; }
     public DbSet<RecipeIngredient> RecipeIngredients { get; set; }
     public DbSet<Category> Categories { get; set; }
+    public DbSet<Activity> Activities { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -213,6 +214,18 @@ public class ReceiptHealthContext : DbContext
             entity.HasIndex(e => e.Name).IsUnique();
             entity.HasIndex(e => e.IsSystemCategory);
             entity.HasIndex(e => e.SortOrder);
+        });
+
+        // Activity configuration
+        modelBuilder.Entity<Activity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Type).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Description).IsRequired().HasMaxLength(500);
+            entity.HasIndex(e => e.Timestamp);
+            entity.HasIndex(e => e.Type);
+            entity.HasIndex(e => e.IsRead);
+            entity.HasIndex(e => new { e.EntityType, e.EntityId });
         });
     }
 }

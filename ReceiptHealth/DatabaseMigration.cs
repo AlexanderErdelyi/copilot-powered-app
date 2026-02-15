@@ -64,6 +64,21 @@ public class DatabaseMigration
             Console.WriteLine("ℹ️  LineItems table doesn't exist yet - will be created by EnsureCreated()");
         }
 
+        // Check if Activities table exists
+        var checkActivitiesTableCmd = connection.CreateCommand();
+        checkActivitiesTableCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='Activities'";
+        var activitiesExists = checkActivitiesTableCmd.ExecuteScalar() != null;
+
+        if (!activitiesExists)
+        {
+            Console.WriteLine("⚠️  Activities table not found. Adding...");
+            RunActivitiesMigration(connection);
+        }
+        else
+        {
+            Console.WriteLine("✅ Activities table exists.");
+        }
+
         connection.Close();
         Console.WriteLine("✅ Database migration completed successfully!");
     }
@@ -111,5 +126,32 @@ public class DatabaseMigration
         ";
         cmd.ExecuteNonQuery();
         Console.WriteLine("   ✅ CategoryId column added to LineItems and mapped from existing data");
+    }
+
+    private static void RunActivitiesMigration(SqliteConnection connection)
+    {
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            CREATE TABLE Activities (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Type TEXT NOT NULL,
+                Description TEXT NOT NULL,
+                EntityType TEXT,
+                EntityId INTEGER,
+                Timestamp TEXT NOT NULL,
+                IsSuccess INTEGER NOT NULL DEFAULT 1,
+                IsRead INTEGER NOT NULL DEFAULT 0,
+                ErrorMessage TEXT,
+                Icon TEXT,
+                NavigateUrl TEXT
+            );
+
+            CREATE INDEX IX_Activities_Timestamp ON Activities (Timestamp);
+            CREATE INDEX IX_Activities_Type ON Activities (Type);
+            CREATE INDEX IX_Activities_IsRead ON Activities (IsRead);
+            CREATE INDEX IX_Activities_EntityType_EntityId ON Activities (EntityType, EntityId);
+        ";
+        cmd.ExecuteNonQuery();
+        Console.WriteLine("   ✅ Activities table created with indexes");
     }
 }

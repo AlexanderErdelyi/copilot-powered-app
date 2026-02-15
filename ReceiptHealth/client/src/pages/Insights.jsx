@@ -155,14 +155,31 @@ function Insights() {
                   Predicted Spending (Next Month)
                 </div>
                 <div className="text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-300">
-                  ${prediction.predictedAmount?.toFixed(2) || '0.00'}
+                  ${prediction.predictedTotal?.toFixed(2) || '0.00'}
+                </div>
+                <div className="mt-2 space-y-1 text-xs text-blue-600 dark:text-blue-400">
+                  <div className="flex justify-between">
+                    <span>Current Month:</span>
+                    <span className="font-semibold">${prediction.currentMonthSpend?.toFixed(2) || '0.00'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Average Monthly:</span>
+                    <span className="font-semibold">${prediction.averageMonthlySpend?.toFixed(2) || '0.00'}</span>
+                  </div>
                 </div>
                 {prediction.confidence && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    Confidence: {(prediction.confidence * 100).toFixed(0)}%
+                  <div className="mt-2">
+                    <span className="inline-block px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded text-xs font-semibold">
+                      {prediction.confidence.toUpperCase()} Confidence
+                    </span>
                   </div>
                 )}
               </div>
+              {prediction.message && (
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                  {prediction.message}
+                </p>
+              )}
               {prediction.trend && (
                 <div className="flex items-center space-x-2 text-sm">
                   {prediction.trend === 'increasing' ? (
@@ -200,26 +217,32 @@ function Insights() {
           </div>
         ) : recommendations.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-            {recommendations.map((rec, idx) => (
-              <div key={idx} className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
-                <div className="text-sm sm:text-base font-semibold text-green-700 dark:text-green-300 mb-1">
-                  {rec.title || rec.category}
-                </div>
-                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  {rec.suggestion || rec.recommendation}
-                </div>
-                {rec.potentialSavings && (
-                  <div className="text-xs sm:text-sm font-semibold text-green-600 dark:text-green-400 mt-2">
-                    Save up to ${rec.potentialSavings.toFixed(2)}
+            {recommendations.map((rec, idx) => {
+              // Recommendations come as strings with emojis at the start
+              const text = typeof rec === 'string' ? rec : (rec.suggestion || rec.recommendation || rec.title || '');
+              // Extract emoji if present (first character)   
+              const hasEmoji = text && /[\u{1F300}-\u{1F9FF}]/u.test(text[0]);
+              const emoji = hasEmoji ? text[0] : '💡';
+              const content = hasEmoji ? text.slice(1).trim() : text;
+              
+              return (
+                <div key={idx} className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg flex-shrink-0">{emoji}</span>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-700 dark:text-gray-300">
+                        {content}
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <p>No recommendations at this time</p>
-            <p className="text-sm mt-1">Keep tracking your spending for personalized tips!</p>
+            <p>📊 Upload receipts to get recommendations</p>
+            <p className="text-sm mt-1">AI will analyze your shopping patterns and suggest healthier alternatives!</p>
           </div>
         )}
       </div>

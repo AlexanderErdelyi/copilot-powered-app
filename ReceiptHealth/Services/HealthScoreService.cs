@@ -20,11 +20,10 @@ public class HealthScoreService : IHealthScoreService
     {
         if (lineItems.Count == 0)
         {
-            _logger.LogDebug("No line items, returning default score of 50");
-            return 50m;
+            _logger.LogDebug("No line items, returning default score of 0");
+            return 0m;
         }
 
-        decimal totalAmount = lineItems.Sum(item => item.Price * item.Quantity);
         decimal healthyAmount = 0m;
         decimal junkAmount = 0m;
         decimal otherAmount = 0m;
@@ -47,24 +46,28 @@ public class HealthScoreService : IHealthScoreService
             }
         }
 
-        // Calculate percentages
-        decimal healthyPercent = totalAmount > 0 ? (healthyAmount / totalAmount) * 100m : 0m;
-        decimal junkPercent = totalAmount > 0 ? (junkAmount / totalAmount) * 100m : 0m;
-        decimal otherPercent = totalAmount > 0 ? (otherAmount / totalAmount) * 100m : 0m;
+        // Calculate total of only Healthy and Junk items
+        decimal healthyJunkTotal = healthyAmount + junkAmount;
 
-        // New algorithm: 
-        // - Healthy items contribute positively (worth full value)
-        // - Junk items contribute negatively
-        // - Other items are treated as slightly positive (60% of neutral = 60 points)
-        // Formula: (Healthy% * 100) + (Other% * 60) + (Junk% * 0)
-        decimal score = (healthyPercent * 1.0m) + (otherPercent * 0.6m) + (junkPercent * 0m);
+        // If there are no Healthy or Junk items, return 0 (neutral)
+        if (healthyJunkTotal == 0)
+        {
+            _logger.LogInformation(
+                "No Healthy or Junk items found (Other={OtherAmount:F2}), returning score of 0",
+                otherAmount);
+            return 0m;
+        }
+
+        // New formula: Healthy / (Healthy + Junk) * 100
+        // This focuses only on food health, ignoring "Other" and "Unknown" categories
+        decimal score = (healthyAmount / healthyJunkTotal) * 100m;
         
-        // Clamp to 0-100
+        // Clamp to 0-100 (should already be in range, but just in case)
         score = Math.Max(0m, Math.Min(100m, score));
 
         _logger.LogInformation(
-            "Computed health score: {Score:F2} (Healthy={HealthyPercent:F1}%, Other={OtherPercent:F1}%, Junk={JunkPercent:F1}%)",
-            score, healthyPercent, otherPercent, junkPercent);
+            "Computed health score: {Score:F2} (Healthy={HealthyAmount:F2}, Junk={JunkAmount:F2}, Other={OtherAmount:F2})",
+            score, healthyAmount, junkAmount, otherAmount);
 
         return Math.Round(score, 2);
     }
