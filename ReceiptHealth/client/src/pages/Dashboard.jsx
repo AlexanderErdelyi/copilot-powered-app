@@ -1068,7 +1068,7 @@ function Dashboard() {
       {/* Spending Breakdown Modal - All Purchased Items */}
       {showSpendingBreakdown && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
             <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-center z-10">
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
@@ -1085,13 +1085,13 @@ function Dashboard() {
                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-4 sm:p-6">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               {allPurchasedItems.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-2 overflow-visible">
                   {allPurchasedItems.map((item, index) => {
                     const categoryStyle = getCategoryStyles(item.category);
                     return (
-                      <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border}`}>
+                      <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border} ${showCategorySelector && editingItemId === item.id ? 'relative z-[100000]' : ''}`}>
                         <div className="flex-1 min-w-0">
                           <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description || item.name}</span>
                           <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 flex-wrap">
@@ -1167,8 +1167,8 @@ function Dashboard() {
       {/* Healthy Items Modal */}
       {showHealthyItemsModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-green-500/20 border border-gray-200/50 dark:border-gray-700/50">
-            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-center z-10">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-green-500/20 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-center z-10 flex-shrink-0">
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
                   🥗 Healthy Items
@@ -1184,13 +1184,13 @@ function Dashboard() {
                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-4 sm:p-6">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               {healthyItems.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-2 overflow-visible">
                   {healthyItems.map((item, index) => {
                     const categoryStyle = getCategoryStyles(item.category);
                     return (
-                    <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border}`}>
+                    <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border} ${showCategorySelector && editingItemId === item.id ? 'relative z-[100000]' : ''}`}>
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description || item.name}</span>
                         <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 flex-wrap">
@@ -1250,7 +1250,8 @@ function Dashboard() {
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 text-center py-8">
@@ -1265,8 +1266,8 @@ function Dashboard() {
       {/* Junk Items Modal */}
       {showJunkItemsModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-red-500/20 border border-gray-200/50 dark:border-gray-700/50">
-            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-center z-10">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-red-500/20 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-center z-10 flex-shrink-0">
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-400">
                   🍔 Junk Items
@@ -1282,13 +1283,13 @@ function Dashboard() {
                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-4 sm:p-6">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               {junkItems.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-2 overflow-visible">
                   {junkItems.map((item, index) => {
                     const categoryStyle = getCategoryStyles(item.category);
                     return (
-                    <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border}`}>
+                    <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border} ${showCategorySelector && editingItemId === item.id ? 'relative z-[100000]' : ''}`}>
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description || item.name}</span>
                         <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 flex-wrap">
@@ -1364,8 +1365,8 @@ function Dashboard() {
       {/* Category Items Modal */}
       {showCategoryModal && selectedCategory && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
-            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-center z-10">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-center z-10 flex-shrink-0">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                 {selectedCategory} Items
               </h2>
@@ -1376,13 +1377,13 @@ function Dashboard() {
                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-4 sm:p-6">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               {categoryItems.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-2 overflow-visible">
                   {categoryItems.map((item, index) => {
                     const categoryStyle = getCategoryStyles(item.category);
                     return (
-                      <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border}`}>
+                      <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border} ${showCategorySelector && editingItemId === item.id ? 'relative z-[100000]' : ''}`}>
                         <div className="flex-1 min-w-0">
                           <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description || item.name}</span>
                           <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 flex-wrap">
