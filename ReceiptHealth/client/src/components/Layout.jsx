@@ -10,6 +10,7 @@ import WakeWordListener from './WakeWordListener';
 
 function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -203,10 +204,15 @@ function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Sidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        toggleSidebar={toggleSidebar}
+        isCollapsed={sidebarCollapsed}
+        setIsCollapsed={setSidebarCollapsed}
+      />
       
       {/* Main content */}
-      <div className="lg:ml-64 min-h-screen flex flex-col">
+      <div className={`${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} min-h-screen flex flex-col transition-all duration-300`}>
         {/* Top bar */}
         <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-30">
           <div className="flex items-center justify-between px-2 sm:px-4 py-3 sm:py-4">
