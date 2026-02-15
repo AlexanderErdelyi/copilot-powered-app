@@ -14,6 +14,7 @@ import Settings from './pages/Settings';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import Support from './pages/Support';
+import Docs from './pages/Docs';
 import Roadmap from './pages/Roadmap';
 import Changelog from './pages/Changelog';
 import WakeWordListener from './components/WakeWordListener';
@@ -40,6 +41,7 @@ function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/support" element={<Support />} />
+            <Route path="/docs" element={<Docs />} />
             <Route path="/roadmap" element={<Roadmap />} />
             <Route path="/changelog" element={<Changelog />} />
           </Routes>

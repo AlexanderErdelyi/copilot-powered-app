@@ -49,7 +49,7 @@ function Support() {
       icon: Book,
       title: "User Guide",
       description: "Complete documentation on how to use all features",
-      link: "#docs"
+      link: "/docs"
     },
     {
       icon: Video,
