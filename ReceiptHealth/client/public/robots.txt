@@ -1,0 +1,9 @@
+# Sanitas Mind - robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://sanitasmind.app/sitemap.xml
+
+# Security - Disallow sensitive paths (if any)
+Disallow: /api/

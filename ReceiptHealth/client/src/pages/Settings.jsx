@@ -19,7 +19,7 @@ function Settings() {
 
   // Theme settings
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('theme') || 'system';
+    return localStorage.getItem('theme') || 'dark'; // Default to dark
   });
 
   // Notification settings
@@ -113,7 +113,7 @@ function Settings() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `receipthealth-settings-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `sanitasmind-settings-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -190,7 +190,7 @@ function Settings() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `receipthealth-fulldata-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `sanitasmind-fulldata-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -441,7 +441,7 @@ function Settings() {
                     Appearance
                   </h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                    Customize how ReceiptHealth looks on your device
+                    Customize how Sanitas Mind looks on your device
                   </p>
                 </div>
 
@@ -681,17 +681,17 @@ function Settings() {
               <div className="space-y-6">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                    About ReceiptHealth
+                    About Sanitas Mind
                   </h2>
                 </div>
 
                 <div className="space-y-4">
                   <div className="text-center py-8">
-                    <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                      <span className="text-4xl">🧾</span>
+                    <div className="w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                      <img src="/logo.svg" alt="Sanitas Mind" className="w-20 h-20" />
                     </div>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                      ReceiptHealth
+                      Sanitas Mind
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400 mb-1">
                       Version 1.0.0
@@ -716,17 +716,17 @@ function Settings() {
 
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-6 text-sm text-gray-600 dark:text-gray-400">
                     <p className="mb-4">
-                      ReceiptHealth helps you track your spending habits and make healthier choices.
+                      Sanitas Mind helps you track your spending habits and make healthier choices.
                       Upload receipts, analyze your purchases, and get AI-powered insights.
                     </p>
                     <div className="flex flex-wrap gap-3">
-                      <a href="#" className="text-primary-500 hover:text-primary-600">Documentation</a>
+                      <a href="/docs" className="text-primary-500 hover:text-primary-600">Documentation</a>
                       <span>•</span>
-                      <a href="#" className="text-primary-500 hover:text-primary-600">Privacy Policy</a>
+                      <a href="/privacy" className="text-primary-500 hover:text-primary-600">Privacy Policy</a>
                       <span>•</span>
-                      <a href="#" className="text-primary-500 hover:text-primary-600">Terms of Service</a>
+                      <a href="/terms" className="text-primary-500 hover:text-primary-600">Terms of Service</a>
                       <span>•</span>
-                      <a href="#" className="text-primary-500 hover:text-primary-600">Support</a>
+                      <a href="/support" className="text-primary-500 hover:text-primary-600">Support</a>
                     </div>
                   </div>
                 </div>

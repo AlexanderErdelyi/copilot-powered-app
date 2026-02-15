@@ -101,6 +101,39 @@ function Receipts() {
     }
   };
 
+  const getCategoryStyles = (category) => {
+    const categoryName = category?.toLowerCase() || 'unknown';
+    
+    const styles = {
+      'healthy': {
+        bg: 'bg-green-50/80 dark:bg-green-900/20',
+        border: 'border-green-200/50 dark:border-green-700/50',
+        badge: 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300',
+        glow: 'hover:shadow-green-500/20'
+      },
+      'junk': {
+        bg: 'bg-red-50/80 dark:bg-red-900/20',
+        border: 'border-red-200/50 dark:border-red-700/50',
+        badge: 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300',
+        glow: 'hover:shadow-red-500/20'
+      },
+      'other': {
+        bg: 'bg-gray-50/80 dark:bg-gray-700/80',
+        border: 'border-gray-200/50 dark:border-gray-600/50',
+        badge: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
+        glow: 'hover:shadow-gray-500/20'
+      },
+      'unknown': {
+        bg: 'bg-gray-50/80 dark:bg-gray-700/80',
+        border: 'border-gray-200/50 dark:border-gray-600/50',
+        badge: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400',
+        glow: 'hover:shadow-gray-500/20'
+      }
+    };
+    
+    return styles[categoryName] || styles['unknown'];
+  };
+
   const viewReceipt = async (receiptId) => {
     try {
       const response = await axios.get(`/api/receipts/${receiptId}`);
@@ -300,16 +333,16 @@ function Receipts() {
   );
 
   const getHealthScoreColor = (score) => {
-    if (score >= 70) return 'text-green-500 bg-green-100 dark:bg-green-900';
-    if (score >= 40) return 'text-yellow-500 bg-yellow-100 dark:bg-yellow-900';
-    return 'text-red-500 bg-red-100 dark:bg-red-900';
+    if (score >= 70) return 'text-green-600 dark:text-green-400 bg-green-100/80 dark:bg-green-900/50 border-green-300/50 dark:border-green-700/50 shadow-green-500/20';
+    if (score >= 40) return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100/80 dark:bg-yellow-900/50 border-yellow-300/50 dark:border-yellow-700/50 shadow-yellow-500/20';
+    return 'text-red-600 dark:text-red-400 bg-red-100/80 dark:bg-red-900/50 border-red-300/50 dark:border-red-700/50 shadow-red-500/20';
   };
 
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Receipts</h1>
+      <div className="bg-gradient-to-br from-primary-500/10 via-transparent to-accent-500/10 dark:from-primary-400/10 dark:to-accent-400/10 rounded-2xl p-6 border border-primary-200/30 dark:border-primary-700/30 backdrop-blur-xl shadow-lg shadow-primary-500/5">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">📄 Receipts</h1>
         <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
           Upload and manage your receipts
         </p>
@@ -317,10 +350,10 @@ function Receipts() {
 
       {/* Upload area */}
       <div
-        className={`card border-2 border-dashed transition-all duration-200 ${
+        className={`bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl rounded-2xl shadow-xl shadow-primary-500/10 border-2 border-dashed transition-all duration-300 ${
           dragActive 
-            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' 
-            : 'border-gray-300 dark:border-gray-600'
+            ? 'border-primary-500 bg-primary-50/80 dark:bg-primary-900/30 shadow-2xl shadow-primary-500/25 scale-[1.02]' 
+            : 'border-gray-300/50 dark:border-gray-600/50 hover:border-primary-400/50 hover:shadow-primary-500/20'
         }`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -328,7 +361,7 @@ function Receipts() {
         onDrop={handleDrop}
       >
         <div className="text-center py-3 sm:py-4">
-          <Upload className={`w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 ${dragActive ? 'text-primary-500' : 'text-gray-400'}`} />
+          <Upload className={`w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 transition-all duration-300 ${dragActive ? 'text-primary-500 animate-bounce' : 'text-gray-400'}`} />
           <h3 className="text-sm sm:text-base font-semibold mb-1 text-gray-900 dark:text-white">
             {dragActive ? 'Drop your receipt here' : 'Upload Receipt'}
           </h3>
@@ -359,18 +392,18 @@ function Receipts() {
       </div>
 
       {/* Search and filters */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+      <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl rounded-2xl shadow-xl shadow-primary-500/10 border border-gray-200/50 dark:border-gray-700/50 p-4 flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary-400 w-4 h-4 sm:w-5 sm:h-5" />
           <input
             type="text"
             placeholder="Search by vendor..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="input pl-9 sm:pl-10 text-sm sm:text-base"
+            className="input pl-9 sm:pl-10 text-sm sm:text-base bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-gray-300/50 dark:border-gray-600/50 focus:border-primary-400 focus:ring-primary-400/20"
           />
         </div>
-        <button className="btn-secondary flex items-center justify-center space-x-2 text-sm sm:text-base">
+        <button className="btn-secondary flex items-center justify-center space-x-2 text-sm sm:text-base hover:shadow-lg hover:shadow-primary-500/20 transition-all duration-300">
           <Filter className="w-4 h-4" />
           <span>Filters</span>
         </button>
@@ -378,18 +411,18 @@ function Receipts() {
 
       {/* Receipts table */}
       {loading ? (
-        <div className="card">
+        <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl rounded-2xl shadow-xl shadow-primary-500/10 border border-gray-200/50 dark:border-gray-700/50 p-6">
           <div className="animate-pulse space-y-4">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div key={i} className="h-16 bg-gradient-to-r from-gray-200/50 via-gray-300/50 to-gray-200/50 dark:from-gray-700/50 dark:via-gray-600/50 dark:to-gray-700/50 rounded-xl"></div>
             ))}
           </div>
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl rounded-2xl shadow-xl shadow-primary-500/10 border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700">
+              <thead className="bg-gradient-to-r from-gray-50/80 via-primary-50/30 to-gray-50/80 dark:from-gray-700/80 dark:via-primary-900/30 dark:to-gray-700/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-600/50">
                 <tr>
                   <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Vendor
@@ -416,7 +449,7 @@ function Receipts() {
                   <tr 
                     key={receipt.id} 
                     onClick={() => viewReceipt(receipt.id)}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                    className="hover:bg-primary-50/30 dark:hover:bg-primary-900/20 transition-all duration-300 cursor-pointer hover:shadow-lg hover:shadow-primary-500/10 group"
                   >
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                       <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate max-w-[120px] sm:max-w-none">
@@ -439,7 +472,7 @@ function Receipts() {
                       </div>
                     </td>
                     <td className="hidden lg:table-cell px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                      <span className={`px-2 sm:px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getHealthScoreColor(receipt.healthScore || 0)}`}>
+                      <span className={`px-2 sm:px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border backdrop-blur-sm shadow-lg ${getHealthScoreColor(receipt.healthScore || 0)}`}>
                         {receipt.healthScore || 0}%
                       </span>
                     </td>
@@ -449,7 +482,7 @@ function Receipts() {
                           e.stopPropagation();
                           deleteReceipt(receipt.id);
                         }}
-                        className="text-red-500 hover:text-red-600 transition-colors p-1.5 sm:p-2"
+                        className="text-red-500 hover:text-red-600 dark:hover:text-red-400 transition-all duration-300 p-1.5 sm:p-2 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-lg hover:shadow-lg hover:shadow-red-500/20 group-hover:scale-110"
                         title="Delete Receipt"
                       >
                         <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -463,7 +496,7 @@ function Receipts() {
           
           {filteredReceipts.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400">No receipts found</p>
+              <p className="text-gray-500 dark:text-gray-400 text-lg">📭 No receipts found</p>
             </div>
           )}
         </div>
@@ -471,9 +504,9 @@ function Receipts() {
 
       {/* Receipt Details Modal */}
       {showReceiptModal && selectedReceipt && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-start gap-3 z-10">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-start gap-3 z-10 flex-shrink-0">
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 truncate">
                   {selectedReceipt.vendor}
@@ -494,18 +527,19 @@ function Receipts() {
               </button>
             </div>
 
-            <div className="p-4 sm:p-6">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               {/* Line Items */}
               <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-white">Line Items</h3>
-              <div className="space-y-2">
+              <div className="space-y-2 overflow-visible">
                 {selectedReceipt.lineItems && selectedReceipt.lineItems.length > 0 ? (
                   selectedReceipt.lineItems.map((item, index) => {
-                    // Find the category to get its color
+                    // Find the category to get its color and styles
                     const category = availableCategories.find(c => c.name === item.category);
                     const categoryColor = category?.color || '#6b7280'; // fallback to gray
+                    const categoryStyle = getCategoryStyles(item.category);
                     
                     return (
-                    <div key={index} className="flex justify-between items-start p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg gap-2">
+                    <div key={index} className={`flex justify-between items-start p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border} ${showCategorySelector && editingItemId === item.id ? 'relative z-[100000]' : ''}`}>
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block">{item.description}</span>
                         <div className="relative inline-block category-selector-container mt-1">
@@ -523,7 +557,7 @@ function Receipts() {
                           
                           {/* Category Selector Dropdown */}
                           {showCategorySelector && editingItemId === item.id && (
-                            <div className="absolute left-0 top-full mt-1 z-[9999] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg min-w-[150px]">
+                            <div className="absolute left-0 top-full mt-1 z-[99999] bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-300/50 dark:border-gray-600/50 rounded-xl shadow-2xl shadow-primary-500/20 min-w-[150px]">
                               <div className="py-1">
                                 {availableCategories.map((category) => (
                                   <button
@@ -564,10 +598,10 @@ function Receipts() {
               {/* Category Summary */}
               {selectedReceipt.categorySummary && (
                 <div className="mt-4 sm:mt-6">
-                  <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-white">Category Summary</h3>
+                  <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-gray-900 dark:text-white">📊 Category Summary</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                    <div className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Healthy</div>
+                    <div className="p-3 sm:p-4 bg-green-50/80 dark:bg-green-900/30 backdrop-blur-sm rounded-xl border border-green-200/50 dark:border-green-700/50 shadow-lg shadow-green-500/10 hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300">
+                      <div className="text-xs sm:text-sm text-green-600 dark:text-green-400 font-medium">Healthy</div>
                       <div className="text-lg sm:text-xl font-bold text-green-700 dark:text-green-300">
                         {formatCurrency(selectedReceipt.categorySummary.healthyTotal, selectedReceipt.currency)}
                       </div>
@@ -575,8 +609,8 @@ function Receipts() {
                         {selectedReceipt.categorySummary.healthyCount || 0} items
                       </div>
                     </div>
-                    <div className="p-3 sm:p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                      <div className="text-xs sm:text-sm text-red-600 dark:text-red-400">Junk</div>
+                    <div className="p-3 sm:p-4 bg-red-50/80 dark:bg-red-900/30 backdrop-blur-sm rounded-xl border border-red-200/50 dark:border-red-700/50 shadow-lg shadow-red-500/10 hover:shadow-xl hover:shadow-red-500/20 transition-all duration-300">
+                      <div className="text-xs sm:text-sm text-red-600 dark:text-red-400 font-medium">Junk</div>
                       <div className="text-lg sm:text-xl font-bold text-red-700 dark:text-red-300">
                         {formatCurrency(selectedReceipt.categorySummary.junkTotal, selectedReceipt.currency)}
                       </div>
@@ -584,8 +618,8 @@ function Receipts() {
                         {selectedReceipt.categorySummary.junkCount || 0} items
                       </div>
                     </div>
-                    <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <div className="text-xs sm:text-sm text-blue-600 dark:text-blue-400">Other</div>
+                    <div className="p-3 sm:p-4 bg-blue-50/80 dark:bg-blue-900/30 backdrop-blur-sm rounded-xl border border-blue-200/50 dark:border-blue-700/50 shadow-lg shadow-blue-500/10 hover:shadow-xl hover:shadow-blue-500/20 transition-all duration-300">
+                      <div className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 font-medium">Other</div>
                       <div className="text-lg sm:text-xl font-bold text-blue-700 dark:text-blue-300">
                         {formatCurrency(selectedReceipt.categorySummary.otherTotal, selectedReceipt.currency)}
                       </div>
@@ -593,8 +627,8 @@ function Receipts() {
                         {selectedReceipt.categorySummary.otherCount || 0} items
                       </div>
                     </div>
-                    <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Unknown</div>
+                    <div className="p-3 sm:p-4 bg-gray-50/80 dark:bg-gray-700/50 backdrop-blur-sm rounded-xl border border-gray-200/50 dark:border-gray-600/50 shadow-lg shadow-gray-500/10 hover:shadow-xl hover:shadow-gray-500/20 transition-all duration-300">
+                      <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium">Unknown</div>
                       <div className="text-lg sm:text-xl font-bold text-gray-700 dark:text-gray-300">
                         {formatCurrency(selectedReceipt.categorySummary.unknownTotal, selectedReceipt.currency)}
                       </div>
@@ -607,10 +641,10 @@ function Receipts() {
               )}
 
               {/* Totals */}
-              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-6 pt-4 border-t border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-br from-gray-50/50 to-transparent dark:from-gray-700/30 rounded-xl p-4">
                 <div className="flex justify-between text-lg font-semibold text-gray-900 dark:text-white">
-                  <span>Total</span>
-                  <span>{formatCurrency(selectedReceipt.total, selectedReceipt.currency)}</span>
+                  <span>💰 Total</span>
+                  <span className="text-primary-600 dark:text-primary-400">{formatCurrency(selectedReceipt.total, selectedReceipt.currency)}</span>
                 </div>
                 {selectedReceipt.subtotal && (
                   <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mt-2">
@@ -632,20 +666,20 @@ function Receipts() {
 
       {/* Camera Modal */}
       {showCameraModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-2xl">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl shadow-2xl shadow-primary-500/30 border border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 w-full max-w-2xl">
             <div className="flex justify-between items-center mb-3 sm:mb-4">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                {capturedImage ? 'Preview' : 'Take Photo'}
+                {capturedImage ? '🖼️ Preview' : '📸 Take Photo'}
               </h2>
-              <button onClick={closeCamera} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+              <button onClick={closeCamera} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100/50 dark:hover:bg-gray-700/50 rounded-lg p-2 transition-all duration-300">
                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
 
             <div className="space-y-4">
               {!capturedImage ? (
-                <div className="relative bg-black rounded-lg overflow-hidden">
+                <div className="relative bg-black rounded-xl overflow-hidden shadow-xl border border-gray-700/50">
                   <video
                     ref={videoRef}
                     autoPlay
@@ -655,7 +689,7 @@ function Receipts() {
                   <canvas ref={canvasRef} className="hidden" />
                 </div>
               ) : (
-                <div className="relative bg-black rounded-lg overflow-hidden">
+                <div className="relative bg-black rounded-xl overflow-hidden shadow-xl border border-gray-700/50">
                   <img
                     src={capturedImage}
                     alt="Captured receipt"
@@ -667,15 +701,15 @@ function Receipts() {
               <div className="flex gap-2 sm:gap-3">
                 {!capturedImage ? (
                   <button onClick={capturePhoto} className="btn-primary flex-1 text-sm sm:text-base">
-                    Capture
+                    📸 Capture
                   </button>
                 ) : (
                   <>
                     <button onClick={retakePhoto} className="btn-secondary flex-1 text-sm sm:text-base">
-                      Retake
+                      ♻️ Retake
                     </button>
                     <button onClick={uploadCapturedPhoto} className="btn-primary flex-1 text-sm sm:text-base">
-                      Upload
+                      ☁️ Upload
                     </button>
                   </>
                 )}

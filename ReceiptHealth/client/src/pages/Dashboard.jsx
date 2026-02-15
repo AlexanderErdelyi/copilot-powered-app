@@ -8,7 +8,8 @@ import {
   Apple,
   AlertCircle,
   Heart,
-  HelpCircle
+  HelpCircle,
+  X
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -26,6 +27,7 @@ import {
   Legend
 } from 'recharts';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -62,6 +64,13 @@ function Dashboard() {
   const [showSpendingBreakdown, setShowSpendingBreakdown] = useState(false);
   const [showHealthyItemsModal, setShowHealthyItemsModal] = useState(false);
   const [healthyItems, setHealthyItems] = useState([]);
+  const [showJunkItemsModal, setShowJunkItemsModal] = useState(false);
+  const [junkItems, setJunkItems] = useState([]);
+  const [allPurchasedItems, setAllPurchasedItems] = useState([]);
+  // Category editing state
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [availableCategories, setAvailableCategories] = useState([]);
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
   // Period selection states
   const [trendsPeriod, setTrendsPeriod] = useState('weekly');
   const [categoryPeriod, setCategoryPeriod] = useState('all');
@@ -184,6 +193,19 @@ function Dashboard() {
     setFilteredCategoryData(filtered);
   }, [categoryData, hiddenCategories]);
 
+  // Close category selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showCategorySelector && !event.target.closest('.category-selector-container')) {
+        setShowCategorySelector(false);
+        setEditingItemId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showCategorySelector]);
+
   const toggleCategoryFilter = (categoryName) => {
     setHiddenCategories(prev => {
       const newSet = new Set(prev);
@@ -219,8 +241,81 @@ function Dashboard() {
     return symbols[currencyCode] || currencyCode;
   };
 
+  const getCategoryStyles = (category) => {
+    const categoryName = category?.toLowerCase() || 'unknown';
+    
+    const styles = {
+      'healthy': {
+        bg: 'bg-green-50/80 dark:bg-green-900/20',
+        border: 'border-green-200/50 dark:border-green-700/50',
+        badge: 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300',
+        glow: 'hover:shadow-green-500/20'
+      },
+      'junk': {
+        bg: 'bg-red-50/80 dark:bg-red-900/20',
+        border: 'border-red-200/50 dark:border-red-700/50',
+        badge: 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300',
+        glow: 'hover:shadow-red-500/20'
+      },
+      'other': {
+        bg: 'bg-gray-50/80 dark:bg-gray-700/80',
+        border: 'border-gray-200/50 dark:border-gray-600/50',
+        badge: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
+        glow: 'hover:shadow-gray-500/20'
+      },
+      'unknown': {
+        bg: 'bg-gray-50/80 dark:bg-gray-700/80',
+        border: 'border-gray-200/50 dark:border-gray-600/50',
+        badge: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400',
+        glow: 'hover:shadow-gray-500/20'
+      }
+    };
+    
+    return styles[categoryName] || styles['unknown'];
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get('/api/categories');
+      setAvailableCategories(response.data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const updateLineItemCategory = async (lineItemId, categoryId) => {
+    try {
+      await axios.put(`/api/lineitems/${lineItemId}/category`, { categoryId });
+      toast.success('Category updated!');
+      
+      // Refresh the current modal data
+      if (showSpendingBreakdown) {
+        await handleTotalSpentClick();
+      } else if (showHealthyItemsModal) {
+        await handleHealthyItemsClick();
+      } else if (showJunkItemsModal) {
+        const response = await axios.get('/api/analytics/category-items/Junk');
+        setJunkItems(response.data);
+      } else if (showCategoryModal && selectedCategory) {
+        const response = await axios.get(`/api/analytics/category-items/${selectedCategory}`);
+        setCategoryItems(response.data);
+      }
+      
+      // Refresh dashboard stats
+      initializeDashboard();
+    } catch (error) {
+      console.error('Error updating category:', error);
+      toast.error('Failed to update category');
+    } finally {
+      setEditingItemId(null);
+      setShowCategorySelector(false);
+    }
+  };
+
   const initializeDashboard = async () => {
     console.log('🚀 Initializing dashboard...');
+    // Fetch categories
+    fetchCategories();
     // Fetch available years first
     try {
       const response = await axios.get('/api/analytics/available-years');
@@ -327,21 +422,54 @@ function Dashboard() {
     }
   };
 
-  const handleTotalSpentClick = () => {
-    setShowSpendingBreakdown(true);
+  const handleTotalSpentClick = async () => {
+    try {
+      const response = await axios.get('/api/receipts');
+      // Extract all items from all receipts with prices
+      const items = [];
+      response.data.forEach(receipt => {
+        if (receipt.lineItems && receipt.lineItems.length > 0) {
+          receipt.lineItems.forEach(item => {
+            items.push({
+              ...item,
+              vendor: receipt.vendor,
+              date: receipt.date,
+              receiptId: receipt.id
+            });
+          });
+        }
+      });
+      setAllPurchasedItems(items);
+      setShowSpendingBreakdown(true);
+    } catch (error) {
+      console.error('Error fetching all items:', error);
+      setShowSpendingBreakdown(true);
+    }
   };
 
   const handleReceiptsClick = () => {
     navigate('/receipts');
   };
 
-  const handleHealthyItemsClick = async () => {
+  const handleHealthyItemsClick = async (e) => {
+    e.stopPropagation();
     try {
       const response = await axios.get('/api/analytics/category-items/Healthy');
       setHealthyItems(response.data);
       setShowHealthyItemsModal(true);
     } catch (error) {
       console.error('Error fetching healthy items:', error);
+    }
+  };
+
+  const handleJunkItemsClick = async (e) => {
+    e.stopPropagation();
+    try {
+      const response = await axios.get('/api/analytics/category-items/Junk');
+      setJunkItems(response.data);
+      setShowJunkItemsModal(true);
+    } catch (error) {
+      console.error('Error fetching junk items:', error);
     }
   };
 
@@ -446,18 +574,27 @@ function Dashboard() {
         
         {/* Custom Healthy Items Card with Count Display */}
         <div 
-          className="card cursor-pointer hover:shadow-xl transition-shadow"
-          onClick={handleHealthyItemsClick}
+          className="card transition-shadow"
         >
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide truncate">
                 Healthy Items
               </p>
-              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 text-green-500 break-words">
-                {stats.healthyItemCount}
+              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 break-words">
+                <span 
+                  onClick={handleHealthyItemsClick}
+                  className="text-green-500 cursor-pointer hover:text-green-600 hover:underline transition-all"
+                >
+                  {stats.healthyItemCount}
+                </span>
                 <span className="text-gray-400 dark:text-gray-500 mx-1">/</span>
-                <span className="text-red-500">{stats.junkItemCount}</span>
+                <span 
+                  onClick={handleJunkItemsClick}
+                  className="text-red-500 cursor-pointer hover:text-red-600 hover:underline transition-all"
+                >
+                  {stats.junkItemCount}
+                </span>
               </p>
               <div className="mt-1 sm:mt-2 space-y-0.5">
                 {/* Healthy Trend */}
@@ -928,53 +1065,100 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Spending Breakdown Modal */}
+      {/* Spending Breakdown Modal - All Purchased Items */}
       {showSpendingBreakdown && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-center">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                Spending Breakdown
-              </h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-center z-10">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                  All Purchased Items
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Total: {getCurrencySymbol(stats.currency)}{stats.totalSpent.toFixed(2)} • {allPurchasedItems.length} items
+                </p>
+              </div>
               <button
                 onClick={() => setShowSpendingBreakdown(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
               >
                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-4 sm:p-6">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">Total Spent</span>
-                  <span className="text-xl sm:text-2xl font-bold text-primary-500">{getCurrencySymbol(stats.currency)}{stats.totalSpent.toFixed(2)}</span>
-                </div>
-                
-                {categoryData.length > 0 && (
-                  <>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mt-4 sm:mt-6 mb-2 sm:mb-3 text-sm sm:text-base">By Category</h3>
-                    <div className="space-y-2">
-                      {categoryData.map((cat, idx) => (
-                        <div
-                          key={idx}
-                          className="flex justify-between items-center p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                        >
-                          <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-                            <div
-                              className="w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: cat.color }}
-                            />
-                            <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base truncate">{cat.name}</span>
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+              {allPurchasedItems.length > 0 ? (
+                <div className="space-y-2 overflow-visible">
+                  {allPurchasedItems.map((item, index) => {
+                    const categoryStyle = getCategoryStyles(item.category);
+                    return (
+                      <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border} ${showCategorySelector && editingItemId === item.id ? 'relative z-[100000]' : ''}`}>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description || item.name}</span>
+                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 flex-wrap">
+                            {item.vendor && <span className="font-medium">{item.vendor}</span>}
+                            {item.date && <span>•</span>}
+                            {item.date && <span>{new Date(item.date).toLocaleDateString()}</span>}
+                            {item.category && <span>•</span>}
+                            {item.category && (
+                              <div className="relative inline-block category-selector-container">
+                                <button
+                                  onClick={() => {
+                                    setEditingItemId(item.id);
+                                    setShowCategorySelector(true);
+                                  }}
+                                  className={`px-2 py-0.5 ${categoryStyle.badge} rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity`}
+                                  title="Click to change category"
+                                >
+                                  {item.category} ✏️
+                                </button>
+                                
+                                {/* Category Selector Dropdown */}
+                                {showCategorySelector && editingItemId === item.id && (
+                                  <div className="absolute left-0 top-full mt-1 z-[99999] bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-300/50 dark:border-gray-600/50 rounded-xl shadow-2xl shadow-primary-500/20 min-w-[150px]">
+                                    <div className="py-1">
+                                      {availableCategories.map((category) => (
+                                        <button
+                                          key={category.id}
+                                          onClick={() => updateLineItemCategory(item.id, category.id)}
+                                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                        >
+                                          <span>{category.icon}</span>
+                                          <span className="text-gray-900 dark:text-white">{category.name}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setEditingItemId(null);
+                                        setShowCategorySelector(false);
+                                      }}
+                                      className="w-full px-4 py-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 border-t border-gray-200 dark:border-gray-600"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <span className="font-bold text-gray-900 dark:text-white text-sm sm:text-base flex-shrink-0 ml-2">
-                            {getCurrencySymbol(stats.currency)}{cat.value?.toFixed(2) || '0.00'}
-                          </span>
                         </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
+                            {getCurrencySymbol(stats.currency)}{item.price?.toFixed(2) || '0.00'}
+                          </div>
+                          {item.quantity && item.quantity > 1 && (
+                            <div className="text-xs sm:text-sm text-gray-500">Qty: {item.quantity}</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+                  No items found. Upload receipts to see your purchases.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -982,29 +1166,79 @@ function Dashboard() {
 
       {/* Healthy Items Modal */}
       {showHealthyItemsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-center">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                Healthy Items
-              </h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-green-500/20 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-center z-10 flex-shrink-0">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
+                  🥗 Healthy Items
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {healthyItems.length} healthy purchases
+                </p>
+              </div>
               <button
                 onClick={() => setShowHealthyItemsModal(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
               >
                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-4 sm:p-6">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               {healthyItems.length > 0 ? (
-                <div className="space-y-2">
-                  {healthyItems.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-2 sm:p-3 bg-green-50 dark:bg-green-900/20 rounded-lg gap-2">
+                <div className="space-y-2 overflow-visible">
+                  {healthyItems.map((item, index) => {
+                    const categoryStyle = getCategoryStyles(item.category);
+                    return (
+                    <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border} ${showCategorySelector && editingItemId === item.id ? 'relative z-[100000]' : ''}`}>
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description || item.name}</span>
-                        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                          {item.vendor && <span>{item.vendor} • </span>}
+                        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 flex-wrap">
+                          {item.vendor && <span className="font-medium">{item.vendor}</span>}
+                          {item.date && <span>•</span>}
                           {item.date && <span>{new Date(item.date).toLocaleDateString()}</span>}
+                          {item.category && <span>•</span>}
+                          {item.category && (
+                            <div className="relative inline-block category-selector-container">
+                              <button
+                                onClick={() => {
+                                  setEditingItemId(item.id);
+                                  setShowCategorySelector(true);
+                                }}
+                                className={`px-2 py-0.5 ${categoryStyle.badge} rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity`}
+                                title="Click to change category"
+                              >
+                                {item.category} ✏️
+                              </button>
+                              
+                              {/* Category Selector Dropdown */}
+                              {showCategorySelector && editingItemId === item.id && (
+                                <div className="absolute left-0 top-full mt-1 z-[99999] bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-300/50 dark:border-gray-600/50 rounded-xl shadow-2xl shadow-primary-500/20 min-w-[150px]">
+                                  <div className="py-1">
+                                    {availableCategories.map((category) => (
+                                      <button
+                                        key={category.id}
+                                        onClick={() => updateLineItemCategory(item.id, category.id)}
+                                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                      >
+                                        <span>{category.icon}</span>
+                                        <span className="text-gray-900 dark:text-white">{category.name}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setEditingItemId(null);
+                                      setShowCategorySelector(false);
+                                    }}
+                                    className="w-full px-4 py-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 border-t border-gray-200 dark:border-gray-600"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
@@ -1016,11 +1250,111 @@ function Dashboard() {
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-                  No healthy items found
+                  No healthy items found. Keep making great choices! 💪
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Junk Items Modal */}
+      {showJunkItemsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-red-500/20 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-center z-10 flex-shrink-0">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-400">
+                  🍔 Junk Items
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {junkItems.length} unhealthy purchases
+                </p>
+              </div>
+              <button
+                onClick={() => setShowJunkItemsModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              >
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+            </div>
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+              {junkItems.length > 0 ? (
+                <div className="space-y-2 overflow-visible">
+                  {junkItems.map((item, index) => {
+                    const categoryStyle = getCategoryStyles(item.category);
+                    return (
+                    <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border} ${showCategorySelector && editingItemId === item.id ? 'relative z-[100000]' : ''}`}>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description || item.name}</span>
+                        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 flex-wrap">
+                          {item.vendor && <span className="font-medium">{item.vendor}</span>}
+                          {item.date && <span>•</span>}
+                          {item.date && <span>{new Date(item.date).toLocaleDateString()}</span>}
+                          {item.category && <span>•</span>}
+                          {item.category && (
+                            <div className="relative inline-block category-selector-container">
+                              <button
+                                onClick={() => {
+                                  setEditingItemId(item.id);
+                                  setShowCategorySelector(true);
+                                }}
+                                className={`px-2 py-0.5 ${categoryStyle.badge} rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity`}
+                                title="Click to change category"
+                              >
+                                {item.category} ✏️
+                              </button>
+                              
+                              {/* Category Selector Dropdown */}
+                              {showCategorySelector && editingItemId === item.id && (
+                                <div className="absolute left-0 top-full mt-1 z-[99999] bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-300/50 dark:border-gray-600/50 rounded-xl shadow-2xl shadow-primary-500/20 min-w-[150px]">
+                                  <div className="py-1">
+                                    {availableCategories.map((category) => (
+                                      <button
+                                        key={category.id}
+                                        onClick={() => updateLineItemCategory(item.id, category.id)}
+                                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                      >
+                                        <span>{category.icon}</span>
+                                        <span className="text-gray-900 dark:text-white">{category.name}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setEditingItemId(null);
+                                      setShowCategorySelector(false);
+                                    }}
+                                    className="w-full px-4 py-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 border-t border-gray-200 dark:border-gray-600"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
+                          ${item.price?.toFixed(2) || '0.00'}
+                        </div>
+                        {item.quantity > 1 && (
+                          <div className="text-xs sm:text-sm text-gray-500">Qty: {item.quantity}</div>
+                        )}
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+                  No junk items found. Excellent healthy choices! 🎉
                 </p>
               )}
             </div>
@@ -1030,41 +1364,87 @@ function Dashboard() {
 
       {/* Category Items Modal */}
       {showCategoryModal && selectedCategory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-center">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-center z-10 flex-shrink-0">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                 {selectedCategory} Items
               </h2>
               <button
                 onClick={() => setShowCategoryModal(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl sm:text-2xl"
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
               >
-                ×
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-4 sm:p-6">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               {categoryItems.length > 0 ? (
-                <div className="space-y-2">
-                  {categoryItems.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg gap-2">
-                      <div className="flex-1 min-w-0">
-                        <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description || item.name}</span>
-                        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                          {item.vendor && <span>{item.vendor} • </span>}
-                          {item.date && <span>{new Date(item.date).toLocaleDateString()}</span>}
+                <div className="space-y-2 overflow-visible">
+                  {categoryItems.map((item, index) => {
+                    const categoryStyle = getCategoryStyles(item.category);
+                    return (
+                      <div key={index} className={`flex justify-between items-center p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border} ${showCategorySelector && editingItemId === item.id ? 'relative z-[100000]' : ''}`}>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description || item.name}</span>
+                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2 flex-wrap">
+                            {item.vendor && <span className="font-medium">{item.vendor}</span>}
+                            {item.date && <span>•</span>}
+                            {item.date && <span>{new Date(item.date).toLocaleDateString()}</span>}
+                            {item.category && <span>•</span>}
+                            {item.category && (
+                              <div className="relative inline-block category-selector-container">
+                                <button
+                                  onClick={() => {
+                                    setEditingItemId(item.id);
+                                    setShowCategorySelector(true);
+                                  }}
+                                  className={`px-2 py-0.5 ${categoryStyle.badge} rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity`}
+                                  title="Click to change category"
+                                >
+                                  {item.category} ✏️
+                                </button>
+                                
+                                {/* Category Selector Dropdown */}
+                                {showCategorySelector && editingItemId === item.id && (
+                                  <div className="absolute left-0 top-full mt-1 z-[99999] bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-300/50 dark:border-gray-600/50 rounded-xl shadow-2xl shadow-primary-500/20 min-w-[150px]">
+                                    <div className="py-1">
+                                      {availableCategories.map((category) => (
+                                        <button
+                                          key={category.id}
+                                          onClick={() => updateLineItemCategory(item.id, category.id)}
+                                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                        >
+                                          <span>{category.icon}</span>
+                                          <span className="text-gray-900 dark:text-white">{category.name}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setEditingItemId(null);
+                                        setShowCategorySelector(false);
+                                      }}
+                                      className="w-full px-4 py-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 border-t border-gray-200 dark:border-gray-600"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
+                            ${item.price?.toFixed(2) || '0.00'}
+                          </div>
+                          {item.quantity > 1 && (
+                            <div className="text-xs sm:text-sm text-gray-500">Qty: {item.quantity}</div>
+                          )}
                         </div>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
-                          ${item.price?.toFixed(2) || '0.00'}
-                        </div>
-                        {item.quantity > 1 && (
-                          <div className="text-xs sm:text-sm text-gray-500">Qty: {item.quantity}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 text-center py-8">

@@ -1,0 +1,47 @@
+{
+  "name": "Sanitas Mind",
+  "short_name": "Sanitas Mind",
+  "description": "Track your spending, stay healthy. Analyze grocery receipts and make healthier choices.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1f2937",
+  "theme_color": "#667eea",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "32x32",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["finance", "health", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Upload Receipt",
+      "short_name": "Upload",
+      "description": "Upload a new receipt",
+      "url": "/receipts",
+      "icons": [{ "src": "/logo.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Shopping Lists",
+      "short_name": "Shopping",
+      "description": "View your shopping lists",
+      "url": "/shopping-lists",
+      "icons": [{ "src": "/logo.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Insights",
+      "short_name": "Insights",
+      "description": "View spending insights",
+      "url": "/insights",
+      "icons": [{ "src": "/logo.svg", "sizes": "96x96" }]
+    }
+  ]
+}

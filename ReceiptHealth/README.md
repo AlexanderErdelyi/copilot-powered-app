@@ -146,7 +146,8 @@ When `UseAI: true` is configured, the application leverages the GitHub Copilot S
    dotnet run
    ```
 
-5. Open your browser to: **http://localhost:5002**
+5. Open your browser to: **http://localhost:5173** (React app)
+   - Backend API runs on: **http://localhost:5100**
 
 ### Configuration
 
@@ -175,7 +176,7 @@ Edit `appsettings.json` to customize:
 
 ### 1. Upload a Receipt
 
-- Visit the **Dashboard** (http://localhost:5002)
+- Visit the **Dashboard** (http://localhost:5173)
 - Drag & drop receipt files or click the upload zone
 - Supported formats: JPG, PNG, PDF, TXT (max 15MB)
 - Files are processed in the background

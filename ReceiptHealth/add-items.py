@@ -2,7 +2,7 @@ import http.client
 import json
 
 def make_request(method, path, body=None):
-    conn = http.client.HTTPConnection('localhost', 5002)
+    conn = http.client.HTTPConnection('localhost', 5100)
     headers = {'Content-Type': 'application/json'} if body else {}
     
     body_data = json.dumps(body) if body else None

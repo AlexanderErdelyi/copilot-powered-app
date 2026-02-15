@@ -699,7 +699,7 @@ function ShoppingLists() {
           <button 
             onClick={openGenerateModal}
             disabled={generating}
-            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 sm:px-4 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg flex items-center justify-center space-x-2 text-sm sm:text-base"
+            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-2 px-3 sm:px-4 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl hover:shadow-green-500/30 flex items-center justify-center space-x-2 text-sm sm:text-base hover:scale-105 active:scale-95 disabled:opacity-50"
           >
             <Leaf className="w-4 h-4 sm:w-5 sm:h-5" />
             <span>{generating ? 'Generating...' : 'Generate Healthy List'}</span>
@@ -728,10 +728,7 @@ function ShoppingLists() {
               <div 
                 key={list.id} 
                 onClick={() => viewList(list.id)}
-                className="card hover:shadow-2xl hover:scale-102 transition-all duration-200 cursor-pointer group flex flex-col"
-                style={{ boxShadow: '0 0 0 0 rgba(99, 102, 241, 0)' }}
-                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 0 20px 2px rgba(99, 102, 241, 0.3)'}
-                onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 0 0 0 rgba(99, 102, 241, 0)'}
+                className="card hover:shadow-2xl hover:shadow-primary-500/20 transition-all duration-300 cursor-pointer group flex flex-col hover:-translate-y-1 hover:scale-[1.02]"
               >
                 <div className="flex items-start justify-between mb-3 sm:mb-4 gap-2">
                   <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
@@ -799,7 +796,7 @@ function ShoppingLists() {
           
           <div 
             onClick={() => setShowCreateModal(true)}
-            className="card border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-primary-500 transition-colors cursor-pointer flex items-center justify-center min-h-[150px] sm:min-h-[200px]"
+            className="card border-2 border-dashed border-gray-300/50 dark:border-gray-600/50 hover:border-primary-500/50 transition-all duration-300 cursor-pointer flex items-center justify-center min-h-[150px] sm:min-h-[200px] bg-white/50 dark:bg-gray-800/50 hover:shadow-2xl hover:shadow-primary-500/20 hover:-translate-y-1 hover:scale-[1.02]"
           >
             <div className="text-center">
               <Plus className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-2" />
@@ -811,8 +808,8 @@ function ShoppingLists() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-2xl rounded-2xl p-4 sm:p-6 w-full max-w-md shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
             <h2 className="text-lg sm:text-xl font-bold mb-4 text-gray-900 dark:text-white">Create New Shopping List</h2>
             <input
               type="text"
@@ -842,9 +839,9 @@ function ShoppingLists() {
 
       {/* View List Modal */}
       {showViewModal && selectedList && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-start gap-3 z-10">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-start gap-3 z-10">
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-1 sm:mb-2 truncate">{selectedList.name}</h2>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
@@ -859,20 +856,20 @@ function ShoppingLists() {
               </button>
             </div>
 
-            <div className="sticky top-[88px] sm:top-[100px] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 z-10">
+            <div className="sticky top-[88px] sm:top-[100px] bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 z-10">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Items</h3>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     onClick={() => setShowAddItemModal(true)}
-                    className="bg-green-500 hover:bg-green-600 text-white text-xs sm:text-sm font-semibold py-2 px-3 sm:px-4 rounded-lg transition-colors flex items-center justify-center sm:inline-flex"
+                    className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-xs sm:text-sm font-semibold py-2 px-3 sm:px-4 rounded-xl transition-all duration-300 flex items-center justify-center sm:inline-flex shadow-lg hover:shadow-xl hover:shadow-green-500/30 hover:scale-105 active:scale-95"
                   >
                     <Plus className="w-4 h-4 mr-1" />
                     <span>Add Item</span>
                   </button>
                   <button
                     onClick={() => deleteList(selectedList.id)}
-                    className="bg-red-500 hover:bg-red-600 text-white text-xs sm:text-sm font-semibold py-2 px-3 sm:px-4 rounded-lg transition-colors flex items-center justify-center sm:inline-flex"
+                    className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-xs sm:text-sm font-semibold py-2 px-3 sm:px-4 rounded-xl transition-all duration-300 flex items-center justify-center sm:inline-flex shadow-lg hover:shadow-xl hover:shadow-red-500/30 hover:scale-105 active:scale-95"
                   >
                     <Trash2 className="w-4 h-4 mr-1" />
                     <span>Delete List</span>
@@ -895,16 +892,16 @@ function ShoppingLists() {
                         {selectedList.items.filter(item => !item.isPurchased).map((item) => (
                           <div
                             key={item.id}
-                            className="relative group bg-gradient-to-br from-purple-500 to-blue-600 text-white rounded-xl p-3 sm:p-4 shadow-lg hover:-translate-y-1 hover:shadow-2xl transition-all duration-200"
+                            className="relative group bg-gradient-to-br from-purple-500 to-blue-600 text-white rounded-2xl p-3 sm:p-4 shadow-xl hover:-translate-y-2 hover:shadow-2xl hover:shadow-purple-500/40 transition-all duration-300 border border-white/10 backdrop-blur-sm"
                           >
                             {/* Action Buttons */}
-                            <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   openCategoryModal(item);
                                 }}
-                                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full p-1.5 transition-colors"
+                                className="bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-xl p-1.5 transition-all duration-300 hover:scale-110 active:scale-95 shadow-lg"
                                 title="Change category"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -917,7 +914,7 @@ function ShoppingLists() {
                                   e.stopPropagation();
                                   deleteItem(item.id);
                                 }}
-                                className="bg-red-500 hover:bg-red-600 rounded-full p-1.5 transition-colors"
+                                className="bg-red-500/90 hover:bg-red-600 backdrop-blur-md rounded-xl p-1.5 transition-all duration-300 hover:scale-110 active:scale-95 shadow-lg"
                                 title="Delete item"
                               >
                                 <X className="w-3 h-3" />
@@ -974,16 +971,16 @@ function ShoppingLists() {
                         {selectedList.items.filter(item => item.isPurchased).map((item) => (
                           <div
                             key={item.id}
-                            className="relative group bg-gradient-to-br from-gray-400 to-gray-500 text-white rounded-xl p-3 sm:p-4 opacity-70 hover:opacity-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-200"
+                            className="relative group bg-gradient-to-br from-gray-400 to-gray-500 text-white rounded-2xl p-3 sm:p-4 opacity-70 hover:opacity-100 hover:-translate-y-2 hover:shadow-2xl hover:shadow-gray-500/40 transition-all duration-300 border border-white/10 backdrop-blur-sm"
                           >
                             {/* Action Buttons */}
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   deleteItem(item.id);
                                 }}
-                                className="bg-red-500 hover:bg-red-600 rounded-full p-1.5 transition-colors"
+                                className="bg-red-500/90 hover:bg-red-600 backdrop-blur-md rounded-xl p-1.5 transition-all duration-300 hover:scale-110 active:scale-95 shadow-lg"
                                 title="Delete item"
                               >
                                 <X className="w-3 h-3" />
@@ -1040,8 +1037,8 @@ function ShoppingLists() {
 
       {/* Add Item Modal */}
       {showAddItemModal && selectedList && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto my-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto my-4 shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate">
                 Add to {selectedList.name}
@@ -1082,7 +1079,7 @@ function ShoppingLists() {
                 <button
                   onClick={() => addItem()}
                   disabled={addingItem}
-                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg p-4 flex items-center justify-between hover:from-blue-600 hover:to-purple-700 transition-all disabled:opacity-50"
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl p-4 flex items-center justify-between hover:from-blue-600 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 shadow-xl hover:shadow-2xl hover:shadow-blue-500/30 hover:scale-105 active:scale-95 border border-white/10"
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">➕</span>
@@ -1100,7 +1097,7 @@ function ShoppingLists() {
                 <button
                   onClick={() => addItem()}
                   disabled={addingItem}
-                  className="w-full bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg p-3 flex items-center gap-3 hover:from-green-600 hover:to-teal-700 transition-all disabled:opacity-50"
+                  className="w-full bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-2xl p-3 flex items-center gap-3 hover:from-green-600 hover:to-teal-700 transition-all duration-300 disabled:opacity-50 shadow-xl hover:shadow-2xl hover:shadow-green-500/30 hover:scale-105 active:scale-95 border border-white/10"
                 >
                   <span className="text-xl">✨</span>
                   <span className="font-medium">Add custom: "{newItemName}"</span>
@@ -1115,7 +1112,7 @@ function ShoppingLists() {
                   key={index}
                   onClick={() => addItemFromSuggestion(item)}
                   disabled={addingItem}
-                  className="bg-gradient-to-br from-teal-400 to-cyan-500 hover:from-teal-500 hover:to-cyan-600 text-white rounded-lg p-4 flex flex-col items-center justify-center gap-2 transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-gradient-to-br from-teal-400 to-cyan-500 hover:from-teal-500 hover:to-cyan-600 text-white rounded-2xl p-4 flex flex-col items-center justify-center gap-2 transition-all duration-300 transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:shadow-teal-500/40 border border-white/10"
                 >
                   <span className="text-3xl sm:text-4xl">{item.icon}</span>
                   <span className="font-medium text-sm sm:text-base text-center">{item.name}</span>
@@ -1142,8 +1139,8 @@ function ShoppingLists() {
 
       {/* Icon Picker Modal */}
       {showIconPicker && pendingCustomItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
                 Choose Icon for "{pendingCustomItem.name}"
@@ -1161,7 +1158,7 @@ function ShoppingLists() {
             </div>
 
             {/* Selected Icon Preview */}
-            <div className="mb-4 p-4 bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900 dark:to-blue-900 rounded-lg text-center">
+            <div className="mb-4 p-4 bg-gradient-to-r from-purple-100/80 to-blue-100/80 dark:from-purple-900/40 dark:to-blue-900/40 backdrop-blur-sm rounded-2xl text-center border border-purple-200/50 dark:border-purple-700/50">
               <div className="text-6xl mb-2">{newItemIcon}</div>
               <p className="text-sm text-gray-700 dark:text-gray-300">
                 <strong>Selected Icon:</strong> {newItemIcon}
@@ -1177,10 +1174,10 @@ function ShoppingLists() {
                 <button
                   key={index}
                   onClick={() => setNewItemIcon(icon)}
-                  className={`text-4xl p-3 rounded-lg transition-all transform hover:scale-110 flex items-center justify-center ${
+                  className={`text-4xl p-3 rounded-2xl transition-all duration-300 transform hover:scale-125 flex items-center justify-center ${
                     newItemIcon === icon
-                      ? 'bg-gradient-to-br from-purple-500 to-blue-600 ring-4 ring-purple-300 scale-110'
-                      : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-gradient-to-br from-purple-500 to-blue-600 ring-4 ring-purple-300/50 dark:ring-purple-500/50 scale-110 shadow-xl shadow-purple-500/30'
+                      : 'bg-gray-100/80 dark:bg-gray-700/80 hover:bg-gray-200/80 dark:hover:bg-gray-600/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-600/50'
                   }`}
                 >
                   {icon}
@@ -1192,7 +1189,7 @@ function ShoppingLists() {
             <div className="flex gap-3">
               <button
                 onClick={confirmIconSelection}
-                className="flex-1 bg-gradient-to-r from-green-500 to-teal-600 text-white py-3 rounded-lg font-semibold hover:from-green-600 hover:to-teal-700 transition-all"
+                className="flex-1 bg-gradient-to-r from-green-500 to-teal-600 text-white py-3 rounded-xl font-semibold hover:from-green-600 hover:to-teal-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-green-500/30 hover:scale-105 active:scale-95"
               >
                 ✓ Confirm & Add Item
               </button>
@@ -1202,7 +1199,7 @@ function ShoppingLists() {
                   setPendingCustomItem(null);
                   setNewItemIcon('');
                 }}
-                className="flex-1 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-white py-3 rounded-lg font-semibold hover:bg-gray-400 dark:hover:bg-gray-700 transition-all"
+                className="flex-1 bg-gray-100/80 dark:bg-gray-600/80 backdrop-blur-sm text-gray-800 dark:text-white py-3 rounded-xl font-semibold hover:bg-gray-200/80 dark:hover:bg-gray-700/80 transition-all duration-300 border border-gray-200/50 dark:border-gray-600/50 hover:scale-105 active:scale-95"
               >
                 Cancel
               </button>
@@ -1217,8 +1214,8 @@ function ShoppingLists() {
 
       {/* Generate List Options Modal */}
       {showGenerateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto my-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl p-4 sm:p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto my-4 shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
@@ -1242,7 +1239,7 @@ function ShoppingLists() {
               <button
                 onClick={() => generateHealthyList('analyze')}
                 disabled={generating}
-                className="w-full text-left p-4 sm:p-5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left p-4 sm:p-5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:shadow-purple-500/40 transition-all duration-300 transform hover:-translate-y-2 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed border border-white/10"
               >
                 <div className="flex items-start gap-4">
                   <div className="text-4xl">🧠</div>
@@ -1265,7 +1262,7 @@ function ShoppingLists() {
               <button
                 onClick={() => generateHealthyList('healthy')}
                 disabled={generating}
-                className="w-full text-left p-4 sm:p-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left p-4 sm:p-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:shadow-green-500/40 transition-all duration-300 transform hover:-translate-y-2 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed border border-white/10"
               >
                 <div className="flex items-start gap-4">
                   <div className="text-4xl">🥗</div>
@@ -1288,7 +1285,7 @@ function ShoppingLists() {
               <button
                 onClick={() => generateHealthyList('weekly')}
                 disabled={generating}
-                className="w-full text-left p-4 sm:p-5 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left p-4 sm:p-5 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:shadow-blue-500/40 transition-all duration-300 transform hover:-translate-y-2 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed border border-white/10"
               >
                 <div className="flex items-start gap-4">
                   <div className="text-4xl">📅</div>
@@ -1310,7 +1307,7 @@ function ShoppingLists() {
               <button
                 onClick={() => generateHealthyList('quick')}
                 disabled={generating}
-                className="w-full text-left p-4 sm:p-5 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left p-4 sm:p-5 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:shadow-orange-500/40 transition-all duration-300 transform hover:-translate-y-2 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed border border-white/10"
               >
                 <div className="flex items-start gap-4">
                   <div className="text-4xl">⚡</div>
@@ -1345,14 +1342,14 @@ function ShoppingLists() {
                 value={freeformInput}
                 onChange={(e) => setFreeformInput(e.target.value)}
                 placeholder="Example: apple, 2 bananas, 3 kefir, milk, bread, 500g chicken breast, tomatoes..."
-                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                className="w-full p-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 focus:shadow-lg focus:shadow-purple-500/10 resize-none transition-all duration-300"
                 rows="4"
               />
               
               <button
                 onClick={() => generateHealthyList('freeform', freeformInput)}
                 disabled={generating || !freeformInput.trim()}
-                className="w-full mt-3 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full mt-3 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white py-3 rounded-xl font-semibold shadow-xl hover:shadow-2xl hover:shadow-pink-500/40 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:scale-105 active:scale-95"
               >
                 <span className="text-xl">🤖</span>
                 <span>Parse with AI & Generate List</span>
@@ -1368,9 +1365,9 @@ function ShoppingLists() {
       
       {/* Category Change Modal */}
       {showCategoryModal && selectedItemForCategory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl w-full max-w-md shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 Change Category
               </h2>
@@ -1384,10 +1381,10 @@ function ShoppingLists() {
                   <button
                     key={category.id}
                     onClick={() => changeItemCategory(category.name)}
-                    className={`p-4 rounded-lg border-2 transition-all hover:scale-105 ${
+                    className={`p-4 rounded-2xl border-2 transition-all duration-300 hover:scale-110 active:scale-95 ${
                       selectedItemForCategory.category === category.name
-                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                        : 'border-gray-300 dark:border-gray-600 hover:border-purple-300'
+                        ? 'border-purple-500 bg-purple-50/80 dark:bg-purple-900/20 shadow-lg shadow-purple-500/30'
+                        : 'border-gray-300/50 dark:border-gray-600/50 hover:border-purple-300 backdrop-blur-sm bg-white/50 dark:bg-gray-700/50'
                     }`}
                   >
                     <div className="text-3xl mb-2">{category.icon}</div>

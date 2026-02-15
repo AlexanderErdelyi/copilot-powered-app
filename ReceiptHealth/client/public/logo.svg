@@ -1,0 +1,35 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Gradient Definitions -->
+  <defs>
+    <linearGradient id="primaryGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#667eea;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background Circle -->
+  <circle cx="32" cy="32" r="30" fill="url(#primaryGradient)" opacity="0.2"/>
+  
+  <!-- Meditation/Wellness Symbol (Person in wellness pose) -->
+  <path d="M32 16c2.2 0 4-1.8 4-4s-1.8-4-4-4-4 1.8-4 4 1.8 4 4 4z" fill="url(#primaryGradient)"/>
+  
+  <!-- Body in meditation pose -->
+  <path d="M32 20c-3.3 0-6 2.7-6 6v8c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2v-8c0-3.3-2.7-6-6-6z" fill="url(#accentGradient)"/>
+  
+  <!-- Wellness Arms/Energy -->
+  <path d="M20 28c-2.2 0-4 1.8-4 4s1.8 4 4 4c1.1 0 2-.9 2-2v-4c0-1.1-.9-2-2-2z" fill="url(#primaryGradient)" opacity="0.8"/>
+  <path d="M44 28c2.2 0 4 1.8 4 4s-1.8 4-4 4c-1.1 0-2-.9-2-2v-4c0-1.1.9-2 2-2z" fill="url(#primaryGradient)" opacity="0.8"/>
+  
+  <!-- Health Monitor Wave/Pulse -->
+  <path d="M12 44h8l3-6 4 12 4-9 3 3h18" stroke="url(#accentGradient)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Mind/Focus Circles -->
+  <circle cx="24" cy="18" r="1.5" fill="url(#accentGradient)" opacity="0.6"/>
+  <circle cx="40" cy="18" r="1.5" fill="url(#accentGradient)" opacity="0.6"/>
+  <circle cx="18" cy="24" r="1.5" fill="url(#accentGradient)" opacity="0.4"/>
+  <circle cx="46" cy="24" r="1.5" fill="url(#accentGradient)" opacity="0.4"/>
+</svg>
