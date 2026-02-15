@@ -594,7 +594,7 @@ function Achievements() {
         {achievements.length === 0 ? (
           <div className="card text-center py-12">
             <p className="text-gray-500 dark:text-gray-400">
-              No achievements yet. Start using ReceiptHealth to unlock badges!
+              No achievements yet. Start using Sanitas Mind to unlock badges!
             </p>
           </div>
         ) : (

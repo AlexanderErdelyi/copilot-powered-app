@@ -618,7 +618,7 @@ function VoiceAssistant() {
                 <Mic className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
               </div>
               <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Hi! I'm your ReceiptHealth Assistant
+                Hi! I'm your Sanitas Mind Assistant
               </h3>
               <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4 sm:mb-6 max-w-md">
                 I can help you with receipts, shopping lists, meal planning, and more. Try asking me something!
