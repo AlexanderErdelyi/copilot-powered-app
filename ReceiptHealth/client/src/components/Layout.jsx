@@ -203,7 +203,7 @@ function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <Sidebar 
         isOpen={sidebarOpen} 
         toggleSidebar={toggleSidebar}
@@ -211,22 +211,25 @@ function Layout({ children }) {
         setIsCollapsed={setSidebarCollapsed}
       />
       
-      {/* Main content */}
-      <div className={`${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} min-h-screen flex flex-col transition-all duration-300`}>
-        {/* Top bar */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-30">
+      {/* Main content with futuristic effects */}
+      <div className={`${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} min-h-screen flex flex-col transition-all duration-500 ease-out relative`}>
+        {/* Subtle gradient overlay for depth */}
+        <div className="fixed inset-0 pointer-events-none bg-gradient-to-br from-primary-500/[0.02] via-transparent to-secondary-500/[0.02] dark:from-primary-500/[0.03] dark:to-secondary-500/[0.03]" />
+        
+        {/* Top bar with glassmorphism */}
+        <header className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl shadow-lg shadow-gray-200/50 dark:shadow-gray-900/50 sticky top-0 z-30 border-b border-gray-200/50 dark:border-gray-700/50">
           <div className="flex items-center justify-between px-2 sm:px-4 py-3 sm:py-4">
             {/* Left side */}
             <div className="flex items-center space-x-2 sm:space-x-4 flex-1 min-w-0">
               <button
                 onClick={toggleSidebar}
-                className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="lg:hidden p-2 hover:bg-gray-100/80 dark:hover:bg-gray-700/80 rounded-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 active:scale-95"
               >
                 <Menu className="w-6 h-6" />
               </button>
               
-              {/* Search bar */}
-              <form onSubmit={handleSearch} className="hidden sm:flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 flex-1 max-w-md">
+              {/* Search bar with glow effect */}
+              <form onSubmit={handleSearch} className="hidden sm:flex items-center bg-gray-100/80 dark:bg-gray-700/80 backdrop-blur-sm rounded-xl px-3 py-2 flex-1 max-w-md border border-gray-200/50 dark:border-gray-600/50 focus-within:border-primary-500/50 focus-within:shadow-lg focus-within:shadow-primary-500/10 transition-all duration-300">
                 <Search className="w-5 h-5 text-gray-400 mr-2" />
                 <input
                   type="text"
@@ -436,9 +439,11 @@ function Layout({ children }) {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 p-3 sm:p-4 md:p-6">
-          {children}
+        {/* Page content with futuristic container */}
+        <main className="flex-1 p-3 sm:p-4 md:p-6 relative z-10">
+          <div className="max-w-[1920px] mx-auto">
+            {children}
+          </div>
         </main>
 
         {/* Footer */}
