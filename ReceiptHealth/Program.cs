@@ -714,6 +714,14 @@ app.MapGet("/api/receipts", async (ReceiptHealthContext context) =>
             r.HealthScore,
             DocumentId = r.Document.Id,
             DocumentFileName = r.Document.FileName,
+            LineItems = r.LineItems.Select(li => new
+            {
+                li.Id,
+                li.Description,
+                li.Price,
+                li.Quantity,
+                li.Category
+            }).ToList(),
             LineItemCount = r.LineItems.Count,
             CategorySummary = r.CategorySummary != null ? new
             {

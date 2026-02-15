@@ -101,6 +101,39 @@ function Receipts() {
     }
   };
 
+  const getCategoryStyles = (category) => {
+    const categoryName = category?.toLowerCase() || 'unknown';
+    
+    const styles = {
+      'healthy': {
+        bg: 'bg-green-50/80 dark:bg-green-900/20',
+        border: 'border-green-200/50 dark:border-green-700/50',
+        badge: 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300',
+        glow: 'hover:shadow-green-500/20'
+      },
+      'junk': {
+        bg: 'bg-red-50/80 dark:bg-red-900/20',
+        border: 'border-red-200/50 dark:border-red-700/50',
+        badge: 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300',
+        glow: 'hover:shadow-red-500/20'
+      },
+      'other': {
+        bg: 'bg-gray-50/80 dark:bg-gray-700/80',
+        border: 'border-gray-200/50 dark:border-gray-600/50',
+        badge: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
+        glow: 'hover:shadow-gray-500/20'
+      },
+      'unknown': {
+        bg: 'bg-gray-50/80 dark:bg-gray-700/80',
+        border: 'border-gray-200/50 dark:border-gray-600/50',
+        badge: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400',
+        glow: 'hover:shadow-gray-500/20'
+      }
+    };
+    
+    return styles[categoryName] || styles['unknown'];
+  };
+
   const viewReceipt = async (receiptId) => {
     try {
       const response = await axios.get(`/api/receipts/${receiptId}`);
@@ -471,9 +504,9 @@ function Receipts() {
 
       {/* Receipt Details Modal */}
       {showReceiptModal && selectedReceipt && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-start gap-3 z-10">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl shadow-primary-500/20 border border-gray-200/50 dark:border-gray-700/50">
+            <div className="sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl border-b border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 flex justify-between items-start gap-3 z-10">
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 truncate">
                   {selectedReceipt.vendor}
@@ -500,12 +533,13 @@ function Receipts() {
               <div className="space-y-2">
                 {selectedReceipt.lineItems && selectedReceipt.lineItems.length > 0 ? (
                   selectedReceipt.lineItems.map((item, index) => {
-                    // Find the category to get its color
+                    // Find the category to get its color and styles
                     const category = availableCategories.find(c => c.name === item.category);
                     const categoryColor = category?.color || '#6b7280'; // fallback to gray
+                    const categoryStyle = getCategoryStyles(item.category);
                     
                     return (
-                    <div key={index} className="flex justify-between items-start p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg gap-2">
+                    <div key={index} className={`flex justify-between items-start p-2 sm:p-3 ${categoryStyle.bg} backdrop-blur-sm rounded-xl gap-2 hover:shadow-md ${categoryStyle.glow} transition-all border ${categoryStyle.border}`}>
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block">{item.description}</span>
                         <div className="relative inline-block category-selector-container mt-1">
@@ -523,7 +557,7 @@ function Receipts() {
                           
                           {/* Category Selector Dropdown */}
                           {showCategorySelector && editingItemId === item.id && (
-                            <div className="absolute left-0 top-full mt-1 z-[9999] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg min-w-[150px]">
+                            <div className="absolute left-0 top-full mt-1 z-[99999] bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-300/50 dark:border-gray-600/50 rounded-xl shadow-2xl shadow-primary-500/20 min-w-[150px]">
                               <div className="py-1">
                                 {availableCategories.map((category) => (
                                   <button
