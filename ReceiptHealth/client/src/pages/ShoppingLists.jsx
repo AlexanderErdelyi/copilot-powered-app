@@ -236,7 +236,9 @@ function ShoppingLists() {
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [selectedList, setSelectedList] = useState(null);
+  const [selectedItemForCategory, setSelectedItemForCategory] = useState(null);
   const [newListName, setNewListName] = useState('');
   const [newItemName, setNewItemName] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState(1);
@@ -250,9 +252,11 @@ function ShoppingLists() {
   const [freeformInput, setFreeformInput] = useState('');
   const [generationMode, setGenerationMode] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     fetchLists();
+    fetchCategories();
     // Load custom items from localStorage
     const loaded = loadCustomItems();
     setCustomItems(loaded);
@@ -271,6 +275,16 @@ function ShoppingLists() {
       setLists([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get('/api/categories');
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      setCategories([]);
     }
   };
 
@@ -535,6 +549,41 @@ function ShoppingLists() {
     }
   };
 
+  const openCategoryModal = (item) => {
+    setSelectedItemForCategory(item);
+    setShowCategoryModal(true);
+  };
+
+  const changeItemCategory = async (newCategory) => {
+    if (!selectedItemForCategory || !selectedList) return;
+    
+    try {
+      await axios.put(
+        `/api/shopping-lists/${selectedList.id}/items/${selectedItemForCategory.id}/category`,
+        { category: newCategory }
+      );
+      toast.success('Category updated!');
+      setShowCategoryModal(false);
+      setSelectedItemForCategory(null);
+      // Refresh the list
+      viewList(selectedList.id);
+      fetchLists();
+    } catch (error) {
+      console.error('Error updating category:', error);
+      toast.error('Failed to update category');
+    }
+  };
+
+  const getCategoryColor = (categoryName) => {
+    const category = categories.find(c => c.name === categoryName);
+    return category?.color || '#6b7280';
+  };
+
+  const getCategoryIcon = (categoryName) => {
+    const category = categories.find(c => c.name === categoryName);
+    return category?.icon || '📦';
+  };
+
   const getItemIcon = (itemName) => {
     if (!itemName) return '🛒';
     
@@ -679,7 +728,7 @@ function ShoppingLists() {
               <div 
                 key={list.id} 
                 onClick={() => viewList(list.id)}
-                className="card hover:shadow-2xl hover:scale-102 transition-all duration-200 cursor-pointer group"
+                className="card hover:shadow-2xl hover:scale-102 transition-all duration-200 cursor-pointer group flex flex-col"
                 style={{ boxShadow: '0 0 0 0 rgba(99, 102, 241, 0)' }}
                 onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 0 20px 2px rgba(99, 102, 241, 0.3)'}
                 onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 0 0 0 rgba(99, 102, 241, 0)'}
@@ -722,6 +771,9 @@ function ShoppingLists() {
                     )}
                   </div>
                 )}
+                
+                {/* Spacer to push bottom content down */}
+                <div className="flex-grow"></div>
                 
                 <div className="mb-3 sm:mb-4">
                   <div className="flex justify-between text-xs sm:text-sm mb-2">
@@ -792,7 +844,7 @@ function ShoppingLists() {
       {showViewModal && selectedList && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-start gap-3">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-start gap-3 z-10">
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-1 sm:mb-2 truncate">{selectedList.name}</h2>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
@@ -807,8 +859,8 @@ function ShoppingLists() {
               </button>
             </div>
 
-            <div className="p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4">
+            <div className="sticky top-[88px] sm:top-[100px] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 z-10">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Items</h3>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
@@ -827,6 +879,9 @@ function ShoppingLists() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div className="p-4 sm:p-6">
 
               {selectedList.items && selectedList.items.length > 0 ? (
                 <>
@@ -840,27 +895,68 @@ function ShoppingLists() {
                         {selectedList.items.filter(item => !item.isPurchased).map((item) => (
                           <div
                             key={item.id}
-                            onClick={() => toggleItemPurchased(item.id, item.isPurchased)}
-                            className="relative group cursor-pointer bg-gradient-to-br from-purple-500 to-blue-600 text-white rounded-lg p-3 sm:p-4 hover:-translate-y-1 hover:shadow-xl transition-all duration-200"
+                            className="relative group bg-gradient-to-br from-purple-500 to-blue-600 text-white rounded-xl p-3 sm:p-4 shadow-lg hover:-translate-y-1 hover:shadow-2xl transition-all duration-200"
                           >
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteItem(item.id);
+                            {/* Action Buttons */}
+                            <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openCategoryModal(item);
+                                }}
+                                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full p-1.5 transition-colors"
+                                title="Change category"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteItem(item.id);
+                                }}
+                                className="bg-red-500 hover:bg-red-600 rounded-full p-1.5 transition-colors"
+                                title="Delete item"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                            
+                            {/* Item Content */}
+                            <div 
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => toggleItemPurchased(item.id, item.isPurchased)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  toggleItemPurchased(item.id, item.isPurchased);
+                                }
                               }}
-                              className="absolute top-1 right-1 sm:top-2 sm:right-2 opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 rounded-full p-1 transition-opacity"
+                              className="cursor-pointer"
+                              aria-label={`Mark ${item.name || item.itemName} as purchased`}
                             >
-                              <X className="w-3 h-3" />
-                            </button>
-                            <div className="text-center">
-                              <div className="text-3xl sm:text-4xl mb-1 sm:mb-2">{getItemIcon(item.name || item.itemName)}</div>
-                              <div className="font-bold text-xs sm:text-sm mb-1 truncate">{item.name || item.itemName || 'Item'}</div>
-                              {(item.quantity > 1 || item.quantity === 1) && (
-                                <div className="text-xs opacity-90">×{item.quantity}</div>
-                              )}
-                              {item.estimatedPrice && (
-                                <div className="text-xs opacity-90">${item.estimatedPrice.toFixed(2)}</div>
-                              )}
+                              <div className="text-center">
+                                <div className="text-3xl sm:text-4xl mb-1 sm:mb-2">{getItemIcon(item.name || item.itemName)}</div>
+                                <div className="font-bold text-xs sm:text-sm mb-1 truncate">{item.name || item.itemName || 'Item'}</div>
+                                
+                                {/* Category Badge */}
+                                {item.category && item.category !== 'Unknown' && (
+                                  <div className="inline-flex items-center space-x-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full text-[10px] mb-1">
+                                    <span>{getCategoryIcon(item.category)}</span>
+                                    <span>{item.category}</span>
+                                  </div>
+                                )}
+                                
+                                {(item.quantity > 1 || item.quantity === 1) && (
+                                  <div className="text-xs opacity-90">×{item.quantity}</div>
+                                )}
+                                {item.estimatedPrice && (
+                                  <div className="text-xs opacity-90">${item.estimatedPrice.toFixed(2)}</div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -878,34 +974,59 @@ function ShoppingLists() {
                         {selectedList.items.filter(item => item.isPurchased).map((item) => (
                           <div
                             key={item.id}
-                            onClick={() => toggleItemPurchased(item.id, item.isPurchased)}
-                            className="relative group cursor-pointer bg-gradient-to-br from-gray-400 to-gray-500 text-white rounded-lg p-3 sm:p-4 opacity-70 hover:opacity-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-200"
+                            className="relative group bg-gradient-to-br from-gray-400 to-gray-500 text-white rounded-xl p-3 sm:p-4 opacity-70 hover:opacity-100 hover:-translate-y-1 hover:shadow-xl transition-all duration-200"
                           >
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteItem(item.id);
+                            {/* Action Buttons */}
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteItem(item.id);
+                                }}
+                                className="bg-red-500 hover:bg-red-600 rounded-full p-1.5 transition-colors"
+                                title="Delete item"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                            
+                            {/* Item Content */}
+                            <div 
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => toggleItemPurchased(item.id, item.isPurchased)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  toggleItemPurchased(item.id, item.isPurchased);
+                                }
                               }}
-                              className="absolute top-1 right-1 sm:top-2 sm:right-2 opacity-0 group-hover:opacity-100 bg-red-500 hover:bg-red-600 rounded-full p-1 transition-opacity"
+                              className="cursor-pointer"
+                              aria-label={`Unmark ${item.name || item.itemName} as purchased`}
                             >
-                              <X className="w-3 h-3" />
-                            </button>
-                            <div className="text-center">
-                              <div className="text-3xl sm:text-4xl mb-1 sm:mb-2">{getItemIcon(item.name || item.itemName)}</div>
-                              <div className="font-bold text-xs sm:text-sm mb-1 line-through truncate">{item.name || item.itemName || 'Item'}</div>
-                              {(item.quantity > 1 || item.quantity === 1) && (
-                                <div className="text-xs opacity-90">×{item.quantity}</div>
-                              )}
-                              {item.estimatedPrice && (
-                                <div className="text-xs opacity-90">${item.estimatedPrice.toFixed(2)}</div>
-                              )}
-                              <div className="text-xs mt-1">✓ Purchased</div>
+                              <div className="text-center">
+                                <div className="text-3xl sm:text-4xl mb-1 sm:mb-2 opacity-80 line-through">{getItemIcon(item.name || item.itemName)}</div>
+                                <div className="font-bold text-xs sm:text-sm mb-1 truncate line-through">{item.name || item.itemName || 'Item'}</div>
+                                
+                                {/* Category Badge */}
+                                {item.category && item.category !== 'Unknown' && (
+                                  <div className="inline-flex items-center space-x-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full text-[10px] mb-1">
+                                    <span>{getCategoryIcon(item.category)}</span>
+                                    <span>{item.category}</span>
+                                  </div>
+                                )}
+                                
+                                {(item.quantity > 1 || item.quantity === 1) && (
+                                  <div className="text-xs opacity-90">×{item.quantity}</div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
+
                 </>
               ) : (
                 <p className="text-gray-500 dark:text-gray-400 text-center py-8">
@@ -1240,6 +1361,53 @@ function ShoppingLists() {
               <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
                 AI will intelligently parse quantities, units, and item names
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Category Change Modal */}
+      {showCategoryModal && selectedItemForCategory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                Change Category
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Select a category for {selectedItemForCategory.name || selectedItemForCategory.itemName}
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-2 gap-3">
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    onClick={() => changeItemCategory(category.name)}
+                    className={`p-4 rounded-lg border-2 transition-all hover:scale-105 ${
+                      selectedItemForCategory.category === category.name
+                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-purple-300'
+                    }`}
+                  >
+                    <div className="text-3xl mb-2">{category.icon}</div>
+                    <div className="font-medium text-sm text-gray-900 dark:text-white">
+                      {category.name}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => {
+                  setShowCategoryModal(false);
+                  setSelectedItemForCategory(null);
+                }}
+                className="w-full btn-secondary"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

@@ -1,39 +1,56 @@
-import { TrendingUp, TrendingDown, BarChart3, Send, Loader2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { TrendingUp, TrendingDown, BarChart3, Send, Loader2, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useInsights } from '../contexts/InsightsContext';
 
 function Insights() {
   const [query, setQuery] = useState('');
   const [answer, setAnswer] = useState('');
   const [asking, setAsking] = useState(false);
-  const [anomalies, setAnomalies] = useState([]);
-  const [prediction, setPrediction] = useState(null);
-  const [recommendations, setRecommendations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Get pre-loaded insights data from context
+  const { 
+    anomalies, 
+    prediction, 
+    recommendations,
+    stats,
+    categoryData,
+    loading, 
+    refreshing,
+    lastFetch,
+    refresh 
+  } = useInsights();
 
-  useEffect(() => {
-    fetchInsightsData();
-  }, []);
+  // Calculate quick stats from real data
+  const getCurrencySymbol = (currencyCode) => {
+    const symbols = { 'USD': '$', 'EUR': '€', 'GBP': '£', 'CHF': 'CHF', 'JPY': '¥' };
+    return symbols[currencyCode] || currencyCode;
+  };
 
-  const fetchInsightsData = async () => {
-    try {
-      // Fetch anomalies
-      const anomaliesRes = await axios.get('/api/insights/anomalies');
-      setAnomalies(anomaliesRes.data || []);
+  const calculateAvgWeeklySpend = () => {
+    if (!stats || stats.receiptCount === 0) return 0;
+    // Get date range from receipts (simplified - using total / estimated weeks)
+    // For better accuracy, we'd need receipt dates, but this gives a reasonable estimate
+    const estimatedWeeks = Math.max(stats.receiptCount / 2, 1); // Assume ~2 receipts per week minimum
+    return stats.totalSpent / estimatedWeeks;
+  };
 
-      // Fetch budget prediction
-      const predictionRes = await axios.get('/api/insights/budget-prediction');
-      setPrediction(predictionRes.data);
-
-      // Fetch recommendations
-      const recommendationsRes = await axios.get('/api/recommendations/category');
-      setRecommendations(recommendationsRes.data || []);
-    } catch (error) {
-      console.error('Error fetching insights data:', error);
-    } finally {
-      setLoading(false);
+  const getTopCategory = () => {
+    if (!categoryData || categoryData.length === 0) {
+      return { name: 'N/A', percentage: 0 };
     }
+    const sorted = [...categoryData].sort((a, b) => b.value - a.value);
+    const top = sorted[0];
+    const total = categoryData.reduce((sum, cat) => sum + cat.value, 0);
+    const percentage = total > 0 ? (top.value / total * 100) : 0;
+    return { name: top.name, percentage };
+  };
+
+  const handleRefresh = async () => {
+    toast.loading('Recalculating insights...', { id: 'refresh' });
+    await refresh();
+    toast.success('Insights refreshed!', { id: 'refresh' });
   };
 
   const askQuery = async () => {
@@ -56,11 +73,27 @@ function Insights() {
   };
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Insights</h1>
-        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
-          Analyze your spending patterns and health trends
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Insights</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
+            Analyze your spending patterns and health trends
+          </p>
+          {lastFetch && !loading && (
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+              Last updated: {new Date(lastFetch).toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing || loading}
+          className="btn-primary flex items-center space-x-2 text-sm"
+          title="Recalculate insights"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Refresh</span>
+        </button>
       </div>
 
       {/* Ask Me Anything */}
@@ -109,9 +142,10 @@ function Insights() {
           <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white flex items-center">
             ⚠️ Anomaly Alerts
           </h2>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+          {(loading || refreshing) ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-2" />
+              <p className="text-sm text-gray-500">{refreshing ? 'Refreshing...' : 'Pre-loading data...'}</p>
             </div>
           ) : anomalies.length > 0 ? (
             <div className="space-y-2 sm:space-y-3">
@@ -144,9 +178,10 @@ function Insights() {
           <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white flex items-center">
             📊 Budget Prediction
           </h2>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+          {(loading || refreshing) ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-2" />
+              <p className="text-sm text-gray-500">{refreshing ? 'Refreshing...' : 'Pre-loading data...'}</p>
             </div>
           ) : prediction ? (
             <div className="space-y-3 sm:space-y-4">
@@ -155,14 +190,31 @@ function Insights() {
                   Predicted Spending (Next Month)
                 </div>
                 <div className="text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-300">
-                  ${prediction.predictedAmount?.toFixed(2) || '0.00'}
+                  ${prediction.predictedTotal?.toFixed(2) || '0.00'}
+                </div>
+                <div className="mt-2 space-y-1 text-xs text-blue-600 dark:text-blue-400">
+                  <div className="flex justify-between">
+                    <span>Current Month:</span>
+                    <span className="font-semibold">${prediction.currentMonthSpend?.toFixed(2) || '0.00'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Average Monthly:</span>
+                    <span className="font-semibold">${prediction.averageMonthlySpend?.toFixed(2) || '0.00'}</span>
+                  </div>
                 </div>
                 {prediction.confidence && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    Confidence: {(prediction.confidence * 100).toFixed(0)}%
+                  <div className="mt-2">
+                    <span className="inline-block px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded text-xs font-semibold">
+                      {prediction.confidence.toUpperCase()} Confidence
+                    </span>
                   </div>
                 )}
               </div>
+              {prediction.message && (
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                  {prediction.message}
+                </p>
+              )}
               {prediction.trend && (
                 <div className="flex items-center space-x-2 text-sm">
                   {prediction.trend === 'increasing' ? (
@@ -194,38 +246,51 @@ function Insights() {
         <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white flex items-center">
           💡 Personalized Recommendations
         </h2>
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+        {(loading || refreshing) ? (
+          <div className="flex flex-col items-center justify-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-2" />
+            <p className="text-sm text-gray-500">
+              {refreshing ? 'Refreshing...' : 'Pre-loading data...'}
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              AI is analyzing your receipts (this may take ~20 seconds)
+            </p>
           </div>
         ) : recommendations.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-            {recommendations.map((rec, idx) => (
-              <div key={idx} className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
-                <div className="text-sm sm:text-base font-semibold text-green-700 dark:text-green-300 mb-1">
-                  {rec.title || rec.category}
-                </div>
-                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  {rec.suggestion || rec.recommendation}
-                </div>
-                {rec.potentialSavings && (
-                  <div className="text-xs sm:text-sm font-semibold text-green-600 dark:text-green-400 mt-2">
-                    Save up to ${rec.potentialSavings.toFixed(2)}
+            {recommendations.map((rec, idx) => {
+              // Recommendations come as strings with emojis at the start
+              const text = typeof rec === 'string' ? rec : (rec.suggestion || rec.recommendation || rec.title || '');
+              // Extract emoji if present (first character)   
+              const hasEmoji = text && /[\u{1F300}-\u{1F9FF}]/u.test(text[0]);
+              const emoji = hasEmoji ? text[0] : '💡';
+              const content = hasEmoji ? text.slice(1).trim() : text;
+              
+              return (
+                <div key={idx} className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg flex-shrink-0">{emoji}</span>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-700 dark:text-gray-300">
+                        {content}
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <p>No recommendations at this time</p>
-            <p className="text-sm mt-1">Keep tracking your spending for personalized tips!</p>
+            <p>📊 Upload receipts to get recommendations</p>
+            <p className="text-sm mt-1">AI will analyze your shopping patterns and suggest healthier alternatives!</p>
           </div>
         )}
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        {/* Health Score */}
         <div className="card">
           <div className="flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
             <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900 rounded-lg flex-shrink-0">
@@ -233,12 +298,19 @@ function Insights() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Health Score</p>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">68%</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                {loading ? '...' : stats ? `${stats.healthScore}%` : 'N/A'}
+              </p>
             </div>
           </div>
-          <p className="text-xs sm:text-sm text-green-500">+5% from last month</p>
+          <p className="text-xs sm:text-sm text-gray-500">
+            {stats && stats.receiptCount > 0 
+              ? `Based on ${stats.receiptCount} receipt${stats.receiptCount !== 1 ? 's' : ''}`
+              : 'Upload receipts to see score'}
+          </p>
         </div>
         
+        {/* Average Weekly Spending */}
         <div className="card">
           <div className="flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
             <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900 rounded-lg flex-shrink-0">
@@ -246,12 +318,21 @@ function Insights() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Avg Spending</p>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">$420</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                {loading ? '...' : stats 
+                  ? `${getCurrencySymbol(stats.currency)}${calculateAvgWeeklySpend().toFixed(0)}` 
+                  : 'N/A'}
+              </p>
             </div>
           </div>
-          <p className="text-xs sm:text-sm text-gray-500">per week</p>
+          <p className="text-xs sm:text-sm text-gray-500">
+            {stats 
+              ? `Total: ${getCurrencySymbol(stats.currency)}${stats.totalSpent.toFixed(2)}`
+              : 'per week'}
+          </p>
         </div>
         
+        {/* Top Category */}
         <div className="card">
           <div className="flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
             <div className="p-2 sm:p-3 bg-orange-100 dark:bg-orange-900 rounded-lg flex-shrink-0">
@@ -259,10 +340,14 @@ function Insights() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Top Category</p>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate">Groceries</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate">
+                {loading ? '...' : getTopCategory().name}
+              </p>
             </div>
           </div>
-          <p className="text-xs sm:text-sm text-gray-500">44% of spending</p>
+          <p className="text-xs sm:text-sm text-gray-500">
+            {loading ? 'Loading...' : `${getTopCategory().percentage.toFixed(0)}% of spending`}
+          </p>
         </div>
       </div>
     </div>

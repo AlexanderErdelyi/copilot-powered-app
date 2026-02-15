@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ReceiptHealth.Data;
 using ReceiptHealth.Services;
 using ReceiptHealth.Models;
+using ReceiptHealth; // For DatabaseMigration
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,7 +25,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("ReactDevPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:5175")
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
@@ -68,6 +69,7 @@ builder.Services.AddScoped<IInsightsService, InsightsService>();
 builder.Services.AddScoped<INutritionService, NutritionService>();
 builder.Services.AddScoped<IMealPlannerService, MealPlannerService>();
 builder.Services.AddScoped<VoiceAssistantService>();
+builder.Services.AddScoped<ICategoryManagementService, CategoryManagementService>();
 
 // Text-to-Speech service (Piper)
 builder.Services.AddSingleton<IPiperTtsService, PiperTtsService>();
@@ -89,16 +91,59 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Ensure database is created
+// Ensure database is created and migrated
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ReceiptHealthContext>();
+    
+    // Check if database file exists
+    bool isNewDatabase = !File.Exists(dbPath);
+    
+    // Always ensure base schema is created first
     context.Database.EnsureCreated();
     Console.WriteLine($"✅ Database initialized at: {dbPath}");
     app.Logger.LogInformation("Database initialized at: {DbPath}", dbPath);
+    
+    // Run migrations only if database already existed (to add new columns/tables to existing schema)
+    if (!isNewDatabase)
+    {
+        DatabaseMigration.MigrateDatabase($"Data Source={dbPath}");
+    }
+    else
+    {
+        Console.WriteLine("ℹ️  Fresh database created - migrations not needed");
+    }
+    
+    // Initialize system categories
+    var categoryService = scope.ServiceProvider.GetRequiredService<ICategoryManagementService>();
+    await categoryService.EnsureSystemCategoriesExistAsync();
+    Console.WriteLine("✅ System categories initialized");
 }
 
 Console.WriteLine("📡 Setting up API endpoints...");
+
+// Helper method to log activities
+async Task LogActivityAsync(ReceiptHealthContext context, string type, string description, 
+    string? entityType = null, int? entityId = null, bool isSuccess = true, 
+    string? errorMessage = null, string? icon = null, string? navigateUrl = null)
+{
+    var activity = new Activity
+    {
+        Type = type,
+        Description = description,
+        EntityType = entityType,
+        EntityId = entityId,
+        Timestamp = DateTime.Now,
+        IsSuccess = isSuccess,
+        IsRead = false,
+        ErrorMessage = errorMessage,
+        Icon = icon,
+        NavigateUrl = navigateUrl
+    };
+    
+    context.Activities.Add(activity);
+    await context.SaveChangesAsync();
+}
 
 // API Endpoints
 
@@ -117,37 +162,91 @@ app.MapGet("/api/dashboard/stats", async (ReceiptHealthContext context) =>
     var receiptCount = receipts.Count;
     var avgPerReceipt = receiptCount > 0 ? totalSpent / receiptCount : 0;
     
-    // Calculate healthy percentage
-    var totalItems = receipts.Sum(r => r.LineItems.Count);
-    var healthyItems = receipts.Sum(r => r.LineItems.Count(li => li.Category == "Healthy"));
-    var healthyPercentage = totalItems > 0 ? (int)((healthyItems * 100.0) / totalItems) : 0;
+    // Detect most common currency from receipts
+    var currency = receipts
+        .GroupBy(r => r.Currency)
+        .OrderByDescending(g => g.Count())
+        .Select(g => g.Key)
+        .FirstOrDefault() ?? "USD";
+    
+    // Calculate healthy percentage based on spending (Healthy / (Healthy + Junk) * 100)
+    var allLineItems = receipts.SelectMany(r => r.LineItems).ToList();
+    var healthyAmount = allLineItems
+        .Where(li => li.Category == "Healthy")
+        .Sum(li => li.Price * li.Quantity);
+    var junkAmount = allLineItems
+        .Where(li => li.Category == "Junk")
+        .Sum(li => li.Price * li.Quantity);
+    var healthyJunkTotal = healthyAmount + junkAmount;
+    var healthyPercentage = healthyJunkTotal > 0 ? (int)((healthyAmount * 100m) / healthyJunkTotal) : 0;
+    
+    // Calculate item counts (current month and last month for trends)
+    var now = DateTime.Now;
+    var currentMonthStart = new DateTime(now.Year, now.Month, 1);
+    var lastMonthStart = currentMonthStart.AddMonths(-1);
+    
+    var currentMonthReceipts = receipts.Where(r => r.Date >= currentMonthStart).SelectMany(r => r.LineItems).ToList();
+    var lastMonthReceipts = receipts.Where(r => r.Date >= lastMonthStart && r.Date < currentMonthStart).SelectMany(r => r.LineItems).ToList();
+    
+    var healthyItemCount = currentMonthReceipts.Where(li => li.Category == "Healthy").Sum(li => (int)li.Quantity);
+    var junkItemCount = currentMonthReceipts.Where(li => li.Category == "Junk").Sum(li => (int)li.Quantity);
+    var healthyItemCountLastMonth = lastMonthReceipts.Where(li => li.Category == "Healthy").Sum(li => (int)li.Quantity);
+    var junkItemCountLastMonth = lastMonthReceipts.Where(li => li.Category == "Junk").Sum(li => (int)li.Quantity);
+    
+    // Calculate trends (difference from last month)
+    var healthyTrend = healthyItemCount - healthyItemCountLastMonth;
+    var junkTrend = junkItemCount - junkItemCountLastMonth;
     
     return Results.Ok(new
     {
         totalSpent,
         receiptCount,
         healthyPercentage,
-        avgPerReceipt
+        avgPerReceipt,
+        currency,
+        healthyItemCount,
+        junkItemCount,
+        healthyItemCountLastMonth,
+        junkItemCountLastMonth,
+        healthyTrend,
+        junkTrend
     });
 });
 
 // Dashboard category breakdown endpoint  
-app.MapGet("/api/dashboard/category-breakdown", async (ReceiptHealthContext context) =>
+app.MapGet("/api/dashboard/category-breakdown", async (ReceiptHealthContext context, string period = "all") =>
 {
-    var lineItems = await context.LineItems.ToListAsync();
+    // Get all categories with their colors
+    var categories = await context.Categories
+        .ToDictionaryAsync(c => c.Name, c => c.Color);
+    
+    // Get receipts with date filtering based on period
+    var receipts = await context.Receipts
+        .Include(r => r.LineItems)
+        .ToListAsync();
+    
+    // Filter receipts based on period
+    if (period.ToLower() != "all")
+    {
+        var now = DateTime.Now;
+        receipts = period.ToLower() switch
+        {
+            "daily" => receipts.Where(r => r.Date.Date == now.Date).ToList(),
+            "weekly" => receipts.Where(r => r.Date >= now.AddDays(-7)).ToList(),
+            "monthly" => receipts.Where(r => r.Date >= now.AddMonths(-1)).ToList(),
+            "yearly" => receipts.Where(r => r.Date >= now.AddYears(-1)).ToList(),
+            _ => receipts
+        };
+    }
+    
+    var lineItems = receipts.SelectMany(r => r.LineItems).ToList();
     var categoryTotals = lineItems
         .GroupBy(li => li.Category)
         .Select(g => new
         {
             name = g.Key,
             value = g.Sum(li => li.Price * li.Quantity),
-            color = g.Key switch
-            {
-                "Healthy" => "#10b981",
-                "Junk" => "#ef4444",
-                "Other" => "#6b7280",
-                _ => "#9ca3af"
-            }
+            color = categories.ContainsKey(g.Key) ? categories[g.Key] : "#9ca3af"
         })
         .Where(c => c.value > 0)
         .ToList();
@@ -155,27 +254,198 @@ app.MapGet("/api/dashboard/category-breakdown", async (ReceiptHealthContext cont
     return Results.Ok(categoryTotals);
 });
 
-// Dashboard spending trends endpoint
-app.MapGet("/api/dashboard/spending-trends", async (ReceiptHealthContext context) =>
+// Dashboard spending trends endpoint with flexible period support
+app.MapGet("/api/dashboard/spending-trends", async (ReceiptHealthContext context, string period = "weekly") =>
 {
     var sixMonthsAgo = DateTime.Now.AddMonths(-6);
     var receipts = await context.Receipts
+        .Include(r => r.LineItems)
         .Where(r => r.Date >= sixMonthsAgo)
         .ToListAsync();
     
-    var monthlyData = receipts
-        .GroupBy(r => new { r.Date.Year, r.Date.Month })
-        .Select(g => new
-        {
-            year = g.Key.Year,
-            month = g.Key.Month,
-            date = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMM"),
-            amount = g.Sum(r => r.Total)
-        })
-        .OrderBy(x => x.year).ThenBy(x => x.month)
+    if (!receipts.Any())
+    {
+        return Results.Ok(new { weekly = new List<object>(), monthly = new List<object>(), categoryTrends = new List<object>() });
+    }
+    
+    // Get all categories with their colors
+    var categories = await context.Categories
+        .Where(c => !c.IsSystemCategory || c.Name == "Healthy" || c.Name == "Junk")
+        .ToDictionaryAsync(c => c.Name, c => c.Color);
+    
+    var items = receipts
+        .SelectMany(r => r.LineItems.Select(li => new { r.Date, li.Category, Amount = li.Price * li.Quantity }))
         .ToList();
     
-    return Results.Ok(monthlyData);
+    if (!items.Any())
+    {
+        return Results.Ok(new { weekly = new List<object>(), monthly = new List<object>(), categoryTrends = new List<object>() });
+    }
+    
+    // Aggregate data based on selected period
+    var aggregatedData = period.ToLower() switch
+    {
+        "daily" => items
+            .GroupBy(x => x.Date.Date)
+            .Select(g => new
+            {
+                period = g.Key.ToString("MMM dd, yyyy"),
+                sortKey = g.Key,
+                total = g.Sum(x => x.Amount),
+                categoryBreakdown = g.GroupBy(x => x.Category)
+                    .ToDictionary(cg => cg.Key, cg => cg.Sum(x => x.Amount))
+            })
+            .OrderBy(x => x.sortKey)
+            .Select(x => new { x.period, x.total, x.categoryBreakdown })
+            .ToList(),
+            
+        "monthly" => items
+            .GroupBy(x => new { x.Date.Year, x.Date.Month })
+            .Select(g => new
+            {
+                period = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMM yyyy"),
+                sortKey = new DateTime(g.Key.Year, g.Key.Month, 1),
+                total = g.Sum(x => x.Amount),
+                categoryBreakdown = g.GroupBy(x => x.Category)
+                    .ToDictionary(cg => cg.Key, cg => cg.Sum(x => x.Amount))
+            })
+            .OrderBy(x => x.sortKey)
+            .Select(x => new { x.period, x.total, x.categoryBreakdown })
+            .ToList(),
+            
+        "yearly" => items
+            .GroupBy(x => x.Date.Year)
+            .Select(g => new
+            {
+                period = g.Key.ToString(),
+                sortKey = new DateTime(g.Key, 1, 1),
+                total = g.Sum(x => x.Amount),
+                categoryBreakdown = g.GroupBy(x => x.Category)
+                    .ToDictionary(cg => cg.Key, cg => cg.Sum(x => x.Amount))
+            })
+            .OrderBy(x => x.sortKey)
+            .Select(x => new { x.period, x.total, x.categoryBreakdown })
+            .ToList(),
+            
+        _ => items // "weekly" or default
+            .GroupBy(x => new { 
+                Year = x.Date.Year, 
+                Week = System.Globalization.ISOWeek.GetWeekOfYear(x.Date)
+            })
+            .Select(g => {
+                var firstDate = g.Min(x => x.Date);
+                var lastDate = g.Max(x => x.Date);
+                return new
+                {
+                    period = $"W{g.Key.Week} ({firstDate:MMM dd} - {lastDate:MMM dd})",
+                    sortKey = new DateTime(g.Key.Year, 1, 1).AddDays((g.Key.Week - 1) * 7),
+                    total = g.Sum(x => x.Amount),
+                    categoryBreakdown = g.GroupBy(x => x.Category)
+                        .ToDictionary(cg => cg.Key, cg => cg.Sum(x => x.Amount))
+                };
+            })
+            .OrderBy(x => x.sortKey)
+            .Select(x => new { x.period, x.total, x.categoryBreakdown })
+            .ToList()
+    };
+    
+    // Category-specific trends based on period
+    var categoryTrends = period.ToLower() switch
+    {
+        "daily" => items
+            .GroupBy(x => new { Date = x.Date.Date, x.Category })
+            .Select(g => new
+            {
+                period = g.Key.Date.ToString("MMM dd"),
+                sortKey = g.Key.Date,
+                category = g.Key.Category,
+                amount = g.Sum(x => x.Amount),
+                color = categories.ContainsKey(g.Key.Category) ? categories[g.Key.Category] : "#9ca3af"
+            })
+            .OrderBy(x => x.sortKey)
+            .GroupBy(x => x.category)
+            .Select(g => new
+            {
+                category = g.Key,
+                color = g.First().color,
+                data = g.Select(x => new { x.period, x.amount }).ToList()
+            })
+            .ToList(),
+            
+        "monthly" => items
+            .GroupBy(x => new { Year = x.Date.Year, Month = x.Date.Month, x.Category })
+            .Select(g => new
+            {
+                period = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMM yyyy"),
+                sortKey = new DateTime(g.Key.Year, g.Key.Month, 1),
+                category = g.Key.Category,
+                amount = g.Sum(x => x.Amount),
+                color = categories.ContainsKey(g.Key.Category) ? categories[g.Key.Category] : "#9ca3af"
+            })
+            .OrderBy(x => x.sortKey)
+            .GroupBy(x => x.category)
+            .Select(g => new
+            {
+                category = g.Key,
+                color = g.First().color,
+                data = g.Select(x => new { x.period, x.amount }).ToList()
+            })
+            .ToList(),
+            
+        "yearly" => items
+            .GroupBy(x => new { Year = x.Date.Year, x.Category })
+            .Select(g => new
+            {
+                period = g.Key.Year.ToString(),
+                sortKey = new DateTime(g.Key.Year, 1, 1),
+                category = g.Key.Category,
+                amount = g.Sum(x => x.Amount),
+                color = categories.ContainsKey(g.Key.Category) ? categories[g.Key.Category] : "#9ca3af"
+            })
+            .OrderBy(x => x.sortKey)
+            .GroupBy(x => x.category)
+            .Select(g => new
+            {
+                category = g.Key,
+                color = g.First().color,
+                data = g.Select(x => new { x.period, x.amount }).ToList()
+            })
+            .ToList(),
+            
+        _ => items // "weekly" or default
+            .GroupBy(x => new { 
+                Year = x.Date.Year, 
+                Week = System.Globalization.ISOWeek.GetWeekOfYear(x.Date),
+                x.Category
+            })
+            .Select(g => {
+                var firstDate = g.Min(x => x.Date);
+                return new
+                {
+                    period = $"W{g.Key.Week}",
+                    sortKey = new DateTime(g.Key.Year, 1, 1).AddDays((g.Key.Week - 1) * 7),
+                    category = g.Key.Category,
+                    amount = g.Sum(x => x.Amount),
+                    color = categories.ContainsKey(g.Key.Category) ? categories[g.Key.Category] : "#9ca3af"
+                };
+            })
+            .OrderBy(x => x.sortKey)
+            .GroupBy(x => x.category)
+            .Select(g => new
+            {
+                category = g.Key,
+                color = g.First().color,
+                data = g.Select(x => new { x.period, x.amount }).ToList()
+            })
+            .ToList()
+    };
+    
+    return Results.Ok(new
+    {
+        weekly = aggregatedData,  // Reuse this field for all periods for backward compatibility
+        monthly = aggregatedData,  // Also populate this for backward compatibility
+        categoryTrends = categoryTrends
+    });
 });
 
 // Global processing status tracking with detailed progress
@@ -284,6 +554,27 @@ app.MapPost("/api/upload", async (HttpRequest request, IServiceProvider serviceP
                         );
                     });
                     Console.WriteLine($"✅ Background processing completed for document {documentId}");
+                    
+                    // Log activity for successful receipt upload
+                    using var activityScope = rootServiceProvider.CreateScope();
+                    var activityContext = activityScope.ServiceProvider.GetRequiredService<ReceiptHealthContext>();
+                    var receipt = await activityContext.Receipts
+                        .Include(r => r.Document)
+                        .FirstOrDefaultAsync(r => r.DocumentId == documentId);
+                    
+                    if (receipt != null)
+                    {
+                        await LogActivityAsync(
+                            activityContext,
+                            "receipt_upload",
+                            $"Receipt uploaded: {receipt.Vendor} - €{receipt.Total:F2}",
+                            "receipt",
+                            receipt.Id,
+                            isSuccess: true,
+                            icon: "📄",
+                            navigateUrl: $"/receipts/{receipt.Id}"
+                        );
+                    }
                 }
                 catch (Exception bgEx)
                 {
@@ -293,6 +584,30 @@ app.MapPost("/api/upload", async (HttpRequest request, IServiceProvider serviceP
                         $"Processing failed: {bgEx.Message}",
                         DateTime.UtcNow
                     );
+                    
+                    // Log activity for failed receipt upload
+                    try
+                    {
+                        using var activityScope = rootServiceProvider.CreateScope();
+                        var activityContext = activityScope.ServiceProvider.GetRequiredService<ReceiptHealthContext>();
+                        var document = await activityContext.Documents.FindAsync(documentId);
+                        
+                        await LogActivityAsync(
+                            activityContext,
+                            "receipt_upload",
+                            $"Receipt upload failed: {document?.FileName ?? "Unknown file"}",
+                            "document",
+                            documentId,
+                            isSuccess: false,
+                            errorMessage: bgEx.Message,
+                            icon: "❌",
+                            navigateUrl: "/receipts"
+                        );
+                    }
+                    catch (Exception logEx)
+                    {
+                        Console.WriteLine($"⚠️ Failed to log error activity: {logEx.Message}");
+                    }
                 }
             });
             
@@ -528,6 +843,105 @@ app.MapGet("/api/receipts/{id}", async (int id, ReceiptHealthContext context) =>
     });
 });
 
+// Update line item category
+app.MapPut("/api/lineitems/{id}/category", async (int id, ReceiptHealthContext context, UpdateLineItemCategoryRequest request) =>
+{
+    var lineItem = await context.LineItems
+        .Include(li => li.Receipt)
+            .ThenInclude(r => r.CategorySummary)
+        .FirstOrDefaultAsync(li => li.Id == id);
+
+    if (lineItem == null)
+    {
+        return Results.NotFound(new { error = "Line item not found" });
+    }
+
+    // Validate that the category exists
+    var category = await context.Categories
+        .FirstOrDefaultAsync(c => c.Id == request.CategoryId);
+
+    if (category == null)
+    {
+        return Results.BadRequest(new { error = "Invalid category" });
+    }
+
+    var oldCategory = lineItem.Category;
+    lineItem.Category = category.Name;
+    lineItem.CategoryId = category.Id;
+
+    // Recalculate category summary for the receipt
+    if (lineItem.Receipt != null)
+    {
+        var allLineItems = await context.LineItems
+            .Where(li => li.ReceiptId == lineItem.ReceiptId)
+            .ToListAsync();
+
+        var healthyTotal = allLineItems.Where(li => li.Category == "Healthy").Sum(li => li.Price);
+        var junkTotal = allLineItems.Where(li => li.Category == "Junk").Sum(li => li.Price);
+        var otherTotal = allLineItems.Where(li => li.Category == "Other").Sum(li => li.Price);
+        var unknownTotal = allLineItems.Where(li => li.Category == "Unknown" || string.IsNullOrEmpty(li.Category)).Sum(li => li.Price);
+
+        var healthyCount = allLineItems.Count(li => li.Category == "Healthy");
+        var junkCount = allLineItems.Count(li => li.Category == "Junk");
+        var otherCount = allLineItems.Count(li => li.Category == "Other");
+        var unknownCount = allLineItems.Count(li => li.Category == "Unknown" || string.IsNullOrEmpty(li.Category));
+
+        if (lineItem.Receipt.CategorySummary != null)
+        {
+            lineItem.Receipt.CategorySummary.HealthyTotal = healthyTotal;
+            lineItem.Receipt.CategorySummary.JunkTotal = junkTotal;
+            lineItem.Receipt.CategorySummary.OtherTotal = otherTotal;
+            lineItem.Receipt.CategorySummary.UnknownTotal = unknownTotal;
+            lineItem.Receipt.CategorySummary.HealthyCount = healthyCount;
+            lineItem.Receipt.CategorySummary.JunkCount = junkCount;
+            lineItem.Receipt.CategorySummary.OtherCount = otherCount;
+            lineItem.Receipt.CategorySummary.UnknownCount = unknownCount;
+        }
+
+        // Recalculate health score: Healthy / (Healthy + Junk) * 100
+        var healthyJunkTotal = healthyTotal + junkTotal;
+        if (healthyJunkTotal > 0)
+        {
+            var healthyPercentage = (healthyTotal / healthyJunkTotal) * 100;
+            lineItem.Receipt.HealthScore = (int)healthyPercentage;
+        }
+        else
+        {
+            // No Healthy or Junk items, set to 0
+            lineItem.Receipt.HealthScore = 0;
+        }
+    }
+
+    await context.SaveChangesAsync();
+
+    // Log activity for category change
+    await LogActivityAsync(
+        context,
+        "category_updated",
+        $"Item categorized: {lineItem.Description} → {category.Name}",
+        "lineitem",
+        lineItem.Id,
+        isSuccess: true,
+        icon: "🏷️",
+        navigateUrl: $"/receipts/{lineItem.ReceiptId}"
+    );
+
+    return Results.Ok(new
+    {
+        success = true,
+        lineItem = new
+        {
+            lineItem.Id,
+            lineItem.Description,
+            lineItem.Category,
+            lineItem.CategoryId,
+            lineItem.Price,
+            lineItem.Quantity
+        },
+        message = $"Category updated from {oldCategory} to {category.Name}"
+    });
+});
+
 // Analytics: Get available years
 app.MapGet("/api/analytics/available-years", async (ReceiptHealthContext context) =>
 {
@@ -623,6 +1037,92 @@ app.MapGet("/api/analytics/category-items/{category}", async (string category, R
     return Results.Ok(items);
 });
 
+// === Activity/Notification Endpoints ===
+
+// Get recent activities (for Recent Activity section and Notifications)
+app.MapGet("/api/activities", async (ReceiptHealthContext context, int limit = 20, bool unreadOnly = false) =>
+{
+    var query = context.Activities.AsQueryable();
+    
+    if (unreadOnly)
+    {
+        query = query.Where(a => !a.IsRead);
+    }
+    
+    var activities = await query
+        .OrderByDescending(a => a.Timestamp)
+        .Take(limit)
+        .ToListAsync();
+    
+    return Results.Ok(activities);
+});
+
+// Mark an activity as read
+app.MapPut("/api/activities/{id}/read", async (int id, ReceiptHealthContext context) =>
+{
+    var activity = await context.Activities.FindAsync(id);
+    if (activity == null)
+    {
+        return Results.NotFound();
+    }
+    
+    activity.IsRead = true;
+    await context.SaveChangesAsync();
+    
+    return Results.Ok(activity);
+});
+
+// Mark all activities as read
+app.MapPut("/api/activities/read-all", async (ReceiptHealthContext context) =>
+{
+    var unreadActivities = await context.Activities
+        .Where(a => !a.IsRead)
+        .ToListAsync();
+    
+    foreach (var activity in unreadActivities)
+    {
+        activity.IsRead = true;
+    }
+    
+    await context.SaveChangesAsync();
+    
+    return Results.Ok(new { markedAsRead = unreadActivities.Count });
+});
+
+// Get unread notification count
+app.MapGet("/api/activities/unread-count", async (ReceiptHealthContext context) =>
+{
+    var count = await context.Activities
+        .CountAsync(a => !a.IsRead);
+    
+    return Results.Ok(new { count });
+});
+
+// Delete a single activity
+app.MapDelete("/api/activities/{id}", async (int id, ReceiptHealthContext context) =>
+{
+    var activity = await context.Activities.FindAsync(id);
+    if (activity == null)
+    {
+        return Results.NotFound();
+    }
+    
+    context.Activities.Remove(activity);
+    await context.SaveChangesAsync();
+    
+    return Results.Ok(new { message = "Activity deleted successfully" });
+});
+
+// Delete all activities
+app.MapDelete("/api/activities", async (ReceiptHealthContext context) =>
+{
+    var allActivities = await context.Activities.ToListAsync();
+    context.Activities.RemoveRange(allActivities);
+    await context.SaveChangesAsync();
+    
+    return Results.Ok(new { message = "All activities deleted successfully", count = allActivities.Count });
+});
+
 // === Price Comparison Endpoints ===
 
 // Compare prices for an item
@@ -679,7 +1179,7 @@ app.MapGet("/api/shopping-lists/{id}", async (int id, IShoppingListService shopp
 });
 
 // Create a new shopping list
-app.MapPost("/api/shopping-lists", async (HttpRequest request, IShoppingListService shoppingListService) =>
+app.MapPost("/api/shopping-lists", async (HttpRequest request, IShoppingListService shoppingListService, ReceiptHealthContext context) =>
 {
     var body = await request.ReadFromJsonAsync<CreateShoppingListRequest>();
     if (body == null || string.IsNullOrEmpty(body.Name))
@@ -688,11 +1188,24 @@ app.MapPost("/api/shopping-lists", async (HttpRequest request, IShoppingListServ
     }
     
     var list = await shoppingListService.CreateShoppingListAsync(body.Name);
+    
+    // Log activity
+    await LogActivityAsync(
+        context,
+        "shopping_list_created",
+        $"Shopping list created: {list.Name}",
+        "shopping_list",
+        list.Id,
+        isSuccess: true,
+        icon: "🛒",
+        navigateUrl: "/shopping-lists"
+    );
+    
     return Results.Created($"/api/shopping-lists/{list.Id}", MapShoppingListToDto(list));
 });
 
 // Generate shopping list from healthy items
-app.MapPost("/api/shopping-lists/generate", async (int? daysBack, string? mode, IShoppingListService shoppingListService) =>
+app.MapPost("/api/shopping-lists/generate", async (int? daysBack, string? mode, IShoppingListService shoppingListService, ReceiptHealthContext context) =>
 {
     var days = daysBack ?? 30;
     var generationMode = mode ?? "healthy";
@@ -704,6 +1217,25 @@ app.MapPost("/api/shopping-lists/generate", async (int? daysBack, string? mode, 
         "quick" => await shoppingListService.GenerateQuickMealListAsync(),
         _ => await shoppingListService.GenerateFromHealthyItemsAsync(days)
     };
+    
+    // Log activity
+    var modeName = generationMode switch
+    {
+        "analyze" => "from healthy items",
+        "weekly" => "weekly essentials",
+        "quick" => "quick meal",
+        _ => "from healthy items"
+    };
+    await LogActivityAsync(
+        context,
+        "shopping_list_generated",
+        $"Shopping list generated: {list.Name} ({modeName})",
+        "shopping_list",
+        list.Id,
+        isSuccess: true,
+        icon: "✨",
+        navigateUrl: "/shopping-lists"
+    );
     
     return Results.Created($"/api/shopping-lists/{list.Id}", MapShoppingListToDto(list));
 });
@@ -722,7 +1254,7 @@ app.MapPost("/api/shopping-lists/generate-from-text", async (HttpRequest request
 });
 
 // Add item to shopping list
-app.MapPost("/api/shopping-lists/{listId}/items", async (int listId, HttpRequest request, IShoppingListService shoppingListService) =>
+app.MapPost("/api/shopping-lists/{listId}/items", async (int listId, HttpRequest request, IShoppingListService shoppingListService, ReceiptHealthContext context) =>
 {
     var body = await request.ReadFromJsonAsync<AddShoppingListItemRequest>();
     if (body == null || string.IsNullOrEmpty(body.ItemName))
@@ -733,6 +1265,20 @@ app.MapPost("/api/shopping-lists/{listId}/items", async (int listId, HttpRequest
     try
     {
         var item = await shoppingListService.AddItemAsync(listId, body.ItemName, body.Quantity);
+        
+        // Log activity
+        var list = await context.ShoppingLists.FindAsync(listId);
+        await LogActivityAsync(
+            context,
+            "shopping_list_item_added",
+            $"Item added to {list?.Name ?? "shopping list"}: {item.ItemName}",
+            "shopping_list_item",
+            item.Id,
+            isSuccess: true,
+            icon: "➕",
+            navigateUrl: "/shopping-lists"
+        );
+        
         // Project to anonymous object to avoid circular reference
         return Results.Created($"/api/shopping-lists/{listId}/items/{item.Id}", new
         {
@@ -941,7 +1487,7 @@ app.MapGet("/api/meal-plans/{id}", async (int id, IMealPlannerService mealPlanne
 });
 
 // Generate AI-powered meal plan
-app.MapPost("/api/meal-plans/generate", async (HttpRequest request, IMealPlannerService mealPlannerService) =>
+app.MapPost("/api/meal-plans/generate", async (HttpRequest request, IMealPlannerService mealPlannerService, ReceiptHealthContext context) =>
 {
     try
     {
@@ -972,6 +1518,18 @@ app.MapPost("/api/meal-plans/generate", async (HttpRequest request, IMealPlanner
             includeBreakfast, 
             includeLunch, 
             includeDinner
+        );
+        
+        // Log activity
+        await LogActivityAsync(
+            context,
+            "meal_plan_created",
+            $"Meal plan created: {mealPlan.Name} ({days} days, {body.DietaryPreference})",
+            "meal_plan",
+            mealPlan.Id,
+            isSuccess: true,
+            icon: "🍽️",
+            navigateUrl: "/meal-planner"
         );
         
         // Project to avoid circular references
@@ -1524,6 +2082,72 @@ app.MapGet("/api/achievements/celebration", async (IGamificationService gamifica
     return Results.Ok(new { celebrate = shouldCelebrate });
 });
 
+// Leaderboard endpoint (mock data for now - single user system)
+app.MapGet("/api/leaderboard", async (ReceiptHealthContext context, IGamificationService gamificationService) =>
+{
+    try
+    {
+        // Get current user stats
+        var achievements = await gamificationService.GetAchievementsAsync();
+        var completedChallenges = await context.Challenges
+            .Where(c => c.IsCompleted)
+            .CountAsync();
+        var totalReceipts = await context.Receipts.CountAsync();
+        var avgHealthScore = await context.Receipts
+            .Where(r => r.HealthScore > 0)
+            .AverageAsync(r => (decimal?)r.HealthScore) ?? 50m;
+
+        var currentUser = new LeaderboardEntry
+        {
+            Id = 1,
+            UserName = "You",
+            TotalAchievements = achievements.Count(a => a.IsUnlocked),
+            CompletedChallenges = completedChallenges,
+            AvgHealthScore = avgHealthScore,
+            TotalReceipts = totalReceipts,
+            CurrentStreak = 0, // Can be calculated later
+            Points = achievements.Count(a => a.IsUnlocked) * 100 + completedChallenges * 50,
+            LastActivityDate = DateTime.UtcNow
+        };
+
+        // Mock other users for demonstration
+        var mockUsers = new List<LeaderboardEntry>
+        {
+            new() { Id = 2, UserName = "HealthyEater123", TotalAchievements = 15, CompletedChallenges = 8, AvgHealthScore = 85m, TotalReceipts = 45, CurrentStreak = 7, Points = 15 * 100 + 8 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-2) },
+            new() { Id = 3, UserName = "BudgetMaster", TotalAchievements = 12, CompletedChallenges = 10, AvgHealthScore = 72m, TotalReceipts = 38, CurrentStreak = 5, Points = 12 * 100 + 10 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-5) },
+            new() { Id = 4, UserName = "FitnessGuru", TotalAchievements = 18, CompletedChallenges = 6, AvgHealthScore = 92m, TotalReceipts = 52, CurrentStreak = 12, Points = 18 * 100 + 6 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-1) },
+            new() { Id = 5, UserName = "GroceryPro", TotalAchievements = 10, CompletedChallenges = 7, AvgHealthScore = 68m, TotalReceipts = 30, CurrentStreak = 3, Points = 10 * 100 + 7 * 50, LastActivityDate = DateTime.UtcNow.AddHours(-8) }
+        };
+
+        // Combine and sort by points
+        var leaderboard = new List<LeaderboardEntry> { currentUser };
+        leaderboard.AddRange(mockUsers);
+        leaderboard = leaderboard.OrderByDescending(u => u.Points).ToList();
+
+        // Add rank
+        var rankedLeaderboard = leaderboard.Select((entry, index) => new
+        {
+            entry.Id,
+            entry.UserName,
+            Rank = index + 1,
+            entry.TotalAchievements,
+            entry.CompletedChallenges,
+            entry.AvgHealthScore,
+            entry.TotalReceipts,
+            entry.CurrentStreak,
+            entry.Points,
+            entry.LastActivityDate,
+            IsCurrentUser = entry.Id == 1
+        }).ToList();
+
+        return Results.Ok(rankedLeaderboard);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
 // === AI Insights Endpoints ===
 
 // Natural language query
@@ -1704,6 +2328,191 @@ app.MapDelete("/api/receipts/{id}", async (int id, ReceiptHealthContext context,
     }
 });
 
+// ============= Category Management API Endpoints =============
+app.MapGet("/api/categories", async (ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var categories = await categoryService.GetActiveCategoriesAsync();
+        return Results.Ok(categories);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapGet("/api/categories/all", async (ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var categories = await categoryService.GetAllCategoriesAsync();
+        return Results.Ok(categories);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapGet("/api/categories/{id}", async (int id, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var category = await categoryService.GetCategoryByIdAsync(id);
+        if (category == null)
+        {
+            return Results.NotFound(new { message = $"Category with ID {id} not found" });
+        }
+        return Results.Ok(category);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPost("/api/categories", async (CreateCategoryRequest request, ICategoryManagementService categoryService, ReceiptHealthContext context) =>
+{
+    try
+    {
+        var category = new Category
+        {
+            Name = request.Name,
+            Description = request.Description,
+            Color = request.Color,
+            Icon = request.Icon,
+            SortOrder = request.SortOrder
+        };
+
+        var created = await categoryService.CreateCategoryAsync(category);
+        
+        // Log activity
+        await LogActivityAsync(
+            context,
+            "category_added",
+            $"New category added: {created.Icon} {created.Name}",
+            "category",
+            created.Id,
+            isSuccess: true,
+            icon: created.Icon ?? "📁",
+            navigateUrl: "/receipts/categories"
+        );
+        
+        return Results.Created($"/api/categories/{created.Id}", created);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPut("/api/categories/{id}", async (int id, UpdateCategoryRequest request, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var category = new Category
+        {
+            Id = id,
+            Name = request.Name,
+            Description = request.Description,
+            Color = request.Color,
+            Icon = request.Icon,
+            IsActive = request.IsActive,
+            SortOrder = request.SortOrder
+        };
+
+        var updated = await categoryService.UpdateCategoryAsync(category);
+        return Results.Ok(updated);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapDelete("/api/categories/{id}", async (int id, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var result = await categoryService.DeleteCategoryAsync(id);
+        if (!result)
+        {
+            return Results.NotFound(new { message = $"Category with ID {id} not found" });
+        }
+        return Results.NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPost("/api/categories/suggest", async (SuggestCategoriesRequest request, ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var suggestions = await categoryService.SuggestCategoriesAsync(request.ItemDescription);
+        return Results.Ok(new { suggestions });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapGet("/api/categories/suggestions", async (ICategoryManagementService categoryService) =>
+{
+    try
+    {
+        var suggestions = await categoryService.GetCategorySuggestionsAsync();
+        return Results.Ok(suggestions);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
+app.MapPut("/api/shopping-lists/{listId}/items/{itemId}/category", async (
+    int listId, 
+    int itemId, 
+    UpdateItemCategoryRequest request, 
+    ReceiptHealthContext context) =>
+{
+    try
+    {
+        var item = await context.ShoppingListItems
+            .FirstOrDefaultAsync(i => i.Id == itemId && i.ShoppingListId == listId);
+
+        if (item == null)
+        {
+            return Results.NotFound(new { message = "Item not found" });
+        }
+
+        item.Category = request.Category;
+        await context.SaveChangesAsync();
+
+        return Results.Ok(item);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(detail: ex.Message, statusCode: 500);
+    }
+});
+
 Console.WriteLine("✅ All endpoints configured");
 Console.WriteLine("🌐 ReceiptHealth API is running on http://localhost:5002");
 Console.WriteLine("📊 Dashboard: http://localhost:5002");
@@ -1768,4 +2577,9 @@ public record GenerateSingleMealRequest(string DayOfWeek, string MealType, strin
 public record CreateShoppingListFromMealPlanRequest(string? Name = null);
 public record AddRecipeToMealSlotRequest(int RecipeId, DayOfWeek DayOfWeek, MealType MealType);
 public record AddRecipeToShoppingListRequest(int RecipeId, int? ShoppingListId = null);
+public record CreateCategoryRequest(string Name, string? Description = null, string? Color = null, string? Icon = null, int SortOrder = 0);
+public record UpdateCategoryRequest(string Name, string? Description = null, string? Color = null, string? Icon = null, bool IsActive = true, int SortOrder = 0);
+public record UpdateLineItemCategoryRequest(int CategoryId);
+public record SuggestCategoriesRequest(string ItemDescription);
+public record UpdateItemCategoryRequest(string Category);
 

@@ -7,16 +7,26 @@ import {
   TrendingUp, 
   Trophy, 
   Sparkles,
+  Tag,
   Moon,
   Sun,
   Menu,
-  X
+  X,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 const menuItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/receipts', icon: Receipt, label: 'Receipts' },
+  { 
+    path: '/receipts', 
+    icon: Receipt, 
+    label: 'Receipts',
+    subItems: [
+      { path: '/receipts/categories', icon: Tag, label: 'Categories' }
+    ]
+  },
   { path: '/shopping-lists', icon: ShoppingCart, label: 'Shopping Lists' },
   { path: '/meal-planner', icon: UtensilsCrossed, label: 'Meal Planner' },
   { path: '/insights', icon: TrendingUp, label: 'Insights' },
@@ -27,6 +37,7 @@ const menuItems = [
 function Sidebar({ isOpen, toggleSidebar }) {
   const location = useLocation();
   const [darkMode, setDarkMode] = useState(false);
+  const [expandedItems, setExpandedItems] = useState({});
 
   useEffect(() => {
     const isDark = localStorage.getItem('darkMode') === 'true';
@@ -34,7 +45,17 @@ function Sidebar({ isOpen, toggleSidebar }) {
     if (isDark) {
       document.documentElement.classList.add('dark');
     }
-  }, []);
+    
+    // Auto-expand parent menu if on sub-page
+    menuItems.forEach(item => {
+      if (item.subItems) {
+        const isSubItemActive = item.subItems.some(sub => location.pathname === sub.path);
+        if (isSubItemActive) {
+          setExpandedItems(prev => ({ ...prev, [item.path]: true }));
+        }
+      }
+    });
+  }, [location.pathname]);
 
   const toggleDarkMode = () => {
     const newDarkMode = !darkMode;
@@ -85,23 +106,67 @@ function Sidebar({ isOpen, toggleSidebar }) {
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
+            const hasSubItems = item.subItems && item.subItems.length > 0;
+            const isExpanded = expandedItems[item.path];
+            const isSubItemActive = hasSubItems && item.subItems.some(sub => location.pathname === sub.path);
             
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`
-                  flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200
-                  ${isActive 
-                    ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-lg' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }
-                `}
-                onClick={() => window.innerWidth < 1024 && toggleSidebar()}
-              >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-white' : ''}`} />
-                <span className="font-medium">{item.label}</span>
-              </Link>
+              <div key={item.path}>
+                <div className="relative">
+                  <Link
+                    to={item.path}
+                    className={`
+                      flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200
+                      ${isActive || isSubItemActive
+                        ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-lg' 
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }
+                    `}
+                    onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+                  >
+                    <Icon className={`w-5 h-5 ${isActive || isSubItemActive ? 'text-white' : ''}`} />
+                    <span className="font-medium flex-1">{item.label}</span>
+                  </Link>
+                  {hasSubItems && (
+                    <button
+                      onClick={() => setExpandedItems(prev => ({ ...prev, [item.path]: !prev[item.path] }))}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-white/20 transition-colors
+                        ${isActive || isSubItemActive ? 'text-white' : 'text-gray-500 dark:text-gray-400'}
+                      `}
+                    >
+                      {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </button>
+                  )}
+                </div>
+                
+                {/* Sub-items */}
+                {hasSubItems && isExpanded && (
+                  <div className="ml-4 mt-1 space-y-1">
+                    {item.subItems.map((subItem) => {
+                      const SubIcon = subItem.icon;
+                      const isSubActive = location.pathname === subItem.path;
+                      
+                      return (
+                        <Link
+                          key={subItem.path}
+                          to={subItem.path}
+                          className={`
+                            flex items-center space-x-3 px-4 py-2 rounded-lg transition-all duration-200
+                            ${isSubActive
+                              ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }
+                          `}
+                          onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+                        >
+                          <SubIcon className="w-4 h-4" />
+                          <span className="text-sm">{subItem.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>

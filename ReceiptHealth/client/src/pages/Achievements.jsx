@@ -1,4 +1,4 @@
-import { Trophy, Star, Award, Target, Sparkles, RefreshCw, X, Check } from 'lucide-react';
+import { Trophy, Star, Award, Target, Sparkles, RefreshCw, X, Check, Medal } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -7,17 +7,19 @@ function Achievements() {
   const [achievements, setAchievements] = useState([]);
   const [nextAchievements, setNextAchievements] = useState([]);
   const [activeChallenges, setActiveChallenges] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showChallengeModal, setShowChallengeModal] = useState(false);
   const [generatedChallenges, setGeneratedChallenges] = useState([]);
-  const [selectedChallenge, setSelectedChallenge] = useState(null);
+  const [selectedChallenges, setSelectedChallenges] = useState([]);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebratingAchievement, setCelebratingAchievement] = useState(null);
   const [stats, setStats] = useState({ totalUnlocked: 0, activeChallenges: 0, completedChallenges: 0 });
   const [clickedAchievements, setClickedAchievements] = useState(new Set());
   const [selectedGoal, setSelectedGoal] = useState(null);
+  const [viewMode, setViewMode] = useState('achievements'); // 'achievements' or 'leaderboard'
 
   useEffect(() => {
     fetchAllData();
@@ -28,7 +30,8 @@ function Achievements() {
       await Promise.all([
         fetchAchievements(),
         fetchNextAchievements(),
-        fetchActiveChallenges()
+        fetchActiveChallenges(),
+        fetchLeaderboard()
       ]);
     } finally {
       setLoading(false);
@@ -89,6 +92,16 @@ function Achievements() {
     }
   };
 
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await axios.get('/api/leaderboard');
+      setLeaderboard(response.data || []);
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      setLeaderboard([]);
+    }
+  };
+
   const checkForNewAchievements = async () => {
     setChecking(true);
     try {
@@ -119,25 +132,36 @@ function Achievements() {
     }
   };
 
-  const generateAIChallenges = async () => {
+  const generateChallenges = async () => {
     setGenerating(true);
     try {
-      const response = await axios.get('/api/challenges/generate?count=3');
+      const response = await axios.get('/api/challenges/generate?count=5');
       const challenges = response.data || [];
       
-      // Parse the challenge strings (they come as JSON strings from the API)
+      // Parse the challenge strings (format: "Name|Description|Type|TargetValue|DurationDays")
       const parsed = challenges.map(c => {
-        if (typeof c === 'string') {
-          try {
-            return JSON.parse(c);
-          } catch {
-            return null;
+        if (typeof c === 'string' && c.includes('|')) {
+          const parts = c.split('|');
+          if (parts.length === 5) {
+            return {
+              name: parts[0],
+              description: parts[1],
+              type: parts[2],
+              targetValue: parseFloat(parts[3]),
+              durationDays: parseInt(parts[4])
+            };
           }
         }
-        return c;
+        return null;
       }).filter(c => c !== null);
       
+      if (parsed.length === 0) {
+        toast.error('No valid challenges generated');
+        return;
+      }
+      
       setGeneratedChallenges(parsed);
+      setSelectedChallenges([]);
       setShowChallengeModal(true);
     } catch (error) {
       console.error('Error generating challenges:', error);
@@ -147,30 +171,44 @@ function Achievements() {
     }
   };
 
-  const acceptChallenge = async () => {
-    if (!selectedChallenge) {
-      toast.error('Please select a challenge');
+  const acceptSelectedChallenges = async () => {
+    if (selectedChallenges.length === 0) {
+      toast.error('Please select at least one challenge');
       return;
     }
 
     try {
-      await axios.post('/api/challenges', {
-        name: selectedChallenge.name,
-        description: selectedChallenge.description,
-        type: selectedChallenge.type || 'custom',
-        targetValue: selectedChallenge.targetValue || 100,
-        durationDays: selectedChallenge.durationDays || 30
-      });
+      // Accept all selected challenges
+      for (const challenge of selectedChallenges) {
+        await axios.post('/api/challenges', {
+          name: challenge.name,
+          description: challenge.description,
+          type: challenge.type || 'custom',
+          targetValue: challenge.targetValue || 100,
+          durationDays: challenge.durationDays || 30
+        });
+      }
       
-      toast.success('Challenge accepted!');
+      toast.success(`${selectedChallenges.length} challenge(s) accepted!`);
       setShowChallengeModal(false);
-      setSelectedChallenge(null);
+      setSelectedChallenges([]);
       setGeneratedChallenges([]);
       await fetchActiveChallenges();
     } catch (error) {
-      console.error('Error accepting challenge:', error);
-      toast.error('Failed to accept challenge');
+      console.error('Error accepting challenges:', error);
+      toast.error('Failed to accept challenges');
     }
+  };
+
+  const toggleChallengeSelection = (challenge) => {
+    setSelectedChallenges(prev => {
+      const isSelected = prev.some(c => c === challenge);
+      if (isSelected) {
+        return prev.filter(c => c !== challenge);
+      } else {
+        return [...prev, challenge];
+      }
+    });
   };
 
   const handleAchievementClick = (achievement) => {
@@ -303,33 +341,108 @@ function Achievements() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Achievements</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+            {viewMode === 'achievements' ? 'Achievements' : 'Leaderboard'}
+          </h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
-            Track your progress and unlock badges
+            {viewMode === 'achievements' 
+              ? 'Track your progress and unlock badges' 
+              : 'See how you rank against other users'}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+          {viewMode === 'achievements' && (
+            <>
+              <button
+                onClick={checkForNewAchievements}
+                disabled={checking}
+                className="btn-secondary flex items-center justify-center space-x-2 text-sm sm:text-base"
+              >
+                <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${checking ? 'animate-spin' : ''}`} />
+                <span>Check for New</span>
+              </button>
+              <button
+                onClick={generateChallenges}
+                disabled={generating}
+                className="btn-primary flex items-center justify-center space-x-2 text-sm sm:text-base"
+              >
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>{generating ? 'Generating...' : 'Generate Challenges'}</span>
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* View Mode Toggle */}
+      <div className="flex justify-center">
+        <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1 bg-white dark:bg-gray-800">
           <button
-            onClick={checkForNewAchievements}
-            disabled={checking}
-            className="btn-secondary flex items-center justify-center space-x-2 text-sm sm:text-base"
+            onClick={() => setViewMode('achievements')}
+            className={`px-4 sm:px-6 py-2 rounded-lg text-sm sm:text-base font-medium transition-all duration-200 ${
+              viewMode === 'achievements'
+                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-lg'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
           >
-            <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${checking ? 'animate-spin' : ''}`} />
-            <span>Check for New</span>
+            <div className="flex items-center space-x-2">
+              <Trophy className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span>Achievements</span>
+            </div>
           </button>
           <button
-            onClick={generateAIChallenges}
-            disabled={generating}
-            className="btn-primary flex items-center justify-center space-x-2 text-sm sm:text-base"
+            onClick={() => setViewMode('leaderboard')}
+            className={`px-4 sm:px-6 py-2 rounded-lg text-sm sm:text-base font-medium transition-all duration-200 ${
+              viewMode === 'leaderboard'
+                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-lg'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
           >
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span>{generating ? 'Generating...' : 'Generate AI Challenges'}</span>
+            <div className="flex items-center space-x-2">
+              <Medal className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span>Leaderboard</span>
+            </div>
           </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      {/* Content based on view mode */}
+      {viewMode === 'leaderboard' ? (
+        <div className="card text-center py-16">
+          <div className="max-w-md mx-auto">
+            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Medal className="w-12 h-12 text-white" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-4">
+              Leaderboard Coming Soon!
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              We're working on an exciting multiplayer leaderboard feature where you can compete with friends and other users. Stay tuned!
+            </p>
+            <div className="inline-flex items-center space-x-2 text-sm text-primary-500 bg-primary-50 dark:bg-primary-900/20 px-4 py-2 rounded-full">
+              <Sparkles className="w-4 h-4" />
+              <span className="font-medium">Feature in Development</span>
+            </div>
+            <div className="mt-8 grid grid-cols-3 gap-4 text-sm">
+              <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div className="text-2xl mb-1">🏆</div>
+                <div className="text-gray-600 dark:text-gray-400">Rankings</div>
+              </div>
+              <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div className="text-2xl mb-1">👥</div>
+                <div className="text-gray-600 dark:text-gray-400">Friends</div>
+              </div>
+              <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div className="text-2xl mb-1">🎯</div>
+                <div className="text-gray-600 dark:text-gray-400">Compete</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <div className="card bg-gradient-to-br from-purple-500 to-blue-600 text-white">
           <div className="text-center">
             <div className="text-3xl sm:text-4xl font-bold mb-2">{stats.totalUnlocked}</div>
@@ -540,19 +653,26 @@ function Achievements() {
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* Challenge Generation Modal */}
       {showChallengeModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-center gap-3">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                Select a Challenge
-              </h2>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                  AI-Generated Challenges
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Get personalized challenge suggestions based on your shopping habits!
+                </p>
+              </div>
               <button
                 onClick={() => {
                   setShowChallengeModal(false);
-                  setSelectedChallenge(null);
+                  setSelectedChallenges([]);
                 }}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
               >
@@ -561,51 +681,63 @@ function Achievements() {
             </div>
 
             <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
-              {generatedChallenges.map((challenge, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => setSelectedChallenge(challenge)}
-                  className={`p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    selectedChallenge === challenge
-                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-purple-300'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-2 break-words">
-                        {challenge.name}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        {challenge.description}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-500 dark:text-gray-400">
-                        <span>Target: {challenge.targetValue}</span>
-                        <span>Duration: {challenge.durationDays} days</span>
-                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
-                          {challenge.type}
-                        </span>
+              {generatedChallenges.map((challenge, idx) => {
+                const isSelected = selectedChallenges.some(c => c === challenge);
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => toggleChallengeSelection(challenge)}
+                    className={`p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      isSelected
+                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-purple-300'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Checkbox */}
+                      <div className="flex-shrink-0 mt-1">
+                        <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center ${
+                          isSelected
+                            ? 'bg-purple-500 border-purple-500'
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}>
+                          {isSelected && <Check className="w-4 h-4 text-white" />}
+                        </div>
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-2 break-words">
+                          {challenge.name}
+                        </h3>
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+                          {challenge.description}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-500 dark:text-gray-400">
+                          <span>🎯 Target: {challenge.targetValue}</span>
+                          <span>⏰ Duration: {challenge.durationDays} days</span>
+                          <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
+                            📊 Type: {challenge.type.replace('_', ' ')}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    {selectedChallenge === challenge && (
-                      <Check className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500 flex-shrink-0" />
-                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4">
                 <button
-                  onClick={acceptChallenge}
-                  disabled={!selectedChallenge}
+                  onClick={acceptSelectedChallenges}
+                  disabled={selectedChallenges.length === 0}
                   className="btn-primary flex-1 text-sm sm:text-base"
                 >
-                  Accept Selected Challenge
+                  Accept Selected Challenge{selectedChallenges.length !== 1 ? 's' : ''}
+                  {selectedChallenges.length > 0 && ` (${selectedChallenges.length})`}
                 </button>
                 <button
                   onClick={() => {
                     setShowChallengeModal(false);
-                    setSelectedChallenge(null);
+                    setSelectedChallenges([]);
                   }}
                   className="btn-secondary flex-1 text-sm sm:text-base"
                 >

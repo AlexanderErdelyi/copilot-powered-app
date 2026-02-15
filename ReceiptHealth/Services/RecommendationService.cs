@@ -98,15 +98,20 @@ public class RecommendationService : IRecommendationService
         var junkPercentage = totalSpend > 0 ? (totalJunk / totalSpend) * 100 : 0;
         var healthyPercentage = totalSpend > 0 ? (totalHealthy / totalSpend) * 100 : 0;
 
-        // Try AI-powered recommendations first
+        // Try AI-powered recommendations first (with extended timeout for better results)
         try
         {
-            var aiRecommendations = await GenerateAIRecommendationsAsync(recentReceipts, totalSpend, junkPercentage, healthyPercentage);
+            var aiTask = GenerateAIRecommendationsAsync(recentReceipts, totalSpend, junkPercentage, healthyPercentage);
+            var aiRecommendations = await aiTask.WaitAsync(TimeSpan.FromSeconds(30));
             if (aiRecommendations.Any())
             {
                 recommendations.AddRange(aiRecommendations);
                 return recommendations;
             }
+        }
+        catch (TimeoutException)
+        {
+            Console.WriteLine($"⚠️ AI recommendations timed out after 30 seconds, using rule-based fallback");
         }
         catch (Exception ex)
         {
@@ -134,17 +139,20 @@ public class RecommendationService : IRecommendationService
             recommendations.Add($"🎉 Excellent! Your average health score is {avgHealthScore:F1}. Keep up the great work!");
         }
 
-        // Find most purchased junk items
+        // Find most purchased junk items (load to memory first to avoid SQLite decimal sum issues)
         var junkItems = await _context.LineItems
             .Include(li => li.Receipt)
             .Where(li => li.Category == "Junk" && li.Receipt.Date >= DateTime.Now.AddDays(-30))
+            .ToListAsync();
+        
+        var topJunkItems = junkItems
             .GroupBy(li => li.Description)
             .Select(g => new { Item = g.Key, Count = g.Count(), TotalSpent = g.Sum(li => li.Price) })
             .OrderByDescending(x => x.TotalSpent)
             .Take(3)
-            .ToListAsync();
+            .ToList();
 
-        foreach (var item in junkItems)
+        foreach (var item in topJunkItems)
         {
             var alternatives = await GetHealthyAlternativesAsync(item.Item);
             if (alternatives.Any())

@@ -1,4 +1,6 @@
 using ReceiptHealth.Models;
+using ReceiptHealth.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace ReceiptHealth.Services;
 
@@ -8,11 +10,23 @@ public interface ICategoryService
     Task<Dictionary<string, string>> BatchCategorizeItemsAsync(List<string> descriptions);
     CategorySummary ComputeCategorySummary(List<LineItem> lineItems);
     CategorySummary ComputeCategorySummaryFromCategorizedItems(List<LineItem> lineItems);
+    
+    // New methods that work with CategoryId
+    Task<int?> GetCategoryIdAsync(string categoryName);
+    Task<CategoryResult> CategorizeItemWithIdAsync(string description, string? vendor = null);
+    Task<Dictionary<string, CategoryResult>> BatchCategorizeItemsWithIdAsync(List<string> descriptions);
+}
+
+public class CategoryResult
+{
+    public int? CategoryId { get; set; }
+    public string CategoryName { get; set; } = "Unknown";
 }
 
 public class RuleBasedCategoryService : ICategoryService
 {
     private readonly ILogger<RuleBasedCategoryService> _logger;
+    private readonly ReceiptHealthContext _context;
     
     // TODO(Copilot): Make this configurable via appsettings.json
     private readonly Dictionary<string, string> _keywordCategories = new(StringComparer.OrdinalIgnoreCase)
@@ -80,9 +94,51 @@ public class RuleBasedCategoryService : ICategoryService
         ["teig"] = "Other"
     };
 
-    public RuleBasedCategoryService(ILogger<RuleBasedCategoryService> logger)
+    public RuleBasedCategoryService(ILogger<RuleBasedCategoryService> logger, ReceiptHealthContext context)
     {
         _logger = logger;
+        _context = context;
+    }
+
+    public async Task<int?> GetCategoryIdAsync(string categoryName)
+    {
+        var category = await _context.Categories
+            .FirstOrDefaultAsync(c => c.Name.ToLower() == categoryName.ToLower());
+        return category?.Id;
+    }
+
+    public async Task<CategoryResult> CategorizeItemWithIdAsync(string description, string? vendor = null)
+    {
+        var categoryName = CategorizeItem(description, vendor);
+        var categoryId = await GetCategoryIdAsync(categoryName);
+        
+        return new CategoryResult
+        {
+            CategoryId = categoryId,
+            CategoryName = categoryName
+        };
+    }
+
+    public async Task<Dictionary<string, CategoryResult>> BatchCategorizeItemsWithIdAsync(List<string> descriptions)
+    {
+        // Get all categories from database once
+        var categories = await _context.Categories
+            .ToDictionaryAsync(c => c.Name.ToLower(), c => c.Id);
+        
+        var results = new Dictionary<string, CategoryResult>();
+        foreach (var desc in descriptions)
+        {
+            var categoryName = CategorizeItem(desc);
+            var categoryId = categories.TryGetValue(categoryName.ToLower(), out var id) ? id : (int?)null;
+            
+            results[desc] = new CategoryResult
+            {
+                CategoryId = categoryId,
+                CategoryName = categoryName
+            };
+        }
+        
+        return results;
     }
 
     public string CategorizeItem(string description, string? vendor = null)

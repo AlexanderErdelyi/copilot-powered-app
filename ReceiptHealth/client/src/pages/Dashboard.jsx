@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, 
@@ -8,8 +8,7 @@ import {
   Apple,
   AlertCircle,
   Heart,
-  HelpCircle,
-  X
+  HelpCircle
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -35,11 +34,24 @@ function Dashboard() {
     receiptCount: 0,
     healthyPercentage: 0,
     avgPerReceipt: 0,
-    healthScore: 0
+    healthScore: 0,
+    currency: 'USD',
+    healthyItemCount: 0,
+    junkItemCount: 0,
+    healthyItemCountLastMonth: 0,
+    junkItemCountLastMonth: 0,
+    healthyTrend: 0,
+    junkTrend: 0
   });
   const [loading, setLoading] = useState(true);
   const [categoryData, setCategoryData] = useState([]);
+  const [filteredCategoryData, setFilteredCategoryData] = useState([]);
+  const [hiddenCategories, setHiddenCategories] = useState(new Set());
   const [trendData, setTrendData] = useState([]);
+  const [weeklyTrendData, setWeeklyTrendData] = useState([]);
+  const [monthlyTrendData, setMonthlyTrendData] = useState([]);
+  const [categoryTrendData, setCategoryTrendData] = useState([]);
+  const [hiddenTrendLines, setHiddenTrendLines] = useState(new Set());
   const [monthlySpendData, setMonthlySpendData] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -50,35 +62,186 @@ function Dashboard() {
   const [showSpendingBreakdown, setShowSpendingBreakdown] = useState(false);
   const [showHealthyItemsModal, setShowHealthyItemsModal] = useState(false);
   const [healthyItems, setHealthyItems] = useState([]);
+  // Period selection states
+  const [trendsPeriod, setTrendsPeriod] = useState('weekly');
+  const [categoryPeriod, setCategoryPeriod] = useState('all');
+  const [monthlyChartPeriod, setMonthlyChartPeriod] = useState('monthly');
+  // Activity states for Recent Activity section only
+  const [activities, setActivities] = useState([]);
+
+  // Define fetchMonthlySpendData before useEffect hooks
+  const fetchMonthlySpendData = useCallback(async () => {
+    if (!selectedYear) {
+      console.log('⚠️ No selectedYear, skipping fetch');
+      return;
+    }
+    
+    console.log('📊 Fetching monthly spend data for year:', selectedYear);
+    
+    try {
+      const monthlyRes = await axios.get(`/api/analytics/monthly-spend?year=${selectedYear}`);
+      console.log('✅ API Response:', monthlyRes.data);
+      
+      if (monthlyRes.data && monthlyRes.data.data) {
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const formattedData = monthlyRes.data.data.map(item => ({
+          month: monthNames[item.month - 1],
+          monthNumber: item.month,
+          totalSpend: item.totalSpend,
+          receiptCount: item.receiptCount,
+          avgHealthScore: item.averageHealthScore
+        }));
+        console.log('📈 Formatted data:', formattedData);
+        setMonthlySpendData(formattedData);
+        console.log('✅ State updated with', formattedData.length, 'months');
+      } else {
+        console.log('⚠️ No data in API response');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching monthly spend data:', error);
+      setMonthlySpendData([]);
+    }
+  }, [selectedYear]);
+
+  // Transform data based on selected period
+  const getChartDataByPeriod = useCallback(() => {
+    if (!monthlySpendData.length) return [];
+
+    switch (monthlyChartPeriod) {
+      case 'yearly':
+        // Aggregate all months into a single year entry
+        const yearTotal = monthlySpendData.reduce((acc, item) => ({
+          period: selectedYear?.toString() || 'Year',
+          totalSpend: acc.totalSpend + item.totalSpend,
+          receiptCount: acc.receiptCount + item.receiptCount,
+          avgHealthScore: acc.avgHealthScore + item.avgHealthScore
+        }), { period: '', totalSpend: 0, receiptCount: 0, avgHealthScore: 0 });
+        
+        yearTotal.avgHealthScore = yearTotal.avgHealthScore / monthlySpendData.length;
+        return [yearTotal];
+
+      case 'weekly':
+        // Group by weeks (approximate: 4 weeks per month)
+        const weeklyData = [];
+        monthlySpendData.forEach(item => {
+          // Split each month into ~4 weeks
+          const weeksInMonth = 4;
+          const weeklySpend = item.totalSpend / weeksInMonth;
+          const weeklyReceipts = Math.ceil(item.receiptCount / weeksInMonth);
+          
+          for (let w = 1; w <= weeksInMonth; w++) {
+            weeklyData.push({
+              period: `${item.month} W${w}`,
+              totalSpend: weeklySpend,
+              receiptCount: w === 1 ? item.receiptCount - (weeklyReceipts * 3) : weeklyReceipts,
+              avgHealthScore: item.avgHealthScore
+            });
+          }
+        });
+        return weeklyData;
+
+      case 'daily':
+        // Show message that daily view requires more granular data
+        return [];
+
+      case 'monthly':
+      default:
+        // Return monthly data with 'period' key for consistent chart rendering
+        return monthlySpendData.map(item => ({
+          period: item.month,
+          totalSpend: item.totalSpend,
+          receiptCount: item.receiptCount,
+          avgHealthScore: item.avgHealthScore
+        }));
+    }
+  }, [monthlySpendData, monthlyChartPeriod, selectedYear]);
 
   useEffect(() => {
     initializeDashboard();
+    fetchActivities();
   }, []);
 
   useEffect(() => {
     if (selectedYear !== null) {
       fetchMonthlySpendData();
     }
-  }, [selectedYear]);
+  }, [selectedYear, fetchMonthlySpendData]);
+
+  useEffect(() => {
+    console.log('📊 monthlySpendData state updated:', monthlySpendData);
+  }, [monthlySpendData]);
+
+  useEffect(() => {
+    // Refetch data when period changes
+    if (!loading) {
+      fetchDashboardData();
+    }
+  }, [trendsPeriod, categoryPeriod]);
+
+  useEffect(() => {
+    // Filter category data based on hidden categories
+    const filtered = categoryData.filter(cat => !hiddenCategories.has(cat.name));
+    setFilteredCategoryData(filtered);
+  }, [categoryData, hiddenCategories]);
+
+  const toggleCategoryFilter = (categoryName) => {
+    setHiddenCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryName)) {
+        newSet.delete(categoryName);
+      } else {
+        newSet.add(categoryName);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleTrendLine = (lineName) => {
+    setHiddenTrendLines(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(lineName)) {
+        newSet.delete(lineName);
+      } else {
+        newSet.add(lineName);
+      }
+      return newSet;
+    });
+  };
+
+  const getCurrencySymbol = (currencyCode) => {
+    const symbols = {
+      'USD': '$',
+      'EUR': '€',
+      'GBP': '£',
+      'CHF': 'CHF',
+      'JPY': '¥'
+    };
+    return symbols[currencyCode] || currencyCode;
+  };
 
   const initializeDashboard = async () => {
+    console.log('🚀 Initializing dashboard...');
     // Fetch available years first
     try {
       const response = await axios.get('/api/analytics/available-years');
-      const years = response.data;
+      console.log('📅 Available years response:', response.data);
+      const years = response.data.years || [];
+      console.log('📅 Available years:', years);
       setAvailableYears(years);
       
       // Set current year or most recent year as default
       if (years.length > 0) {
         const currentYear = new Date().getFullYear();
         const defaultYear = years.includes(currentYear) ? currentYear : years[0];
+        console.log('✅ Setting selectedYear to:', defaultYear);
         setSelectedYear(defaultYear);
       } else {
         // No years available, use current year
+        console.log('⚠️ No years available, using current year:', new Date().getFullYear());
         setSelectedYear(new Date().getFullYear());
       }
     } catch (error) {
-      console.error('Error fetching available years:', error);
+      console.error('❌ Error fetching available years:', error);
       // Default to current year if API fails
       setSelectedYear(new Date().getFullYear());
     }
@@ -96,13 +259,17 @@ function Dashboard() {
       statsData.healthScore = statsData.healthyPercentage || 0;
       setStats(statsData);
 
-      // Fetch category breakdown (no year filter)
-      const categoryRes = await axios.get('/api/dashboard/category-breakdown');
+      // Fetch category breakdown with period filter
+      const categoryRes = await axios.get(`/api/dashboard/category-breakdown?period=${categoryPeriod}`);
       setCategoryData(categoryRes.data);
 
-      // Fetch spending trends (last 6 months)
-      const trendRes = await axios.get('/api/dashboard/spending-trends');
-      setTrendData(trendRes.data);
+      // Fetch enhanced spending trends with period filter
+      const trendRes = await axios.get(`/api/dashboard/spending-trends?period=${trendsPeriod}`);
+      const trends = trendRes.data;
+      setWeeklyTrendData(trends.weekly || []);
+      setMonthlyTrendData(trends.monthly || []);
+      setCategoryTrendData(trends.categoryTrends || []);
+      setTrendData(trends.monthly || []); // Keep for backward compatibility
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       // Set mock data for demo when backend is not available
@@ -111,36 +278,23 @@ function Dashboard() {
         receiptCount: 0,
         healthyPercentage: 0,
         avgPerReceipt: 0,
-        healthScore: 0
+        healthScore: 0,
+        currency: 'USD',
+        healthyItemCount: 0,
+        junkItemCount: 0,
+        healthyItemCountLastMonth: 0,
+        junkItemCountLastMonth: 0,
+        healthyTrend: 0,
+        junkTrend: 0
       });
       
       setCategoryData([]);
       setTrendData([]);
+      setWeeklyTrendData([]);
+      setMonthlyTrendData([]);
+      setCategoryTrendData([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchMonthlySpendData = async () => {
-    if (!selectedYear) return;
-    
-    try {
-      // Fetch monthly spending trends for selected year
-      const monthlyRes = await axios.get(`/api/analytics/monthly-spend?year=${selectedYear}`);
-      if (monthlyRes.data && monthlyRes.data.data) {
-        // Transform data for bar chart
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const formattedData = monthlyRes.data.data.map(item => ({
-          month: monthNames[item.Month - 1],
-          totalSpend: item.TotalSpend,
-          receiptCount: item.ReceiptCount,
-          avgHealthScore: item.AverageHealthScore
-        }));
-        setMonthlySpendData(formattedData);
-      }
-    } catch (error) {
-      console.error('Error fetching monthly spend data:', error);
-      setMonthlySpendData([]);
     }
   };
 
@@ -153,6 +307,23 @@ function Dashboard() {
       setShowCategoryModal(true);
     } catch (error) {
       console.error('Error fetching category items:', error);
+    }
+  };
+
+  const fetchActivities = async () => {
+    try {
+      const response = await axios.get('/api/activities?limit=5');
+      setActivities(response.data);
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+      setActivities([]);
+    }
+  };
+
+  const handleActivityClick = (activity) => {
+    // Navigate based on activity type and URL
+    if (activity.navigateUrl) {
+      navigate(activity.navigateUrl);
     }
   };
 
@@ -171,13 +342,6 @@ function Dashboard() {
       setShowHealthyItemsModal(true);
     } catch (error) {
       console.error('Error fetching healthy items:', error);
-    }
-  };
-
-  const handleRecentActivityClick = (activity) => {
-    // Navigate to receipts page if it's a receipt activity
-    if (activity.text.includes('Receipt from')) {
-      navigate('/receipts');
     }
   };
 
@@ -218,6 +382,28 @@ function Dashboard() {
     </div>
   );
 
+  const PeriodSelector = ({ value, onChange, options = ['daily', 'weekly', 'monthly', 'yearly'], includeAll = false }) => {
+    const displayOptions = includeAll ? ['all', ...options] : options;
+    
+    return (
+      <div className="flex flex-wrap gap-2">
+        {displayOptions.map(period => (
+          <button
+            key={period}
+            onClick={() => onChange(period)}
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+              value === period
+                ? 'bg-primary-500 text-white shadow-md'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            {period.charAt(0).toUpperCase() + period.slice(1)}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -230,30 +416,12 @@ function Dashboard() {
     <div className="space-y-6">
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
             Welcome back! Here's an overview of your spending habits.
           </p>
         </div>
-        
-        {/* Year Filter */}
-        {availableYears.length > 0 && (
-          <div className="flex items-center space-x-2 w-full sm:w-auto">
-            <label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-              Year:
-            </label>
-            <select 
-              value={selectedYear || ''}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="input w-full sm:w-32 text-sm"
-            >
-              {availableYears.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
       {/* KPI Cards */}
@@ -264,7 +432,7 @@ function Dashboard() {
           icon={DollarSign}
           trend={-5.2}
           colorClass="text-primary-500"
-          prefix="$"
+          prefix={getCurrencySymbol(stats.currency)}
           onClick={handleTotalSpentClick}
         />
         <KPICard
@@ -275,22 +443,73 @@ function Dashboard() {
           colorClass="text-blue-500"
           onClick={handleReceiptsClick}
         />
-        <KPICard
-          title="Healthy Items"
-          value={stats.healthyPercentage}
-          icon={Apple}
-          trend={8.3}
-          colorClass="text-green-500"
-          suffix="%"
+        
+        {/* Custom Healthy Items Card with Count Display */}
+        <div 
+          className="card cursor-pointer hover:shadow-xl transition-shadow"
           onClick={handleHealthyItemsClick}
-        />
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide truncate">
+                Healthy Items
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1 sm:mt-2 text-green-500 break-words">
+                {stats.healthyItemCount}
+                <span className="text-gray-400 dark:text-gray-500 mx-1">/</span>
+                <span className="text-red-500">{stats.junkItemCount}</span>
+              </p>
+              <div className="mt-1 sm:mt-2 space-y-0.5">
+                {/* Healthy Trend */}
+                <div className="flex items-center text-xs sm:text-sm">
+                  {stats.healthyTrend > 0 ? (
+                    <>
+                      <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 mr-1" />
+                      <span className="text-green-500">+{stats.healthyTrend}</span>
+                    </>
+                  ) : stats.healthyTrend < 0 ? (
+                    <>
+                      <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 mr-1" />
+                      <span className="text-red-500">{stats.healthyTrend}</span>
+                    </>
+                  ) : (
+                    <span className="text-gray-500">—</span>
+                  )}
+                  <span className="text-gray-500 ml-1 text-xs">healthy</span>
+                  
+                  {/* Junk Trend */}
+                  <span className="mx-2 text-gray-400">|</span>
+                  {stats.junkTrend > 0 ? (
+                    <>
+                      <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 mr-1" />
+                      <span className="text-red-500">+{stats.junkTrend}</span>
+                    </>
+                  ) : stats.junkTrend < 0 ? (
+                    <>
+                      <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 mr-1" />
+                      <span className="text-green-500">{stats.junkTrend}</span>
+                    </>
+                  ) : (
+                    <span className="text-gray-500">—</span>
+                  )}
+                  <span className="text-gray-500 ml-1 text-xs">junk</span>
+                </div>
+                <span className="text-gray-500 text-xs block">vs last month</span>
+              </div>
+            </div>
+            <div className="p-2 sm:p-3 rounded-lg bg-green-100 bg-opacity-20 flex-shrink-0">
+              <Apple className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
+            </div>
+          </div>
+        </div>
+        
         <KPICard
           title="Avg per Receipt"
           value={stats.avgPerReceipt.toFixed(2)}
           icon={TrendingDown}
           trend={-3.1}
           colorClass="text-orange-500"
-          prefix="$"
+          prefix={getCurrencySymbol(stats.currency)}
         />
         {/* Health Score Card with Tooltip */}
         <div className="card relative overflow-hidden">
@@ -353,48 +572,167 @@ function Dashboard() {
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Spending Trends */}
-        <div className="card">
-          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white">
-            Spending Trends
-          </h2>
-          <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
-            <LineChart data={trendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="date" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#1f2937', 
-                  border: 'none', 
-                  borderRadius: '8px',
-                  color: '#fff'
-                }}
+        {/* Spending Trends - Weekly, Monthly, and Category Lines */}
+        {(weeklyTrendData.length > 0 || monthlyTrendData.length > 0 || categoryTrendData.length > 0) && (
+          <div className="card">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+                Spending Trends
+              </h2>
+              <PeriodSelector
+                value={trendsPeriod}
+                onChange={setTrendsPeriod}
+                options={['daily', 'weekly', 'monthly', 'yearly']}
               />
-              <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="amount" 
-                stroke="#667eea" 
-                strokeWidth={3}
-                dot={{ fill: '#667eea', r: 5 }}
-                activeDot={{ r: 7 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+            </div>
+           
+            {/* Prepare combined data for line chart */}
+            {(() => {
+              // Create a unified timeline from weekly data
+              const weeklyTimelineData = weeklyTrendData.map(w => ({
+                period: w.period,
+                weeklyTotal: w.total,
+                ...Object.fromEntries(
+                  Object.entries(w.categoryBreakdown || {}).map(([cat, amt]) => [`weekly_${cat}`, amt])
+                )
+              }));
 
+              // Get all unique categories from category trends
+              const allCategories = categoryTrendData.map(ct => ({
+                name: ct.category,
+                color: ct.color
+              }));
+
+              // Filter out hidden trend lines
+              const visibleCategories = allCategories.filter(cat => !hiddenTrendLines.has(cat.name));
+
+              return (
+                <>
+                  <ResponsiveContainer width="100%" height={300} className="sm:!h-[350px]">
+                    <LineChart 
+                      data={weeklyTimelineData}
+                      margin={{ top: 30, right: 10, left: 0, bottom: -20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e1f20" />
+                      <XAxis 
+                        dataKey="period" 
+                        stroke="#9ca3af"
+                        tick={{ fontSize: 12 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis stroke="#9ca3af" domain={[0, 'auto']} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1f2937', 
+                          border: 'none', 
+                          borderRadius: '8px',
+                          color: '#fff'
+                        }}
+                        formatter={(value, name) => {
+                          if (name === 'weeklyTotal') return [`${getCurrencySymbol(stats.currency)}${value.toFixed(2)}`, 'Weekly Total'];
+                          if (name.startsWith('weekly_')) {
+                            const catName = name.replace('weekly_', '');
+                            return [`${getCurrencySymbol(stats.currency)}${value.toFixed(2)}`, catName];
+                          }
+                          return [`${getCurrencySymbol(stats.currency)}${value.toFixed(2)}`, name];
+                        }}
+                      />
+                      
+                      {/* Weekly Total Line */}
+                      {!hiddenTrendLines.has('Weekly Total') && (
+                        <Line
+                          type="monotone"
+                          dataKey="weeklyTotal"
+                          stroke="#667eea"
+                          strokeWidth={3}
+                          name="Weekly Total"
+                          dot={{ r: 4 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      )}
+                      
+                      {/* Category Lines */}
+                      {visibleCategories.map((cat, idx) => (
+                        <Line
+                          key={cat.name}
+                          type="monotone"
+                          dataKey={`weekly_${cat.name}`}
+                          stroke={cat.color}
+                          strokeWidth={2}
+                          name={cat.name}
+                          dot={{ r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+
+                  {/* Interactive Legend for Trends */}
+                  <div className="flex flex-wrap justify-center gap-2 mt-4">
+                    {/* Weekly Total Button */}
+                    <button
+                      onClick={() => toggleTrendLine('Weekly Total')}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                        hiddenTrendLines.has('Weekly Total')
+                          ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 opacity-50'
+                          : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm hover:shadow-md'
+                      }`}
+                      title={hiddenTrendLines.has('Weekly Total') ? 'Click to show' : 'Click to hide'}
+                    >
+                      <span
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: '#667eea' }}
+                      ></span>
+                      <span>Weekly Total</span>
+                    </button>
+
+                    {/* Category Buttons */}
+                    {allCategories.map((cat) => (
+                      <button
+                        key={cat.name}
+                        onClick={() => toggleTrendLine(cat.name)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          hiddenTrendLines.has(cat.name)
+                            ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 opacity-50'
+                            : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm hover:shadow-md'
+                        }`}
+                        title={hiddenTrendLines.has(cat.name) ? 'Click to show' : 'Click to hide'}
+                      >
+                        <span
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: cat.color }}
+                        ></span>
+                        <span>{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+        
         {/* Category Breakdown */}
         <div className="card">
-          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white">
-            Category Breakdown
-          </h2>
-          <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+              Category Breakdown
+            </h2>
+            <PeriodSelector
+              value={categoryPeriod}
+              onChange={setCategoryPeriod}
+              options={['daily', 'weekly', 'monthly', 'yearly']}
+              includeAll={true}
+            />
+          </div>
+          <ResponsiveContainer width="100%" height={300} className="sm:!h-[350px]">
             <PieChart>
               <Pie
-                data={categoryData}
+                data={filteredCategoryData}
                 cx="50%"
-                cy="50%"
+                cy="55%"
                 labelLine={false}
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 outerRadius={100}
@@ -403,7 +741,7 @@ function Dashboard() {
                 onClick={handleCategoryClick}
                 style={{ cursor: 'pointer' }}
               >
-                {categoryData.map((entry, index) => (
+                {filteredCategoryData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
@@ -417,19 +755,90 @@ function Dashboard() {
               />
             </PieChart>
           </ResponsiveContainer>
+          
+          {/* Clickable Category Legend */}
+          <div className="flex flex-wrap justify-center gap-2 mt-4">
+            {categoryData.map((category) => (
+              <button
+                key={category.name}
+                onClick={() => toggleCategoryFilter(category.name)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  hiddenCategories.has(category.name)
+                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 opacity-50'
+                    : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm hover:shadow-md'
+                }`}
+                title={hiddenCategories.has(category.name) ? 'Click to show' : 'Click to hide'}
+              >
+                <span
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: category.color }}
+                ></span>
+                <span>{category.name}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {getCurrencySymbol(stats.currency)}{category.value.toFixed(2)}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Monthly Spending Trends */}
-      {monthlySpendData.length > 0 && (
-        <div className="card">
-          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900 dark:text-white">
-            Monthly Spending Trends ({selectedYear})
+      <div className="card">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+            Spending Over Time
           </h2>
+          <div className="flex items-center gap-3">
+            {/* Year Selector */}
+            {availableYears.length > 0 && (
+              <div className="flex items-center space-x-2">
+                <label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Year:
+                </label>
+                <select 
+                  value={selectedYear || ''}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className="input w-full sm:w-32 text-sm"
+                >
+                  {availableYears.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <PeriodSelector
+              value={monthlyChartPeriod}
+              onChange={setMonthlyChartPeriod}
+              options={['daily', 'weekly', 'monthly', 'yearly']}
+            />
+          </div>
+        </div>
+        {(() => {
+          const chartData = getChartDataByPeriod();
+          console.log('📊 Rendering chart section. Period:', monthlyChartPeriod, 'Data length:', chartData.length);
+          
+          // Special handling for daily view
+          if (monthlyChartPeriod === 'daily') {
+            return (
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                <p className="font-semibold">Daily view requires more detailed data</p>
+                <p className="text-sm mt-2">Please select weekly, monthly, or yearly view</p>
+              </div>
+            );
+          }
+          
+          return chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={250} className="sm:!h-[300px]">
-            <BarChart data={monthlySpendData}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="month" stroke="#9ca3af" />
+              <XAxis 
+                dataKey="period" 
+                stroke="#9ca3af"
+                angle={monthlyChartPeriod === 'weekly' ? -45 : 0}
+                textAnchor={monthlyChartPeriod === 'weekly' ? 'end' : 'middle'}
+                height={monthlyChartPeriod === 'weekly' ? 80 : 30}
+              />
               <YAxis stroke="#9ca3af" />
               <Tooltip 
                 contentStyle={{ 
@@ -439,7 +848,7 @@ function Dashboard() {
                   color: '#fff'
                 }}
                 formatter={(value, name) => {
-                  if (name === 'totalSpend') return [`$${value.toFixed(2)}`, 'Total Spent'];
+                  if (name === 'totalSpend') return [`${getCurrencySymbol(stats.currency)}${value.toFixed(2)}`, 'Total Spent'];
                   if (name === 'receiptCount') return [value, 'Receipts'];
                   if (name === 'avgHealthScore') return [value.toFixed(1), 'Avg Health Score'];
                   return [value, name];
@@ -450,8 +859,14 @@ function Dashboard() {
               <Bar dataKey="receiptCount" fill="#764ba2" name="Receipt Count" />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-      )}
+        ) : (
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            <p>No spending data available for {selectedYear || 'selected year'}</p>
+            <p className="text-sm mt-2">Upload receipts to see your spending trends</p>
+          </div>
+        );
+        })()}
+      </div>
 
       {/* Recent activity */}
       <div className="card">
@@ -460,7 +875,7 @@ function Dashboard() {
             Recent Activity
           </h2>
           <button 
-            onClick={() => navigate('/receipts')}
+            onClick={() => navigate('/activities')}
             className="text-primary-500 hover:text-primary-600 font-medium text-xs sm:text-sm"
           >
             View All
@@ -468,32 +883,48 @@ function Dashboard() {
         </div>
         
         <div className="space-y-2 sm:space-y-3">
-          {[
-            { icon: ShoppingBag, text: 'Receipt from Whole Foods', amount: '$87.50', time: '2 hours ago', clickable: true },
-            { icon: Apple, text: 'Healthy meal plan generated', amount: '', time: '5 hours ago', clickable: false },
-            { icon: AlertCircle, text: 'Price alert: Organic milk on sale', amount: '$3.99', time: '1 day ago', clickable: false }
-          ].map((activity, idx) => (
-            <div 
-              key={idx} 
-              onClick={() => activity.clickable && handleRecentActivityClick(activity)}
-              className={`flex items-center justify-between p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
-                activity.clickable ? 'cursor-pointer' : ''
-              }`}
-            >
-              <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-                <div className="p-1.5 sm:p-2 bg-primary-100 dark:bg-primary-900 rounded-lg flex-shrink-0">
-                  <activity.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary-500" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-gray-900 dark:text-white text-sm sm:text-base truncate">{activity.text}</p>
-                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{activity.time}</p>
-                </div>
-              </div>
-              {activity.amount && (
-                <span className="font-bold text-gray-900 dark:text-white text-sm sm:text-base flex-shrink-0 ml-2">{activity.amount}</span>
-              )}
+          {activities.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <p className="text-sm">No recent activities</p>
+              <p className="text-xs mt-1">Upload a receipt to get started!</p>
             </div>
-          ))}
+          ) : (
+            activities.slice(0, 5).map((activity) => (
+              <div 
+                key={activity.id} 
+                onClick={() => handleActivityClick(activity)}
+                className={`flex items-center justify-between p-3 sm:p-4 rounded-lg transition-colors cursor-pointer ${
+                  activity.isRead 
+                    ? 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600' 
+                    : 'bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800'
+                } ${!activity.isSuccess ? 'border-l-4 border-red-500' : ''}`}
+              >
+                <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                  <div className={`text-2xl flex-shrink-0`}>
+                    {activity.icon}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`font-medium text-sm sm:text-base truncate ${
+                      activity.isRead ? 'text-gray-900 dark:text-white' : 'text-blue-900 dark:text-blue-100 font-semibold'
+                    }`}>
+                      {activity.description}
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                      {new Date(activity.timestamp).toLocaleString()}
+                    </p>
+                    {!activity.isSuccess && activity.errorMessage && (
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                        {activity.errorMessage}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {!activity.isRead && (
+                  <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 ml-2"></span>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -516,7 +947,7 @@ function Dashboard() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">Total Spent</span>
-                  <span className="text-xl sm:text-2xl font-bold text-primary-500">${stats.totalSpent.toFixed(2)}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-primary-500">{getCurrencySymbol(stats.currency)}{stats.totalSpent.toFixed(2)}</span>
                 </div>
                 
                 {categoryData.length > 0 && (
@@ -536,7 +967,7 @@ function Dashboard() {
                             <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base truncate">{cat.name}</span>
                           </div>
                           <span className="font-bold text-gray-900 dark:text-white text-sm sm:text-base flex-shrink-0 ml-2">
-                            ${cat.value?.toFixed(2) || '0.00'}
+                            {getCurrencySymbol(stats.currency)}{cat.value?.toFixed(2) || '0.00'}
                           </span>
                         </div>
                       ))}
