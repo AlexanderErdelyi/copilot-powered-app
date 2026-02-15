@@ -1,24 +1,55 @@
 # Sanitas Mind
 
+<div align="center">
+
+![Sanitas Mind Logo](ReceiptHealth/client/public/logo.svg)
+
 *From Latin: Sanitas - Health, both physical and mental well-being*
 
-A full-stack receipt management application powered by GitHub Copilot AI, featuring health-conscious shopping assistance and intelligent insights. Open source and built with modern technologies.
+**A full-stack receipt management application powered by GitHub Copilot AI, featuring health-conscious shopping assistance and intelligent insights.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![React](https://img.shields.io/badge/React-19.2.0-blue.svg)](https://reactjs.org/)
 [![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)](https://dotnet.microsoft.com/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![GitHub Issues](https://img.shields.io/github/issues/AlexanderErdelyi/copilot-powered-app)](https://github.com/AlexanderErdelyi/copilot-powered-app/issues)
+
+[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing) • [License](#-license)
+
+</div>
+
+---
 
 ## ✨ Features
 
-- 📸 **Receipt Scanning** - AI-powered text extraction from receipt images
-- 💚 **Health Tracking** - Calculate health scores based on your purchases
-- 🛒 **Smart Shopping Lists** - AI-generated healthy alternatives
-- 🍳 **Meal Planning** - Personalized meal plans with dietary preferences
-- 🎤 **Voice Assistant** - AI-powered conversational assistant
+<table>
+<tr>
+<td width="50%">
+
+### 🎯 Core Features
+- 📸 **Smart Receipt Scanning** - AI-powered OCR text extraction
+- 💚 **Health Score Tracking** - Monitor shopping health impact
+- 🛒 **Intelligent Shopping Lists** - AI-generated healthy alternatives
+- 🍳 **Meal Planning** - Personalized plans with dietary preferences
 - 📊 **Insights & Analytics** - Spending trends and anomaly detection
-- 🏆 **Achievements** - Gamification to encourage healthy choices
+
+</td>
+<td width="50%">
+
+### 🚀 Advanced Features
+- 🎤 **Voice Assistant** - Conversational AI for recipes & advice
+- 🏆 **Gamification** - Achievements and progress tracking
+- 🔄 **Data Export/Import** - Full backup and restore
 - 🌓 **Dark Mode** - Beautiful dark theme by default
-- 📱 **Responsive Design** - Works seamlessly on all devices
+- 📱 **PWA Ready** - Install as native app
+
+</td>
+</tr>
+</table>
+
+### 🎬 Demo
+
+> **Try it yourself!** Upload a receipt, ask the AI assistant for recipe suggestions, and watch your health score improve with better shopping choices.
 
 ## 🏗️ Project Structure
 
@@ -169,44 +200,43 @@ npm run lint
 
 ## 🤝 Contributing
 
-We welcome contributions! Here's how you can help:
+We welcome contributions from everyone! Whether you're fixing bugs, adding features, improving documentation, or sharing ideas, your help is appreciated.
 
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Make your changes**
-   - Follow existing code style and patterns
-   - Write clear commit messages
-   - Test your changes thoroughly
-4. **Commit your changes**
-   ```bash
-   git commit -m "Add amazing feature"
-   ```
-5. **Push to your branch**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-6. **Open a Pull Request**
+**Quick Start for Contributors:**
 
-### Development Guidelines
+1. 🍴 Fork the repository
+2. 🌿 Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. 💻 Make your changes and test thoroughly
+4. ✍️ Commit with clear messages (`git commit -m "Add amazing feature"`)
+5. 📤 Push to your branch (`git push origin feature/amazing-feature`)
+6. 🎉 Open a Pull Request
 
-- Follow existing coding patterns and conventions
-- Use meaningful variable and function names
-- Write comments for complex logic
-- Keep components small and focused
-- Ensure responsive design for mobile devices
-- Test dark mode compatibility
-- Update documentation for new features
+**Please read our [Contributing Guidelines](CONTRIBUTING.md) for detailed information.**
+
+### 🎯 Good First Issues
+
+Looking for a place to start? Check out our [good first issues](https://github.com/AlexanderErdelyi/copilot-powered-app/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) - they're perfect for newcomers!
+
+### 💬 Join the Community
+
+- 💡 [Discussions](https://github.com/AlexanderErdelyi/copilot-powered-app/discussions) - Share ideas and get help
+- 🐛 [Issues](https://github.com/AlexanderErdelyi/copilot-powered-app/issues) - Report bugs or request features
+- 📧 [Email](mailto:hello@sanitasmind.app) - Direct contact
 
 ## 📖 Documentation
 
-- [Privacy Policy](ReceiptHealth/client/src/pages/Privacy.jsx)
-- [Terms of Service](ReceiptHealth/client/src/pages/Terms.jsx)
-- [Support & FAQ](ReceiptHealth/client/src/pages/Support.jsx)
-- [Roadmap](ReceiptHealth/client/src/pages/Roadmap.jsx)
-- [Changelog](ReceiptHealth/client/src/pages/Changelog.jsx)
+- 📘 [**User Documentation**](ReceiptHealth/client/src/pages/Docs.jsx) - Complete feature guide, voice commands, troubleshooting
+- 🔒 [**Privacy Policy**](ReceiptHealth/client/src/pages/Privacy.jsx) - How we handle your data
+- ⚖️ [**Terms of Service**](ReceiptHealth/client/src/pages/Terms.jsx) - Usage terms and conditions
+- ❓ [**Support & FAQ**](ReceiptHealth/client/src/pages/Support.jsx) - Common questions and help resources
+- 🗺️ [**Roadmap**](ReceiptHealth/client/src/pages/Roadmap.jsx) - Upcoming features and plans
+- 📝 [**Changelog**](ReceiptHealth/client/src/pages/Changelog.jsx) - Version history and updates
+
+### 🛡️ Security & Guidelines
+
+- 🔐 [**Security Policy**](SECURITY.md) - Report vulnerabilities responsibly
+- 🤝 [**Contributing Guide**](CONTRIBUTING.md) - Detailed contribution instructions
+- 📜 [**Code of Conduct**](CODE_OF_CONDUCT.md) - Community standards
 
 ## 📄 Version Control Best Practices
 
@@ -228,18 +258,24 @@ We welcome contributions! Here's how you can help:
 
 See [`.gitignore`](.gitignore) for complete list.
 
-## 🐛 Bug Reports
+## 🐛 Bug Reports & 💡 Feature Requests
 
-Found a bug? Please [open an issue](https://github.com/AlexanderErdelyi/copilot-powered-app/issues/new) with:
-- Clear description of the bug
-- Steps to reproduce
-- Expected vs actual behavior
-- Screenshots if applicable
-- Your environment (OS, browser, versions)
+### Found a Bug?
 
-## 💡 Feature Requests
+Please [open an issue](https://github.com/AlexanderErdelyi/copilot-powered-app/issues/new?labels=bug) with:
+- ✅ Clear description of the bug
+- 🔄 Steps to reproduce
+- 📊 Expected vs actual behavior
+- 📸 Screenshots if applicable
+- 💻 Your environment (OS, browser, versions)
 
-Have an idea? We'd love to hear it! [Open a feature request](https://github.com/AlexanderErdelyi/copilot-powered-app/issues/new?labels=enhancement) or join our [discussions](https://github.com/AlexanderErdelyi/copilot-powered-app/discussions).
+### Have an Idea?
+
+We'd love to hear it! [Open a feature request](https://github.com/AlexanderErdelyi/copilot-powered-app/issues/new?labels=enhancement) or join our [discussions](https://github.com/AlexanderErdelyi/copilot-powered-app/discussions).
+
+### 🔒 Security Issues
+
+**Do NOT open public issues for security vulnerabilities.** Please follow our [Security Policy](SECURITY.md) to report them responsibly.
 
 ## 📜 License
 
