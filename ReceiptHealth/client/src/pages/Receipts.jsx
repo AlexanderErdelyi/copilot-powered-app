@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Upload, Search, Filter, Trash2, Calendar, X, Camera } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -7,6 +8,8 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { formatCurrency } from '../utils/currency';
 
 function Receipts() {
+  const { id } = useParams();
+  const navigate = useNavigate();
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,6 +37,13 @@ function Receipts() {
     fetchReceipts();
     fetchCategories();
   }, []);
+
+  // Open receipt modal if ID is in URL
+  useEffect(() => {
+    if (id) {
+      viewReceipt(id);
+    }
+  }, [id]);
 
   // Close category selector when clicking outside
   useEffect(() => {
@@ -91,14 +101,26 @@ function Receipts() {
     }
   };
 
-  const viewReceipt = async (id) => {
+  const viewReceipt = async (receiptId) => {
     try {
-      const response = await axios.get(`/api/receipts/${id}`);
+      const response = await axios.get(`/api/receipts/${receiptId}`);
       setSelectedReceipt(response.data);
       setShowReceiptModal(true);
     } catch (error) {
       console.error('Error fetching receipt details:', error);
       toast.error('Failed to load receipt details');
+      // If viewing from URL and receipt not found, navigate back to receipts list
+      if (id) {
+        navigate('/receipts');
+      }
+    }
+  };
+
+  const closeReceiptModal = () => {
+    setShowReceiptModal(false);
+    // If we came from a URL with ID, navigate back to clean receipts URL
+    if (id) {
+      navigate('/receipts');
     }
   };
 
@@ -451,7 +473,7 @@ function Receipts() {
       {showReceiptModal && selectedReceipt && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-start gap-3">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-start gap-3 z-10">
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 truncate">
                   {selectedReceipt.vendor}
@@ -465,7 +487,7 @@ function Receipts() {
                 </div>
               </div>
               <button
-                onClick={() => setShowReceiptModal(false)}
+                onClick={closeReceiptModal}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
               >
                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -483,16 +505,16 @@ function Receipts() {
                     const categoryColor = category?.color || '#6b7280'; // fallback to gray
                     
                     return (
-                    <div key={index} className="flex justify-between items-center p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg gap-2">
+                    <div key={index} className="flex justify-between items-start p-2 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg gap-2">
                       <div className="flex-1 min-w-0">
-                        <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block truncate">{item.description}</span>
-                        <div className="relative inline-block category-selector-container">
+                        <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base block">{item.description}</span>
+                        <div className="relative inline-block category-selector-container mt-1">
                           <button
                             onClick={() => {
                               setEditingItemId(item.id);
                               setShowCategorySelector(true);
                             }}
-                            className="ml-2 px-2 py-1 text-xs rounded cursor-pointer hover:opacity-80 transition-opacity text-white font-medium"
+                            className="px-2 py-1 text-xs rounded cursor-pointer hover:opacity-80 transition-opacity text-white font-medium"
                             style={{ backgroundColor: categoryColor }}
                             title="Click to change category"
                           >
@@ -501,7 +523,7 @@ function Receipts() {
                           
                           {/* Category Selector Dropdown */}
                           {showCategorySelector && editingItemId === item.id && (
-                            <div className="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg min-w-[150px]">
+                            <div className="absolute left-0 top-full mt-1 z-[9999] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg min-w-[150px]">
                               <div className="py-1">
                                 {availableCategories.map((category) => (
                                   <button

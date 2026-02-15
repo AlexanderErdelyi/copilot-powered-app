@@ -180,13 +180,36 @@ app.MapGet("/api/dashboard/stats", async (ReceiptHealthContext context) =>
     var healthyJunkTotal = healthyAmount + junkAmount;
     var healthyPercentage = healthyJunkTotal > 0 ? (int)((healthyAmount * 100m) / healthyJunkTotal) : 0;
     
+    // Calculate item counts (current month and last month for trends)
+    var now = DateTime.Now;
+    var currentMonthStart = new DateTime(now.Year, now.Month, 1);
+    var lastMonthStart = currentMonthStart.AddMonths(-1);
+    
+    var currentMonthReceipts = receipts.Where(r => r.Date >= currentMonthStart).SelectMany(r => r.LineItems).ToList();
+    var lastMonthReceipts = receipts.Where(r => r.Date >= lastMonthStart && r.Date < currentMonthStart).SelectMany(r => r.LineItems).ToList();
+    
+    var healthyItemCount = currentMonthReceipts.Where(li => li.Category == "Healthy").Sum(li => (int)li.Quantity);
+    var junkItemCount = currentMonthReceipts.Where(li => li.Category == "Junk").Sum(li => (int)li.Quantity);
+    var healthyItemCountLastMonth = lastMonthReceipts.Where(li => li.Category == "Healthy").Sum(li => (int)li.Quantity);
+    var junkItemCountLastMonth = lastMonthReceipts.Where(li => li.Category == "Junk").Sum(li => (int)li.Quantity);
+    
+    // Calculate trends (difference from last month)
+    var healthyTrend = healthyItemCount - healthyItemCountLastMonth;
+    var junkTrend = junkItemCount - junkItemCountLastMonth;
+    
     return Results.Ok(new
     {
         totalSpent,
         receiptCount,
         healthyPercentage,
         avgPerReceipt,
-        currency
+        currency,
+        healthyItemCount,
+        junkItemCount,
+        healthyItemCountLastMonth,
+        junkItemCountLastMonth,
+        healthyTrend,
+        junkTrend
     });
 });
 
@@ -1073,6 +1096,31 @@ app.MapGet("/api/activities/unread-count", async (ReceiptHealthContext context) 
         .CountAsync(a => !a.IsRead);
     
     return Results.Ok(new { count });
+});
+
+// Delete a single activity
+app.MapDelete("/api/activities/{id}", async (int id, ReceiptHealthContext context) =>
+{
+    var activity = await context.Activities.FindAsync(id);
+    if (activity == null)
+    {
+        return Results.NotFound();
+    }
+    
+    context.Activities.Remove(activity);
+    await context.SaveChangesAsync();
+    
+    return Results.Ok(new { message = "Activity deleted successfully" });
+});
+
+// Delete all activities
+app.MapDelete("/api/activities", async (ReceiptHealthContext context) =>
+{
+    var allActivities = await context.Activities.ToListAsync();
+    context.Activities.RemoveRange(allActivities);
+    await context.SaveChangesAsync();
+    
+    return Results.Ok(new { message = "All activities deleted successfully", count = allActivities.Count });
 });
 
 // === Price Comparison Endpoints ===

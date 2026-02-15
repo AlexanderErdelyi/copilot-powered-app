@@ -728,7 +728,7 @@ function ShoppingLists() {
               <div 
                 key={list.id} 
                 onClick={() => viewList(list.id)}
-                className="card hover:shadow-2xl hover:scale-102 transition-all duration-200 cursor-pointer group"
+                className="card hover:shadow-2xl hover:scale-102 transition-all duration-200 cursor-pointer group flex flex-col"
                 style={{ boxShadow: '0 0 0 0 rgba(99, 102, 241, 0)' }}
                 onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 0 20px 2px rgba(99, 102, 241, 0.3)'}
                 onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 0 0 0 rgba(99, 102, 241, 0)'}
@@ -771,6 +771,9 @@ function ShoppingLists() {
                     )}
                   </div>
                 )}
+                
+                {/* Spacer to push bottom content down */}
+                <div className="flex-grow"></div>
                 
                 <div className="mb-3 sm:mb-4">
                   <div className="flex justify-between text-xs sm:text-sm mb-2">
@@ -841,7 +844,7 @@ function ShoppingLists() {
       {showViewModal && selectedList && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-start gap-3">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 flex justify-between items-start gap-3 z-10">
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-1 sm:mb-2 truncate">{selectedList.name}</h2>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
@@ -856,8 +859,8 @@ function ShoppingLists() {
               </button>
             </div>
 
-            <div className="p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4">
+            <div className="sticky top-[88px] sm:top-[100px] bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sm:p-6 z-10">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Items</h3>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
@@ -876,6 +879,9 @@ function ShoppingLists() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div className="p-4 sm:p-6">
 
               {selectedList.items && selectedList.items.length > 0 ? (
                 <>

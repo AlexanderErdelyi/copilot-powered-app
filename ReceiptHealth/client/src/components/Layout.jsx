@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, Bell, Search, User, X, Settings, LogOut, Mic, MicOff } from 'lucide-react';
+import { Menu, Bell, Search, User, X, Settings, LogOut, Mic, MicOff, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
@@ -18,6 +18,10 @@ function Layout({ children }) {
   });
   const [activities, setActivities] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [userProfile, setUserProfile] = useState(() => {
+    const saved = localStorage.getItem('userProfile');
+    return saved ? JSON.parse(saved) : { name: 'User', email: 'user@example.com' };
+  });
   const navigate = useNavigate();
 
   // Reset to disabled on mount (page load/refresh)
@@ -69,6 +73,27 @@ function Layout({ children }) {
     }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
+  }, []);
+
+  // Listen for profile changes from Settings page
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const saved = localStorage.getItem('userProfile');
+      if (saved) {
+        setUserProfile(JSON.parse(saved));
+      }
+    };
+
+    // Listen for storage events (changes from other tabs/windows)
+    window.addEventListener('storage', handleStorageChange);
+
+    // Also check localStorage periodically in case same-tab changes don't trigger storage event
+    const interval = setInterval(handleStorageChange, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
   }, []);
 
   const cycleListeningMode = () => {
@@ -146,6 +171,32 @@ function Layout({ children }) {
     } catch (error) {
       console.error('Error marking all as read:', error);
       toast.error('Failed to mark all as read');
+    }
+  };
+
+  const handleDeleteActivity = async (activityId, event) => {
+    event.stopPropagation();
+    try {
+      await axios.delete(`/api/activities/${activityId}`);
+      await fetchActivities();
+      await fetchUnreadCount();
+      toast.success('Notification deleted');
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      toast.error('Failed to delete notification');
+    }
+  };
+
+  const handleDeleteAllActivities = async () => {
+    try {
+      await axios.delete('/api/activities');
+      await fetchActivities();
+      await fetchUnreadCount();
+      setShowNotifications(false);
+      toast.success('All notifications deleted');
+    } catch (error) {
+      console.error('Error deleting all activities:', error);
+      toast.error('Failed to delete all notifications');
     }
   };
 
@@ -247,17 +298,26 @@ function Layout({ children }) {
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white">Notifications</h3>
                       <div className="flex gap-2 items-center">
                         {activities.length > 0 && (
-                          <button
-                            onClick={markAllAsRead}
-                            className={`text-xs font-medium px-3 py-1 rounded ${
-                              unreadCount > 0 
-                                ? 'text-primary-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' 
-                                : 'text-gray-400 cursor-default'
-                            }`}
-                            disabled={unreadCount === 0}
-                          >
-                            Mark all as read
-                          </button>
+                          <>
+                            <button
+                              onClick={markAllAsRead}
+                              className={`text-xs font-medium px-3 py-1 rounded ${
+                                unreadCount > 0 
+                                  ? 'text-primary-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' 
+                                  : 'text-gray-400 cursor-default'
+                              }`}
+                              disabled={unreadCount === 0}
+                            >
+                              Mark all read
+                            </button>
+                            <button
+                              onClick={handleDeleteAllActivities}
+                              className="text-xs font-medium px-3 py-1 rounded text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              title="Delete all notifications"
+                            >
+                              Delete all
+                            </button>
+                          </>
                         )}
                         <button
                           onClick={() => setShowNotifications(false)}
@@ -279,7 +339,7 @@ function Layout({ children }) {
                             <div
                               key={activity.id}
                               onClick={() => handleActivityClick(activity)}
-                              className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                              className={`p-3 rounded-lg cursor-pointer transition-colors group ${
                                 activity.isRead
                                   ? 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
                                   : 'bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800'
@@ -302,9 +362,18 @@ function Layout({ children }) {
                                     </p>
                                   )}
                                 </div>
-                                {!activity.isRead && (
-                                  <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2"></span>
-                                )}
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  {!activity.isRead && (
+                                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                  )}
+                                  <button
+                                    onClick={(e) => handleDeleteActivity(activity.id, e)}
+                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-opacity p-1"
+                                    title="Delete notification"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -327,18 +396,24 @@ function Layout({ children }) {
                   <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
                     <User className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   </div>
-                  <span className="hidden lg:block font-medium text-sm">User</span>
+                  <span className="hidden lg:block font-medium text-sm">{userProfile.name}</span>
                 </button>
 
                 {/* User Menu Dropdown */}
                 {showUserMenu && (
-                  <div className="user-menu-dropdown absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                  <div className="user-menu-dropdown absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                     <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                      <p className="font-semibold text-gray-900 dark:text-white">User Account</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">user@example.com</p>
+                      <p className="font-semibold text-gray-900 dark:text-white truncate" title={userProfile.name}>{userProfile.name}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate" title={userProfile.email}>{userProfile.email}</p>
                     </div>
                     <div className="py-2">
-                      <button className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center">
+                      <button 
+                        onClick={() => {
+                          navigate('/settings');
+                          setShowUserMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                      >
                         <Settings className="w-4 h-4 mr-3" />
                         Settings
                       </button>

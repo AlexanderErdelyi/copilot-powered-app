@@ -408,67 +408,35 @@ function Achievements() {
 
       {/* Content based on view mode */}
       {viewMode === 'leaderboard' ? (
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
-            Top Players
-          </h2>
-          <div className="space-y-3">
-            {leaderboard.map((entry, index) => (
-              <div
-                key={entry.id}
-                className={`card transition-all duration-300 ${
-                  entry.isCurrentUser
-                    ? 'border-2 border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                    : ''
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    {/* Rank Badge */}
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${
-                        entry.rank === 1
-                          ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-white'
-                          : entry.rank === 2
-                          ? 'bg-gradient-to-br from-gray-300 to-gray-500 text-white'
-                          : entry.rank === 3
-                          ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-white'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                      }`}
-                    >
-                      {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}
-                    </div>
-                    {/* User Info */}
-                    <div>
-                      <h3 className="font-bold text-gray-900 dark:text-white">
-                        {entry.userName}
-                        {entry.isCurrentUser && (
-                          <span className="ml-2 text-xs text-purple-600 dark:text-purple-400">(You)</span>
-                        )}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {entry.points} points • {entry.totalReceipts} receipts
-                      </p>
-                    </div>
-                  </div>
-                  {/* Stats */}
-                  <div className="hidden sm:flex items-center space-x-6 text-sm">
-                    <div className="text-center">
-                      <div className="font-bold text-gray-900 dark:text-white">{entry.totalAchievements}</div>
-                      <div className="text-xs text-gray-500">Achievements</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-bold text-gray-900 dark:text-white">{entry.avgHealthScore.toFixed(0)}</div>
-                      <div className="text-xs text-gray-500">Avg Score</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-bold text-gray-900 dark:text-white">{entry.currentStreak}</div>
-                      <div className="text-xs text-gray-500">Streak</div>
-                    </div>
-                  </div>
-                </div>
+        <div className="card text-center py-16">
+          <div className="max-w-md mx-auto">
+            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Medal className="w-12 h-12 text-white" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-4">
+              Leaderboard Coming Soon!
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              We're working on an exciting multiplayer leaderboard feature where you can compete with friends and other users. Stay tuned!
+            </p>
+            <div className="inline-flex items-center space-x-2 text-sm text-primary-500 bg-primary-50 dark:bg-primary-900/20 px-4 py-2 rounded-full">
+              <Sparkles className="w-4 h-4" />
+              <span className="font-medium">Feature in Development</span>
+            </div>
+            <div className="mt-8 grid grid-cols-3 gap-4 text-sm">
+              <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div className="text-2xl mb-1">🏆</div>
+                <div className="text-gray-600 dark:text-gray-400">Rankings</div>
               </div>
-            ))}
+              <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div className="text-2xl mb-1">👥</div>
+                <div className="text-gray-600 dark:text-gray-400">Friends</div>
+              </div>
+              <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div className="text-2xl mb-1">🎯</div>
+                <div className="text-gray-600 dark:text-gray-400">Compete</div>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
