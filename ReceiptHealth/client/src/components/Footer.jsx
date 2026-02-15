@@ -1,101 +1,100 @@
 import { Link } from 'react-router-dom';
-import { Heart, Github, Mail } from 'lucide-react';
+import { Heart, Github, Mail, ExternalLink } from 'lucide-react';
 
 function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Brand */}
-          <div className="col-span-1 md:col-span-1">
-            <h3 className="text-base font-bold bg-gradient-to-r from-primary-500 to-secondary-500 bg-clip-text text-transparent mb-1">
+    <footer className="bg-white/50 dark:bg-gray-900/50 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-700/50 mt-auto">
+      <div className="max-w-7xl mx-auto px-6 py-3">
+        {/* Single line ultra-compact layout */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 text-xs">
+          
+          {/* Left: Brand + Quick Links */}
+          <div className="flex flex-wrap items-center gap-2 text-gray-600 dark:text-gray-400">
+            {/* Brand with gradient */}
+            <span className="font-semibold bg-gradient-to-r from-primary-500 to-secondary-500 bg-clip-text text-transparent">
               Sanitas Mind
-            </h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400">
-              Mindful spending, healthier living.
-            </p>
+            </span>
+            
+            <span className="text-gray-300 dark:text-gray-600">•</span>
+            
+            {/* Inline navigation */}
+            <Link 
+              to="/docs" 
+              className="hover:text-primary-500 dark:hover:text-primary-400 transition-colors duration-200"
+            >
+              Docs
+            </Link>
+            
+            <span className="text-gray-300 dark:text-gray-600">•</span>
+            
+            <Link 
+              to="/support" 
+              className="hover:text-primary-500 dark:hover:text-primary-400 transition-colors duration-200"
+            >
+              Support
+            </Link>
+            
+            <span className="text-gray-300 dark:text-gray-600">•</span>
+            
+            <Link 
+              to="/privacy" 
+              className="hover:text-primary-500 dark:hover:text-primary-400 transition-colors duration-200"
+            >
+              Privacy
+            </Link>
+            
+            <span className="text-gray-300 dark:text-gray-600">•</span>
+            
+            <Link 
+              to="/terms" 
+              className="hover:text-primary-500 dark:hover:text-primary-400 transition-colors duration-200"
+            >
+              Terms
+            </Link>
+            
+            <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">•</span>
+            
+            <a 
+              href="https://github.com/AlexanderErdelyi/copilot-powered-app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary-500 dark:hover:text-primary-400 transition-colors duration-200 inline-flex items-center gap-1 group"
+            >
+              <Github className="w-3 h-3 group-hover:rotate-12 transition-transform duration-300" />
+              <span className="hidden sm:inline">GitHub</span>
+            </a>
+            
+            <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">•</span>
+            
+            <a 
+              href="mailto:hello@sanitasmind.app"
+              className="hover:text-primary-500 dark:hover:text-primary-400 transition-colors duration-200 inline-flex items-center gap-1"
+            >
+              <Mail className="w-3 h-3" />
+              <span className="hidden sm:inline">Contact</span>
+            </a>
           </div>
-
-          {/* Product */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Product</h4>
-            <ul className="space-y-1">
-              <li>
-                <Link to="/roadmap" className="text-xs text-gray-600 dark:text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
-                  Roadmap
-                </Link>
-              </li>
-              <li>
-                <Link to="/changelog" className="text-xs text-gray-600 dark:text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
-                  Changelog
-                </Link>
-              </li>
-              <li>
-                <Link to="/support" className="text-xs text-gray-600 dark:text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
-                  Support
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Legal</h4>
-            <ul className="space-y-1">
-              <li>
-                <Link to="/privacy" className="text-xs text-gray-600 dark:text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link to="/terms" className="text-xs text-gray-600 dark:text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
-                  Terms of Service
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Community */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Community</h4>
-            <ul className="space-y-1">
-              <li>
-                <a
-                  href="https://github.com/AlexanderErdelyi/copilot-powered-app"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-gray-600 dark:text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors inline-flex items-center space-x-1"
-                >
-                  <Github className="w-4 h-4" />
-                  <span>GitHub</span>
-                </a>
-              </li>
-              <li>
-                <a
-                  href="mailto:hello@sanitasmind.app"
-                  className="text-xs text-gray-600 dark:text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors inline-flex items-center space-x-1"
-                >
-                  <Mail className="w-4 h-4" />
-                  <span>Contact</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
-            <p className="text-xs text-gray-600 dark:text-gray-400">
-              © {currentYear} Sanitas Mind. Open source project.
-            </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center space-x-1">
-              <span>Made with</span>
-              <Heart className="w-4 h-4 text-red-500 fill-current" />
-              <span>using GitHub Copilot</span>
-            </p>
+          
+          {/* Right: Copyright + Status */}
+          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-500">
+            <span className="inline-flex items-center gap-1">
+              Made with
+              <Heart className="w-3 h-3 text-red-500 fill-current animate-pulse" />
+              using AI
+            </span>
+            
+            <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">•</span>
+            
+            <span className="hidden sm:inline">© {currentYear}</span>
+            
+            <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">•</span>
+            
+            <span className="inline-flex items-center gap-1 font-mono">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="hidden sm:inline">Online</span>
+            </span>
           </div>
         </div>
       </div>
