@@ -19,7 +19,7 @@ function Settings() {
 
   // Theme settings
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('theme') || 'system';
+    return localStorage.getItem('theme') || 'dark'; // Default to dark
   });
 
   // Notification settings

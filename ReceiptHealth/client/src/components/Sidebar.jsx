@@ -40,10 +40,14 @@ function Sidebar({ isOpen, toggleSidebar }) {
   const [expandedItems, setExpandedItems] = useState({});
 
   useEffect(() => {
-    const isDark = localStorage.getItem('darkMode') === 'true';
+    const storedTheme = localStorage.getItem('darkMode');
+    const isDark = storedTheme !== null ? storedTheme === 'true' : true; // Default to dark mode
     setDarkMode(isDark);
+    localStorage.setItem('darkMode', isDark);
     if (isDark) {
       document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
     
     // Auto-expand parent menu if on sub-page
@@ -90,7 +94,7 @@ function Sidebar({ isOpen, toggleSidebar }) {
               <Receipt className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-primary-500 to-secondary-500 bg-clip-text text-transparent">
-              ReceiptHealth
+              Sanitas Mind
             </h1>
           </div>
           <button 

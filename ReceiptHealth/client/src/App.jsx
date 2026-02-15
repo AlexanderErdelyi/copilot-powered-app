@@ -11,6 +11,11 @@ import VoiceAssistant from './pages/VoiceAssistant';
 import Categories from './pages/Categories';
 import Activities from './pages/Activities';
 import Settings from './pages/Settings';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
+import Support from './pages/Support';
+import Roadmap from './pages/Roadmap';
+import Changelog from './pages/Changelog';
 import WakeWordListener from './components/WakeWordListener';
 import { InsightsProvider } from './contexts/InsightsContext';
 
@@ -32,6 +37,11 @@ function App() {
             <Route path="/achievements" element={<Achievements />} />
             <Route path="/voice-assistant" element={<VoiceAssistant />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/support" element={<Support />} />
+            <Route path="/roadmap" element={<Roadmap />} />
+            <Route path="/changelog" element={<Changelog />} />
           </Routes>
         </Layout>
         <Toaster 

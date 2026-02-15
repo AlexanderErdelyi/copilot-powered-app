@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import Sidebar from './Sidebar';
+import Footer from './Footer';
 import GlobalVoiceAssistant from './GlobalVoiceAssistant';
 import WakeWordListener from './WakeWordListener';
 
@@ -435,16 +436,7 @@ function Layout({ children }) {
         </main>
 
         {/* Footer */}
-        <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-3 px-3 sm:py-4 sm:px-6">
-          <div className="flex flex-col md:flex-row justify-between items-center text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-            <p className="text-center md:text-left">© 2026 ReceiptHealth - Track your spending, stay healthy</p>
-            <div className="flex space-x-3 sm:space-x-4 mt-2 md:mt-0">
-              <a href="#" className="hover:text-primary-500 transition-colors">Privacy</a>
-              <a href="#" className="hover:text-primary-500 transition-colors">Terms</a>
-              <a href="#" className="hover:text-primary-500 transition-colors">Support</a>
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
       
       {/* Global Voice Components */}
